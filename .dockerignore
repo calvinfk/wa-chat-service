@@ -1,0 +1,13 @@
+.env*
+**.tar
+**.exe
+docker-compose*.yml
+Dockerfile
+Makefile
+
+# Go related ignores
+**.out
+**.log
+/testdata
+**_test.go
+/pkg/postgres/databaseContainer.go

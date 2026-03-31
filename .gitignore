@@ -1,0 +1,20 @@
+.env*
+!.env.example
+DS_Store
+
+**.tar
+**.exe
+**.pem
+**.sql
+
+# Ignore Docker files for now
+docker-compose.local.yml
+# Dockerfile
+
+# Go related ignores
+**.out
+**.log
+/testdata
+/bin
+
+service-accounts

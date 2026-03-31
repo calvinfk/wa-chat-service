@@ -1,0 +1,15 @@
+services:
+  wa-chat-service:
+    image: wa-chat-service:latest
+    container_name: wa-chat-service
+    ports:
+      - "8121:8121"
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - app_log:/app.log
+
+volumes:
+  app_log:
+    driver: local
