@@ -14,4 +14,8 @@ type (
 		// Retrieves action log from the system based on the provided filter criteria
 		GetFiltered(ctx context.Context, user model.User, filter filter_request.FilterRequest[dto.ActivityLogFilterRequest]) (filter_request.FilterResponse[dto.ActivityLogResponse], bool, error)
 	}
+
+	Message interface {
+		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
+	}
 )

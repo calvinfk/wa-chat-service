@@ -4,6 +4,7 @@ import (
 	"context"
 	"mime/multipart"
 	"time"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -50,5 +51,9 @@ type (
 		UnsubscribeFromTopic(ctx context.Context, topics []string, tokens []string) error
 		// SendNotificationToTopic sends a notification to the specified topic in Firebase Cloud Messaging. It takes the notification title, body, and the topic name as parameters. It returns an error if there is an issue during the sending process.
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
+	}
+
+	WhatsappService interface {
+		SendMessage(ctx context.Context, phoneNumberID, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, error)
 	}
 )

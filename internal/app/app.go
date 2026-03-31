@@ -13,9 +13,12 @@ import (
 	access_token_service "wa_chat_service/internal/service/access_token"
 	encrypt_service "wa_chat_service/internal/service/encrypt"
 	google_service "wa_chat_service/internal/service/google"
+	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
+	message_usecase "wa_chat_service/internal/usecase/message"
 	"wa_chat_service/pkg/database"
 	"wa_chat_service/pkg/google"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/transaction"
 
 	"github.com/gofiber/fiber/v3"
@@ -25,6 +28,7 @@ func Run(config *config.Config) {
 	log.Printf("[INFO][internal/app/app/Run] Starting %s, version %s, in %s mode", config.App.Name, config.App.Version, config.App.Environment)
 
 	dbPostgres := database.OpenPostgresConnection(config.Database.URL)
+	whatsappClient := whatsapp_business.NewWhatsappBusiness(config.WABusiness.Version, config.WABusiness.AccessToken)
 	firebaseClient := google.OpenFirebaseConnection(config.GCP.ProjectID)
 	gcpStorageClient := google.OpenGCPStorageConnection()
 	firestoreClient, err := firebaseClient.Firestore(context.Background())
@@ -38,16 +42,21 @@ func Run(config *config.Config) {
 	encryptService := encrypt_service.NewEncryptService(&config.Encrypt)
 	googleStorageService := google_service.NewGoogleStorageService(gcpStorageClient, &config.GCP)
 	googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseClient)
+	whatsappService := whatsapp_service.NewWhatsappService(whatsappClient)
 
 	// Repository
 	activityLogRepository := repository_firestore.NewActivityLogRepository(firestoreClient)
+	messageRepository := repository_firestore.NewMessageRepository(firestoreClient)
+	chatRepository := repository_firestore.NewChatRepository(firestoreClient)
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
+	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, whatsappService)
 
 	// Router Handler
 	routerHandlerV1 := http_v1.RouterHandlerV1{
 		ActivityLogUsecase:    activityLogUsecase,
+		MessageUsecase:        messageUsecase,
 		AccessTokenService:    accessTokenService,
 		EncryptService:        encryptService,
 		GoogleStorageService:  googleStorageService,

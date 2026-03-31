@@ -1,0 +1,34 @@
+package http_v1
+
+import (
+	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/usecase"
+	"wa_chat_service/pkg/api_response"
+
+	"github.com/gofiber/fiber/v3"
+)
+
+type ChatHandler struct {
+	messageUsecase usecase.Message
+}
+
+func NewChatHandler(messageUsecase usecase.Message) HandlerV1 {
+	return &ChatHandler{
+		messageUsecase: messageUsecase,
+	}
+}
+
+func (h *ChatHandler) RegisterRoute(api fiber.Router) {
+	api.Post("/chat/send", h.SendMessage)
+}
+
+func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
+	var requestData dto.MessageSendRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
+	return ctx.Status(code).JSON(response)
+}
