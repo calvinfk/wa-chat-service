@@ -6,7 +6,6 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
-	"wa_chat_service/pkg/filter_request"
 )
 
 // Struct that implements the activity log usecase interface
@@ -34,15 +33,4 @@ func (uc *ActivityLogUsecase) Insert(ctx context.Context, inputData dto.Activity
 		return model.ActivityLog{}, true, err
 	}
 	return activityLog, false, nil
-}
-
-func (uc *ActivityLogUsecase) GetFiltered(ctx context.Context, user model.User, filter filter_request.FilterRequest[dto.ActivityLogFilterRequest]) (filter_request.FilterResponse[dto.ActivityLogResponse], bool, error) {
-	var err error
-	var response filter_request.FilterResponse[dto.ActivityLogResponse]
-	response, err = uc.activityLogRepository.GetFiltered(ctx, filter)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/activity_log/activity_log.go][GetFiltered] Error getting activity log ", err.Error())
-		return response, true, err
-	}
-	return response, false, nil
 }
