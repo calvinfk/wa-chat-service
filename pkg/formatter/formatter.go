@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"reflect"
 	"regexp"
+	"strings"
 	"time"
 	"unicode"
+
+	"github.com/go-playground/validator/v10"
 )
 
 // AnyToPointer is a generic function that takes a value of any type and returns a pointer to that value. This can be useful in situations where you need to pass a pointer to a value, such as when working with optional fields in structs.
@@ -156,4 +160,49 @@ func AnyToJsonString(v any) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func FormatErrors(err error, rootEntity any) map[string]string {
+	result := make(map[string]string)
+
+	if ve, ok := err.(validator.ValidationErrors); ok {
+		for _, fe := range ve {
+			tag := fe.Tag()
+			param := fe.Param()
+
+			if param != "" {
+				// Translate "FirstName" -> "first_name"
+				// We pass fe.Value()'s parent context if possible,
+				// but usually, your Document struct is the context.
+				jsonParam := getJsonName(fe.Type(), param)
+				tag = tag + "=" + jsonParam
+			}
+
+			result[fe.Namespace()] = tag
+		}
+	}
+	return result
+}
+
+func getJsonName(entity any, fieldName string) string {
+	t := reflect.TypeOf(entity)
+
+	// If it's a pointer, get the element
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Handle the case where we are validating the wrapper struct
+	field, found := t.FieldByName(fieldName)
+	if !found {
+		return strings.ToLower(fieldName) // Fallback
+	}
+
+	jsonTag := field.Tag.Get("json")
+	if jsonTag == "" || jsonTag == "-" {
+		return strings.ToLower(fieldName)
+	}
+
+	// Return only the name part of the tag (before any commas)
+	return strings.Split(jsonTag, ",")[0]
 }

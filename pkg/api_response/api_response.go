@@ -27,12 +27,19 @@ func NewApiResponse(serverError bool, err error, successMessage string, data any
 	}
 	if err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			// errors := make(map[string]string)
+			// for _, fieldErr := range validationErrors {
+			// 	var errMsgBuilder strings.Builder
+			// 	errMsgBuilder.WriteString(fieldErr.Tag())
+			// 	if fieldErr.Param() != "" {
+			// 		errMsgBuilder.WriteString("=")
+			// 		errMsgBuilder.WriteString(fieldErr.Param())
+			// 	}
+			// 	errors[fieldErr.Namespace()] = errMsgBuilder.String()
+			// }
+			errors := formatter.FormatErrors(validationErrors, data)
 			response.Code = http.StatusBadRequest
 			response.Data = nil
-			errors := make(map[string]string)
-			for _, fieldErr := range validationErrors {
-				errors[fieldErr.Namespace()] = fieldErr.Tag()
-			}
 			response.Errors = errors
 			response.Message = "Validation error"
 		} else {
