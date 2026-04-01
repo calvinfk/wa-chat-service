@@ -29,9 +29,6 @@ func NewMessageUsecase(messageRepository repository.Message, chatRepository repo
 func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error) {
 	var err error
 	var response model.Message
-	textComponent := &whatsapp_business_component.Text{
-		Body: inputData.Content,
-	}
 	// create chat header if not exist
 	chat := model.Chat{
 		DocumentID:  fmt.Sprintf("%s-%s", inputData.RecipientID, inputData.PhoneNumberID),
@@ -45,8 +42,12 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert chat:", err)
 		return response, true, err
 	}
-
-	sendResponse, err := u.whatsappService.SendMessage(ctx, inputData.PhoneNumberID, inputData.RecipientID, textComponent)
+	component, err := whatsapp_business_component.ValidateMapMessageComponent(inputData.Type, inputData.Payload)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate message component:", err)
+		return response, false, err
+	}
+	sendResponse, err := u.whatsappService.SendMessage(ctx, inputData.PhoneNumberID, inputData.RecipientID, component)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
 		return response, true, err
@@ -54,10 +55,10 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	message := model.Message{
 		DocumentID:      sendResponse.Messages[0].ID,
 		ChatID:          chat.DocumentID,
-		MessageType:     textComponent.GetType(),
+		MessageType:     component.GetType(),
 		MessageCategory: "-",
 		SenderName:      inputData.SenderName,
-		Content:         textComponent.Body,
+		Payload:         component.GetPayloadString(),
 		Status:          "-",
 		CreatedAt:       time.Now().Unix(),
 		UpdatedAt:       time.Now().Unix(),

@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
 func NewWhatsappBusiness(version, userAccessToken string) *Client {
@@ -44,11 +45,12 @@ func (wb *Client) postAPI(endpoint string, payload any) ([]byte, int, error) {
 	return body, resp.StatusCode, nil
 }
 
-func (wb *Client) SendMessage(phoneNumberID, to string, payload MessageComponent) (MessageResponse, error) {
+func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_business_component.MessageComponent) (MessageResponse, error) {
 	payloadData := map[string]any{
 		"messaging_product": "whatsapp",
 		"recipient_type":    "individual",
 		"to":                to,
+		"type":              payload.GetType(),
 	}
 	maps.Copy(payloadData, payload.GetPayload())
 	body, httpCode, err := wb.postAPI(wb.GetMessageEndpoint(phoneNumberID), payloadData)
@@ -59,7 +61,7 @@ func (wb *Client) SendMessage(phoneNumberID, to string, payload MessageComponent
 		if err := json.Unmarshal(body, &responseError); err != nil {
 			return MessageResponse{}, fmt.Errorf("unexpected http code: %d", httpCode)
 		}
-		return MessageResponse{}, fmt.Errorf("unexpected http code: %d, status code: %d, response: %s", httpCode, responseError.Error.Code, responseError.Error.Message)
+		return MessageResponse{}, responseError
 	}
 	var response MessageResponse
 	if err := json.Unmarshal(body, &response); err != nil {

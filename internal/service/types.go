@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"time"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -54,6 +55,6 @@ type (
 	}
 
 	WhatsappService interface {
-		SendMessage(ctx context.Context, phoneNumberID, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, error)
+		SendMessage(ctx context.Context, phoneNumberID, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, error)
 	}
 )

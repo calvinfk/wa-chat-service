@@ -30,7 +30,7 @@ func (r *ActivityLogRepository) Insert(ctx context.Context, tx *firestore.Transa
 		return r.model, err
 	}
 	data.CreatedAt = time.Now()
-	dataMap, err := formatter.StructToMap(data)
+	dataMap, err := formatter.StructToMap(data, true)
 	if err != nil {
 		return r.model, err
 	}

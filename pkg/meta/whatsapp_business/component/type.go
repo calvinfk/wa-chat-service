@@ -1,0 +1,52 @@
+package whatsapp_business_component
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type MessageComponent interface {
+	GetType() string
+	GetPayload() map[string]any
+	GetPayloadString() string
+	Validate() error
+}
+
+func ValidateMapMessageComponent(componentType string, component any) (MessageComponent, error) {
+	var err error
+	var componentBytes []byte
+	switch component := component.(type) {
+	case []byte:
+		componentBytes = component
+	case string:
+		componentBytes = []byte(component)
+	case map[string]any, []any:
+		componentBytes, err = json.Marshal(component)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported component payload type: %T", component)
+	}
+	switch componentType {
+	case "text":
+		var textComponent Text
+		if err := json.Unmarshal(componentBytes, &textComponent); err != nil {
+			return nil, err
+		}
+		return textComponent, nil
+	case "audio":
+		var audioComponent Audio
+		if err := json.Unmarshal(componentBytes, &audioComponent); err != nil {
+			return nil, err
+		}
+		return audioComponent, nil
+	case "contacts":
+		var contactsComponent Contacts
+		if err := json.Unmarshal(componentBytes, &contactsComponent); err != nil {
+			return nil, err
+		}
+		return contactsComponent, nil
+	}
+	return nil, fmt.Errorf("unsupported message component type: %s", componentType)
+}

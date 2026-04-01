@@ -5,11 +5,6 @@ type Client struct {
 	UserAccessToken string
 }
 
-type MessageComponent interface {
-	GetType() string
-	GetPayload() map[string]any
-}
-
 type MessageResponse struct {
 	MessagingProduct string `json:"messaging_product"`
 	Contacts         []struct {

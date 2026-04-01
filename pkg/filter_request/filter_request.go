@@ -92,7 +92,7 @@ func InitializeFilter[T Validatable](filterRequest FilterRequest[T], allowedFilt
 	if paginate.PageSize <= 0 {
 		paginate.PageSize = DEFAULT_PAGE_SIZE
 	}
-	mapStruct, err := formatter.StructToMap(filterRequest.SpecificFilter)
+	mapStruct, err := formatter.StructToMap(filterRequest.SpecificFilter, false)
 	if err != nil {
 		return nil, filterRequest.Sort, filterRequest.Paginate, err
 	}

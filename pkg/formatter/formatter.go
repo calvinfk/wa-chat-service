@@ -12,8 +12,10 @@ import (
 )
 
 // AnyToPointer is a generic function that takes a value of any type and returns a pointer to that value. This can be useful in situations where you need to pass a pointer to a value, such as when working with optional fields in structs.
+//
+//go:fix inline
 func AnyToPointer[T any](value T) *T {
-	return &value
+	return new(value)
 }
 
 // HasCommonValueMap checks if there is at least one common value between two slices of any comparable type. It uses a map to store the values of the first slice for efficient lookups, and then iterates through the second slice to check for common values. If a common value is found, it returns true; otherwise, it returns false after checking all values.
@@ -89,7 +91,7 @@ func ValidateEmail(email string) bool {
 }
 
 // StructToMap converts a struct to a map[string]any by first marshaling the struct to JSON and then unmarshaling it back into a map.
-func StructToMap(v any) (map[string]any, error) {
+func StructToMap(v any, omitNull bool) (map[string]any, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
@@ -97,7 +99,39 @@ func StructToMap(v any) (map[string]any, error) {
 
 	var result map[string]any
 	err = json.Unmarshal(b, &result)
+	// if the value is null
+	if omitNull {
+		omitNullValues(result)
+	}
 	return result, err
+}
+
+func omitNullValues(m map[string]any) map[string]any {
+	// recursively omit null values from the map
+	for k, v := range m {
+		switch val := v.(type) {
+		case map[string]any:
+			m[k] = omitNullValues(val)
+			if len(m[k].(map[string]any)) == 0 {
+				delete(m, k)
+			}
+		case []any:
+			for i, item := range val {
+				if itemMap, ok := item.(map[string]any); ok {
+					val[i] = omitNullValues(itemMap)
+					if len(val[i].(map[string]any)) == 0 {
+						val = append(val[:i], val[i+1:]...)
+					}
+				} else if item == nil {
+					val = append(val[:i], val[i+1:]...)
+				}
+			}
+		case nil:
+			delete(m, k)
+			continue
+		}
+	}
+	return m
 }
 
 func MapToStruct(m map[string]any, v any) error {
@@ -106,4 +140,20 @@ func MapToStruct(m map[string]any, v any) error {
 		return err
 	}
 	return json.Unmarshal(b, v)
+}
+
+func StructToJsonString(v any) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func AnyToJsonString(v any) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
