@@ -35,5 +35,10 @@ func (c Text) GetPayloadString() string {
 
 func (c Text) Validate() error {
 	validator := validate_struct.New()
-	return validator.Validate(c)
+	data := struct {
+		Text Text `json:"text" validate:"required"`
+	}{
+		Text: c,
+	}
+	return validator.Validate(data)
 }

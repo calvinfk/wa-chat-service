@@ -2,20 +2,19 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-
-	"github.com/go-playground/validator/v10"
+	"wa_chat_service/pkg/validate_struct"
 )
 
 type Contacts []Contact
 
 type Contact struct {
-	Addresses []Address `json:"addresses"`
+	Addresses []Address `json:"addresses,omitempty" validate:"dive"`
 	Birthday  *string   `json:"birthday,omitempty"` // Format: YYYY-MM-DD
-	Emails    []Email   `json:"emails,omitempty"`
-	Name      Name      `json:"name"`
-	Org       *Org      `json:"org"`
-	Phones    []Phone   `json:"phones,omitempty"`
-	Urls      []Url     `json:"urls,omitempty"`
+	Emails    []Email   `json:"emails,omitempty" validate:"dive"`
+	Name      Name      `json:"name" validate:"required"`
+	Org       *Org      `json:"org,omitempty"`
+	Phones    []Phone   `json:"phones,omitempty" validate:"dive"`
+	Urls      []Url     `json:"urls,omitempty" validate:"dive"`
 }
 
 type Address struct {
@@ -88,11 +87,11 @@ func (c Contacts) GetPayloadString() string {
 }
 
 func (c Contacts) Validate() error {
-	validator := validator.New()
-	for _, contact := range c {
-		if err := validator.Struct(contact); err != nil {
-			return err
-		}
+	validator := validate_struct.New()
+	validatePayload := struct {
+		Contacts Contacts `json:"contacts" validate:"dive"`
+	}{
+		Contacts: c,
 	}
-	return nil
+	return validator.Validate(validatePayload)
 }

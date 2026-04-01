@@ -1,6 +1,8 @@
 package http_v1
 
 import (
+	"encoding/json"
+	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
@@ -28,6 +30,21 @@ func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
+
+	jsonBody := ctx.Body()
+	var additionalData map[string]any
+	if err := json.Unmarshal(jsonBody, &additionalData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+
+	messageData, ok := additionalData[requestData.Type]
+	if !ok {
+		code, response := api_response.NewApiResponse(false, fmt.Errorf("invalid message type: %s", requestData.Type), "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	requestData.Payload = messageData
+
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
 	return ctx.Status(code).JSON(response)

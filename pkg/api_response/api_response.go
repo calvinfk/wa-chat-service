@@ -31,7 +31,7 @@ func NewApiResponse(serverError bool, err error, successMessage string, data any
 			response.Data = nil
 			errors := make(map[string]string)
 			for _, fieldErr := range validationErrors {
-				errors[fieldErr.Field()] = fieldErr.Error()
+				errors[fieldErr.Namespace()] = fieldErr.Tag()
 			}
 			response.Errors = errors
 			response.Message = "Validation error"

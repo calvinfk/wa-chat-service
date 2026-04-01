@@ -15,6 +15,7 @@ type MessageComponent interface {
 func ValidateMapMessageComponent(componentType string, component any) (MessageComponent, error) {
 	var err error
 	var componentBytes []byte
+	var messageComponent MessageComponent
 	switch component := component.(type) {
 	case []byte:
 		componentBytes = component
@@ -34,19 +35,30 @@ func ValidateMapMessageComponent(componentType string, component any) (MessageCo
 		if err := json.Unmarshal(componentBytes, &textComponent); err != nil {
 			return nil, err
 		}
-		return textComponent, nil
+		messageComponent = textComponent
 	case "audio":
 		var audioComponent Audio
 		if err := json.Unmarshal(componentBytes, &audioComponent); err != nil {
 			return nil, err
 		}
-		return audioComponent, nil
+		messageComponent = audioComponent
 	case "contacts":
 		var contactsComponent Contacts
 		if err := json.Unmarshal(componentBytes, &contactsComponent); err != nil {
 			return nil, err
 		}
-		return contactsComponent, nil
+		messageComponent = contactsComponent
+	case "document":
+		var documentComponent Document
+		if err := json.Unmarshal(componentBytes, &documentComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = documentComponent
+	default:
+		return nil, fmt.Errorf("unsupported message component type: %s", componentType)
 	}
-	return nil, fmt.Errorf("unsupported message component type: %s", componentType)
+	if err := messageComponent.Validate(); err != nil {
+		return nil, err
+	}
+	return messageComponent, nil
 }
