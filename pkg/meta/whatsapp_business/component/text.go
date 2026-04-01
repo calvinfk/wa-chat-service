@@ -10,22 +10,22 @@ type Text struct {
 	Body              string `json:"body" validate:"required"`
 }
 
-func (t Text) GetType() string {
+func (c Text) GetType() string {
 	return "text"
 }
 
-func (t Text) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(t, true)
+func (c Text) GetPayload() map[string]any {
+	jsonData, err := formatter.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
 	return map[string]any{
-		t.GetType(): jsonData,
+		c.GetType(): jsonData,
 	}
 }
 
-func (t Text) GetPayloadString() string {
-	jsonData := t.GetPayload()[t.GetType()]
+func (c Text) GetPayloadString() string {
+	jsonData := c.GetPayload()[c.GetType()]
 	jsonString, err := formatter.AnyToJsonString(jsonData)
 	if err != nil {
 		panic(err)
@@ -33,7 +33,7 @@ func (t Text) GetPayloadString() string {
 	return jsonString
 }
 
-func (t Text) Validate() error {
+func (c Text) Validate() error {
 	validator := validate_struct.New()
-	return validator.Validate(t)
+	return validator.Validate(c)
 }

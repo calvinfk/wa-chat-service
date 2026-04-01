@@ -10,22 +10,22 @@ type Audio struct {
 	Voice *bool   `json:"voice,omitempty"` // Only include if sending voice message
 }
 
-func (a Audio) GetType() string {
+func (c Audio) GetType() string {
 	return "audio"
 }
 
-func (a Audio) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(a, true)
+func (c Audio) GetPayload() map[string]any {
+	jsonData, err := formatter.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
 	return map[string]any{
-		a.GetType(): jsonData,
+		c.GetType(): jsonData,
 	}
 }
 
-func (a Audio) GetPayloadString() string {
-	jsonData := a.GetPayload()[a.GetType()]
+func (c Audio) GetPayloadString() string {
+	jsonData := c.GetPayload()[c.GetType()]
 	jsonString, err := formatter.AnyToJsonString(jsonData)
 	if err != nil {
 		panic(err)
@@ -33,7 +33,7 @@ func (a Audio) GetPayloadString() string {
 	return jsonString
 }
 
-func (a Audio) Validate() error {
+func (c Audio) Validate() error {
 	// No required fields, but you can add custom validation if needed
 	return nil
 }
