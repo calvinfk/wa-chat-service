@@ -114,6 +114,12 @@ func ValidateMapMessageComponent(componentType string, component any) (MessageCo
 				return nil, err
 			}
 			messageComponent = interactiveButtonComponent
+		case "location_request_message":
+			var locationRequestComponent LocationRequest
+			if err := json.Unmarshal(componentBytes, &locationRequestComponent); err != nil {
+				return nil, err
+			}
+			messageComponent = locationRequestComponent
 		default:
 			return nil, fmt.Errorf("unsupported interactive message component type: %s", interactiveComponent.Type)
 		}
