@@ -60,6 +60,30 @@ func ValidateMapMessageComponent(componentType string, component any) (MessageCo
 			return nil, err
 		}
 		messageComponent = imageComponent
+	case "location":
+		var locationComponent Location
+		if err := json.Unmarshal(componentBytes, &locationComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = locationComponent
+	case "reaction":
+		var reactionComponent Reaction
+		if err := json.Unmarshal(componentBytes, &reactionComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = reactionComponent
+	case "sticker":
+		var stickerComponent Sticker
+		if err := json.Unmarshal(componentBytes, &stickerComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = stickerComponent
+	case "video":
+		var videoComponent Video
+		if err := json.Unmarshal(componentBytes, &videoComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = videoComponent
 	default:
 		return nil, fmt.Errorf("unsupported message component type: %s", componentType)
 	}

@@ -7,7 +7,7 @@ import (
 
 type (
 	StorageMediaUploadRequest struct {
-		File *multipart.FileHeader `form:"file" validate:"required"`
+		File *multipart.FileHeader `form:"file" validate:"required,file"`
 	}
 	StorageMediaGetRequest struct {
 		ID string `query:"id" validate:"required"`

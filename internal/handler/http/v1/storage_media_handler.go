@@ -32,6 +32,10 @@ func (h *StorageMediaHandler) UploadMedia(ctx fiber.Ctx) error {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
+	if requestData.File == nil {
+		code, response := api_response.NewApiResponse(false, fmt.Errorf("file is required"), "", nil)
+		return ctx.Status(code).JSON(response)
+	}
 	media, serverError, err := h.storageMediaUsecase.UploadMedia(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", media)
 	return ctx.Status(code).JSON(response)

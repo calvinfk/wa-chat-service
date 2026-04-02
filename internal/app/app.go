@@ -76,7 +76,8 @@ func Run(config *config.Config) {
 	}
 
 	app := fiber.New(fiber.Config{
-		AppName: config.App.Name,
+		AppName:   config.App.Name,
+		BodyLimit: 16 * 1024 * 1024, // 16MB
 	})
 
 	http_internal.NewRouter(app, config, routerHandlerV1)
