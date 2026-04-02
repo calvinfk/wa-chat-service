@@ -6,9 +6,8 @@ import (
 )
 
 type Audio struct {
-	ID    *string `json:"id,omitempty" validate:"required_without=Link,excluded_with=Link,omitempty,min=1"` // Only if using uploaded media, Required if using uploaded media, otherwise omit.
-	Link  *string `json:"link,omitempty" validate:"required_without=ID,excluded_with=ID,omitempty,uri"`     // Only if using hosted media (not recommended), Required if using hosted media, otherwise omit.
-	Voice *bool   `json:"voice,omitempty"`                                                                  // Only include if sending voice message
+	Media
+	Voice *bool `json:"voice,omitempty"` // Only include if sending voice message
 }
 
 func (c Audio) GetType() string {

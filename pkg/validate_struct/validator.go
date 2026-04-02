@@ -21,6 +21,9 @@ func New() *structValidator {
 		return name
 	})
 	v.RegisterValidation("ext", func(fl validator.FieldLevel) bool {
+		if fl.Field().Kind() != reflect.String {
+			return false
+		}
 		field := fl.Field().String()
 		if field == "" {
 			return true
