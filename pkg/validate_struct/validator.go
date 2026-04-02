@@ -20,6 +20,27 @@ func New() *structValidator {
 		}
 		return name
 	})
+	v.RegisterValidation("ext", func(fl validator.FieldLevel) bool {
+		field := fl.Field().String()
+		if field == "" {
+			return true
+		}
+
+		// Get the parameters from the tag (e.g., "jpg png jpeg")
+		param := fl.Param()
+		allowedExts := strings.Split(param, " ")
+
+		loweredField := strings.ToLower(field)
+		for _, ext := range allowedExts {
+			// Check if filename ends with .ext
+			if strings.HasSuffix(loweredField, "."+strings.ToLower(ext)) {
+				return true
+			}
+		}
+		return false
+	})
+	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
+	// TODO: check if from google storage, check the extension is allowed
 	return &structValidator{
 		validate: v,
 	}

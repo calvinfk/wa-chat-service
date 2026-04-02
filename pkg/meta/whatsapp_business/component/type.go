@@ -54,6 +54,12 @@ func ValidateMapMessageComponent(componentType string, component any) (MessageCo
 			return nil, err
 		}
 		messageComponent = documentComponent
+	case "image":
+		var imageComponent Image
+		if err := json.Unmarshal(componentBytes, &imageComponent); err != nil {
+			return nil, err
+		}
+		messageComponent = imageComponent
 	default:
 		return nil, fmt.Errorf("unsupported message component type: %s", componentType)
 	}
