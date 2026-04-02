@@ -52,6 +52,8 @@ type (
 		UnsubscribeFromTopic(ctx context.Context, topics []string, tokens []string) error
 		// SendNotificationToTopic sends a notification to the specified topic in Firebase Cloud Messaging. It takes the notification title, body, and the topic name as parameters. It returns an error if there is an issue during the sending process.
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
+		// UploadFile uploads a file to Firebase Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file. It returns the public URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
+		UploadFile(ctx context.Context, filePath string, file []byte) (*storage.ObjectAttrs, error)
 	}
 
 	WhatsappService interface {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+
+	"cloud.google.com/go/storage"
 )
 
 type (
@@ -14,5 +16,10 @@ type (
 
 	Message interface {
 		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
+	}
+
+	StorageMedia interface {
+		UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error)
+		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error)
 	}
 )

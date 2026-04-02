@@ -30,4 +30,11 @@ type (
 		// Insert Log Message entry.
 		InsertLog(ctx context.Context, tx *firestore.Transaction, data model.MessageLog) (model.MessageLog, error)
 	}
+
+	StorageMedia interface {
+		// Inserts a media entry.
+		Insert(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) (model.StorageMedia, error)
+		// Gets media entry by document ID.
+		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
+	}
 )

@@ -6,31 +6,27 @@ import (
 	"log"
 	"wa_chat_service/config"
 
-	firebase "firebase.google.com/go/v4"
+	gs "cloud.google.com/go/storage"
 	"firebase.google.com/go/v4/messaging"
+	"firebase.google.com/go/v4/storage"
 )
 
 type GoogleFirebaseService struct {
-	cfg            *config.GCP
-	firebaseClient *firebase.App
+	cfg                     *config.GCP
+	firebaseMessagingClient *messaging.Client
+	firebaseStorageClient   *storage.Client
 }
 
-func NewGoogleFirebaseService(cfg *config.GCP, firebaseClient *firebase.App) *GoogleFirebaseService {
+func NewGoogleFirebaseService(cfg *config.GCP, firebaseMessagingClient *messaging.Client, firebaseStorageClient *storage.Client) *GoogleFirebaseService {
 	return &GoogleFirebaseService{
-		cfg:            cfg,
-		firebaseClient: firebaseClient,
+		cfg:                     cfg,
+		firebaseMessagingClient: firebaseMessagingClient,
+		firebaseStorageClient:   firebaseStorageClient,
 	}
 }
 
 func (s *GoogleFirebaseService) SendNotification(ctx context.Context, title string, body string, tokens []string) error {
-	// 1. Obtain a Messaging Client
-	client, err := s.firebaseClient.Messaging(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting Messaging client: %v", err)
-	}
-
-	// 2. Send the message
-	response, err := client.SendEachForMulticast(ctx, &messaging.MulticastMessage{
+	response, err := s.firebaseMessagingClient.SendEachForMulticast(ctx, &messaging.MulticastMessage{
 		Notification: &messaging.Notification{
 			Title: title,
 			Body:  body,
@@ -50,14 +46,8 @@ func (s *GoogleFirebaseService) SendNotification(ctx context.Context, title stri
 }
 
 func (s *GoogleFirebaseService) SubscribeToTopic(ctx context.Context, topics []string, tokens []string) error {
-	// 1. Obtain a Messaging Client
-	client, err := s.firebaseClient.Messaging(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting Messaging client: %v", err)
-	}
-	// 2. Subscribe to topics
 	for _, t := range topics {
-		response, err := client.SubscribeToTopic(ctx, tokens, t)
+		response, err := s.firebaseMessagingClient.SubscribeToTopic(ctx, tokens, t)
 		if err != nil {
 			return fmt.Errorf("error subscribing to topic: %v", err)
 		}
@@ -67,14 +57,9 @@ func (s *GoogleFirebaseService) SubscribeToTopic(ctx context.Context, topics []s
 }
 
 func (s *GoogleFirebaseService) UnsubscribeFromTopic(ctx context.Context, topics []string, tokens []string) error {
-	// 1. Obtain a Messaging Client
-	client, err := s.firebaseClient.Messaging(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting Messaging client: %v", err)
-	}
 	// 2. Unsubscribe from topics
 	for _, t := range topics {
-		response, err := client.UnsubscribeFromTopic(ctx, tokens, t)
+		response, err := s.firebaseMessagingClient.UnsubscribeFromTopic(ctx, tokens, t)
 		if err != nil {
 			return fmt.Errorf("error unsubscribing from topic: %v", err)
 		}
@@ -84,13 +69,7 @@ func (s *GoogleFirebaseService) UnsubscribeFromTopic(ctx context.Context, topics
 }
 
 func (s *GoogleFirebaseService) SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error {
-	// 1. Obtain a Messaging Client
-	client, err := s.firebaseClient.Messaging(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting Messaging client: %v", err)
-	}
-	// 2. Send the message
-	response, err := client.Send(ctx, &messaging.Message{
+	response, err := s.firebaseMessagingClient.Send(ctx, &messaging.Message{
 		Notification: &messaging.Notification{
 			Title: title,
 			Body:  body,
@@ -102,4 +81,24 @@ func (s *GoogleFirebaseService) SendNotificationToTopic(ctx context.Context, tit
 	}
 	log.Printf("Successfully sent message to topic %s: %s\n", topic, response)
 	return nil
+}
+
+func (s *GoogleFirebaseService) UploadFile(ctx context.Context, filePath string, file []byte) (*gs.ObjectAttrs, error) {
+	bucket, err := s.firebaseStorageClient.DefaultBucket()
+	if err != nil {
+		return nil, fmt.Errorf("error getting bucket: %v", err)
+	}
+	object := bucket.Object(filePath)
+	writer := object.NewWriter(ctx)
+	if _, err := writer.Write(file); err != nil {
+		return nil, fmt.Errorf("error writing file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("error closing writer: %v", err)
+	}
+	attrs, err := object.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting object attributes: %v", err)
+	}
+	return attrs, nil
 }

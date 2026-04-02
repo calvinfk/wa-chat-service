@@ -10,8 +10,9 @@ import (
 
 type RouterHandlerV1 struct {
 	ActivityLogUsecase    usecase.ActivityLog
-	AccessTokenService    service.AccessToken
 	MessageUsecase        usecase.Message
+	StorageMediaUsecase   usecase.StorageMedia
+	AccessTokenService    service.AccessToken
 	EncryptService        service.Encrypt
 	GoogleStorageService  service.GoogleStorage
 	GoogleFirebaseService service.GoogleFirebase
@@ -24,4 +25,6 @@ type HandlerV1 interface {
 func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, cfg *config.Config) {
 	chatHandler := NewChatHandler(routerHandler.MessageUsecase)
 	chatHandler.RegisterRoute(api)
+	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase)
+	storageMediaHandler.RegisterRoutes(api)
 }

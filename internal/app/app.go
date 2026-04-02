@@ -16,6 +16,7 @@ import (
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	message_usecase "wa_chat_service/internal/usecase/message"
+	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	"wa_chat_service/pkg/database"
 	"wa_chat_service/pkg/google"
 	"wa_chat_service/pkg/meta/whatsapp_business"
@@ -35,28 +36,39 @@ func Run(config *config.Config) {
 	if err != nil {
 		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firestore client: %v", err)
 	}
+	firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
+	if err != nil {
+		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
+	}
+	firebaseStorageClient, err := firebaseClient.Storage(context.Background())
+	if err != nil {
+		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
+	}
 	_ = transaction.NewTxManager(dbPostgres, firestoreClient)
 
 	// Service
 	accessTokenService := access_token_service.NewAccessTokenService(config)
 	encryptService := encrypt_service.NewEncryptService(&config.Encrypt)
 	googleStorageService := google_service.NewGoogleStorageService(gcpStorageClient, &config.GCP)
-	googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseClient)
+	googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseMessagingClient, firebaseStorageClient)
 	whatsappService := whatsapp_service.NewWhatsappService(whatsappClient)
 
 	// Repository
 	activityLogRepository := repository_firestore.NewActivityLogRepository(firestoreClient)
 	messageRepository := repository_firestore.NewMessageRepository(firestoreClient)
 	chatRepository := repository_firestore.NewChatRepository(firestoreClient)
+	storageMediaRepository := repository_firestore.NewStorageMediaRepository(firestoreClient)
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
 	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, whatsappService)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, googleFirebaseService, googleStorageService)
 
 	// Router Handler
 	routerHandlerV1 := http_v1.RouterHandlerV1{
 		ActivityLogUsecase:    activityLogUsecase,
 		MessageUsecase:        messageUsecase,
+		StorageMediaUsecase:   storageMediaUsecase,
 		AccessTokenService:    accessTokenService,
 		EncryptService:        encryptService,
 		GoogleStorageService:  googleStorageService,

@@ -17,8 +17,8 @@ func NewRouter(app *fiber.App, cfg *config.Config, routerHandlerV1 http_v1.Route
 		middleware.Recover(),
 		middleware.Cors(&cfg.CORS),
 		middleware.OptionsRoute(),
-		middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
-		middleware.ActivityLog(routerHandlerV1.ActivityLogUsecase),
+		// middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
+		// middleware.ActivityLog(routerHandlerV1.ActivityLogUsecase),
 	)
 
 	api := app.Group("api")
