@@ -9,6 +9,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/formatter"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
@@ -42,7 +43,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert chat:", err)
 		return response, true, err
 	}
-	component, err := whatsapp_business_component.ValidateMapMessageComponent(inputData.Type, inputData.Payload)
+	component, err := whatsapp_business_component.New(inputData.Type, inputData.Payload)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate message component:", err)
 		return response, false, err
@@ -52,13 +53,18 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
 		return response, true, err
 	}
+	payloadData, err := formatter.AnyToJsonString(component.GetPayload())
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to convert payload to JSON")
+	}
 	message := model.Message{
 		DocumentID:      sendResponse.Messages[0].ID,
 		ChatID:          chat.DocumentID,
-		MessageType:     component.GetType(),
+		MessageType:     string(component.GetType()),
 		MessageCategory: "-",
 		SenderName:      inputData.SenderName,
-		Payload:         component.GetPayloadString(),
+		Payload:         payloadData,
+		Content:         component.GetMessage(),
 		Status:          "-",
 		CreatedAt:       time.Now().Unix(),
 		UpdatedAt:       time.Now().Unix(),

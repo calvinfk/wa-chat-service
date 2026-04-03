@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type InteractiveList struct {
@@ -26,8 +25,8 @@ type InteractiveListRow struct {
 	Description string `json:"description,omitempty" validate:"omitempty,max=72"`
 }
 
-func (c InteractiveList) GetType() string {
-	return "interactive"
+func (c InteractiveList) GetType() MessageType {
+	return InteractiveMessageType
 }
 
 func (c InteractiveList) GetPayload() map[string]any {
@@ -36,25 +35,20 @@ func (c InteractiveList) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c InteractiveList) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c InteractiveList) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Interactive InteractiveList `json:"interactive" validate:"required"`
 	}{
 		Interactive: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c InteractiveList) GetMessage() string {
+	return c.Body.Text
 }

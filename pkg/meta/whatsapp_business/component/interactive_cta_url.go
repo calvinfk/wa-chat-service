@@ -3,7 +3,6 @@ package whatsapp_business_component
 import (
 	"log"
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type InteractiveCTAUrl struct {
@@ -32,8 +31,8 @@ type InteractiveCTAUrlParameter struct {
 	URL         string `json:"url" validate:"required,uri"`
 }
 
-func (c InteractiveCTAUrl) GetType() string {
-	return "interactive"
+func (c InteractiveCTAUrl) GetType() MessageType {
+	return InteractiveMessageType
 }
 
 func (c InteractiveCTAUrl) GetPayload() map[string]any {
@@ -42,26 +41,21 @@ func (c InteractiveCTAUrl) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c InteractiveCTAUrl) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c InteractiveCTAUrl) Validate() error {
 	log.Println("[DEBUG][pkg/meta/whatsapp_business/component/interactive_cta_url.go][Validate] Validating InteractiveCTAUrl component")
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Interactive InteractiveCTAUrl `json:"interactive" validate:"required"`
 	}{
 		Interactive: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c InteractiveCTAUrl) GetMessage() string {
+	return c.Body.Text
 }

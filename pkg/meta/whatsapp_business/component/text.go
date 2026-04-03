@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type Text struct {
@@ -10,8 +9,8 @@ type Text struct {
 	Body              string `json:"body" validate:"required"`
 }
 
-func (c Text) GetType() string {
-	return "text"
+func (c Text) GetType() MessageType {
+	return TextMessageType
 }
 
 func (c Text) GetPayload() map[string]any {
@@ -20,25 +19,20 @@ func (c Text) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c Text) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c Text) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Text Text `json:"text" validate:"required"`
 	}{
 		Text: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c Text) GetMessage() string {
+	return c.Body
 }

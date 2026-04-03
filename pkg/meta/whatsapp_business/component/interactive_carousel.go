@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type InteractiveCarousel struct {
@@ -38,8 +37,8 @@ type InteractiveCarouselCardAction struct {
 	Buttons *[]QuickReplyButton `json:"buttons" validate:"omitempty,dive"`
 }
 
-func (c InteractiveCarousel) GetType() string {
-	return "interactive"
+func (c InteractiveCarousel) GetType() MessageType {
+	return InteractiveMessageType
 }
 
 func (c InteractiveCarousel) GetPayload() map[string]any {
@@ -48,21 +47,12 @@ func (c InteractiveCarousel) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c InteractiveCarousel) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c InteractiveCarousel) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Interactive InteractiveCarousel `json:"interactive" validate:"required"`
 	}{
@@ -73,4 +63,8 @@ func (c InteractiveCarousel) Validate() error {
 		return err
 	}
 	return nil
+}
+
+func (c InteractiveCarousel) GetMessage() string {
+	return c.Body.Text
 }

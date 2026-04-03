@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type Audio struct {
@@ -10,8 +9,8 @@ type Audio struct {
 	Voice *bool `json:"voice,omitempty"` // Only include if sending voice message
 }
 
-func (c Audio) GetType() string {
-	return "audio"
+func (c Audio) GetType() MessageType {
+	return AudioMessageType
 }
 
 func (c Audio) GetPayload() map[string]any {
@@ -20,25 +19,20 @@ func (c Audio) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c Audio) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c Audio) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Audio Audio `json:"audio" validate:"required"`
 	}{
 		Audio: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c Audio) GetMessage() string {
+	return "(Audio)"
 }

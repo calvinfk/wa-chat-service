@@ -43,7 +43,7 @@ func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
 		code, response := api_response.NewApiResponse(false, fmt.Errorf("invalid message type: %s", requestData.Type), "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	requestData.Payload = messageData
+	requestData.Payload = messageData.(map[string]any)
 
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)

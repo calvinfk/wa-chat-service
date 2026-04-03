@@ -1,9 +1,7 @@
 package whatsapp_business_component
 
 import (
-	"log"
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type InteractiveButton struct {
@@ -35,8 +33,8 @@ type InteractiveButtonActionButtonReply struct {
 	Title string `json:"title" validate:"required,max=20"`
 }
 
-func (c InteractiveButton) GetType() string {
-	return "interactive"
+func (c InteractiveButton) GetType() MessageType {
+	return InteractiveMessageType
 }
 
 func (c InteractiveButton) GetPayload() map[string]any {
@@ -45,26 +43,20 @@ func (c InteractiveButton) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c InteractiveButton) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c InteractiveButton) Validate() error {
-	log.Println("[DEBUG][pkg/meta/whatsapp_business/component/interactive_button.go][Validate] Validating InteractiveButton component")
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Interactive InteractiveButton `json:"interactive" validate:"required"`
 	}{
 		Interactive: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c InteractiveButton) GetMessage() string {
+	return c.Body.Text
 }

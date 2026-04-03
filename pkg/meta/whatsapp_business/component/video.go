@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type Video struct {
@@ -11,8 +10,8 @@ type Video struct {
 	Caption *string `json:"caption,omitempty" validate:"omitempty,max=1024"`
 }
 
-func (c Video) GetType() string {
-	return "video"
+func (c Video) GetType() MessageType {
+	return VideoMessageType
 }
 
 func (c Video) GetPayload() map[string]any {
@@ -21,25 +20,22 @@ func (c Video) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c Video) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c Video) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Video Video `json:"video" validate:"required"`
 	}{
 		Video: c,
 	}
 	return validator.Validate(data)
+}
+func (c Video) GetMessage() string {
+	if c.Caption != nil {
+		return *c.Caption
+	}
+	return "(Video)"
 }

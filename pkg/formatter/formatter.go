@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"reflect"
 	"regexp"
@@ -15,58 +14,12 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// AnyToPointer is a generic function that takes a value of any type and returns a pointer to that value. This can be useful in situations where you need to pass a pointer to a value, such as when working with optional fields in structs.
-//
-//go:fix inline
-func AnyToPointer[T any](value T) *T {
-	return new(value)
-}
-
-// HasCommonValueMap checks if there is at least one common value between two slices of any comparable type. It uses a map to store the values of the first slice for efficient lookups, and then iterates through the second slice to check for common values. If a common value is found, it returns true; otherwise, it returns false after checking all values.
-func HasCommonValueMap[T comparable](arr1 []T, arr2 []T) bool {
-	if len(arr1) == 0 || len(arr2) == 0 {
-		return false
-	}
-	valueMap := make(map[T]bool, len(arr1))
-	for _, value := range arr1 {
-		valueMap[value] = true
-	}
-	for _, value := range arr2 {
-		if valueMap[value] {
-			return true
-		}
-	}
-	return false
-}
-
-// NullToEmptyString converts a pointer to a string to an empty string if the pointer is nil. If the pointer is not nil, it returns the value pointed to by the pointer. This function is useful for handling optional string fields in structs, allowing you to easily convert nil pointers to empty strings when needed.
-func NullToEmptyString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // CapitalizeFirstLetter capitalizes the first letter of a given string. If the input string is empty, it returns the empty string. Otherwise, it converts the first character to uppercase and concatenates it with the rest of the string unchanged.
 func CapitalizeFirstLetter(s string) string {
 	if len(s) == 0 {
 		return s
 	}
 	return string(unicode.ToUpper(rune(s[0]))) + s[1:]
-}
-
-// PrintJson takes any data structure, marshals it into a pretty-printed JSON format, and logs the resulting JSON string. If there is an error during the marshaling process, it returns the error instead of logging.
-func PrintJson(data any) error {
-	if data == nil {
-		log.Println("nil")
-		return nil
-	}
-	jsonData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-	log.Println(string(jsonData))
-	return nil
 }
 
 // RandString generates a random string of the specified length using a combination of uppercase and lowercase letters. It uses a seeded random number generator to ensure that the generated string is different each time the function is called.
@@ -146,14 +99,6 @@ func MapToStruct(m map[string]any, v any) error {
 	return json.Unmarshal(b, v)
 }
 
-func StructToJsonString(v any) (string, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
 func AnyToJsonString(v any) (string, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -205,4 +150,59 @@ func getJsonName(entity any, fieldName string) string {
 
 	// Return only the name part of the tag (before any commas)
 	return strings.Split(jsonTag, ",")[0]
+}
+
+func MapToJSONString(m map[string]any) string {
+	b, _ := json.Marshal(m)
+	return string(b)
+}
+
+type structValidator struct {
+	validate *validator.Validate
+}
+
+func Validator() *structValidator {
+	v := validator.New()
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		if name == "-" {
+			return ""
+		}
+		return name
+	})
+	v.RegisterValidation("ext", func(fl validator.FieldLevel) bool {
+		if fl.Field().Kind() != reflect.String {
+			return false
+		}
+		field := fl.Field().String()
+		if field == "" {
+			return true
+		}
+
+		// Get the parameters from the tag (e.g., "jpg png jpeg")
+		param := fl.Param()
+		allowedExts := strings.Split(param, " ")
+
+		loweredField := strings.ToLower(field)
+		for _, ext := range allowedExts {
+			// Check if filename ends with .ext
+			if strings.HasSuffix(loweredField, "."+strings.ToLower(ext)) {
+				return true
+			}
+		}
+		return false
+	})
+	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
+	// TODO: check if from google storage, check the extension is allowed
+	return &structValidator{
+		validate: v,
+	}
+}
+
+// Validator needs to implement the Validate method
+func (v *structValidator) Validate(out any) error {
+	if out == nil {
+		return nil // Or return a specific "missing body" error
+	}
+	return v.validate.Struct(out)
 }

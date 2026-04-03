@@ -6,130 +6,178 @@ import (
 )
 
 type MessageComponent interface {
-	GetType() string
+	GetType() MessageType
 	GetPayload() map[string]any
-	GetPayloadString() string
 	Validate() error
+	GetMessage() string
 }
 
-func ValidateMapMessageComponent(componentType string, component any) (MessageComponent, error) {
-	var err error
-	var componentBytes []byte
-	var messageComponent MessageComponent
-	switch component := component.(type) {
-	case []byte:
-		componentBytes = component
-	case string:
-		componentBytes = []byte(component)
-	case map[string]any, []any:
-		componentBytes, err = json.Marshal(component)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unsupported component payload type: %T", component)
+type MessageType string
+
+const (
+	AudioMessageType       MessageType = "audio"
+	ButtonMessageType      MessageType = "button"
+	ContactsMessageType    MessageType = "contacts"
+	DocumentMessageType    MessageType = "document"
+	EditMessageType        MessageType = "edit"
+	ImageMessageType       MessageType = "image"
+	InteractiveMessageType MessageType = "interactive"
+	LocationMessageType    MessageType = "location"
+	OrderMessageType       MessageType = "order"
+	ReactionMessageType    MessageType = "reaction"
+	RevokeMessageType      MessageType = "revoke"
+	StickerMessageType     MessageType = "sticker"
+	SystemMessageType      MessageType = "system"
+	TextMessageType        MessageType = "text"
+	UnsupportedMessageType MessageType = "unsupported"
+	VideoMessageType       MessageType = "video"
+)
+
+var (
+	messageRegistry = map[MessageType]MessageComponent{
+		AudioMessageType:    &Audio{},
+		ContactsMessageType: &Contacts{},
+		DocumentMessageType: &Document{},
+		ImageMessageType:    &Image{},
+		LocationMessageType: &Location{},
+		ReactionMessageType: &Reaction{},
+		StickerMessageType:  &Sticker{},
+		TextMessageType:     &Text{},
+		VideoMessageType:    &Video{},
 	}
-	switch componentType {
-	case "text":
-		var textComponent Text
-		if err := json.Unmarshal(componentBytes, &textComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = textComponent
-	case "audio":
-		var audioComponent Audio
-		if err := json.Unmarshal(componentBytes, &audioComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = audioComponent
-	case "contacts":
-		var contactsComponent Contacts
-		if err := json.Unmarshal(componentBytes, &contactsComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = contactsComponent
-	case "document":
-		var documentComponent Document
-		if err := json.Unmarshal(componentBytes, &documentComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = documentComponent
-	case "image":
-		var imageComponent Image
-		if err := json.Unmarshal(componentBytes, &imageComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = imageComponent
-	case "location":
-		var locationComponent Location
-		if err := json.Unmarshal(componentBytes, &locationComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = locationComponent
-	case "reaction":
-		var reactionComponent Reaction
-		if err := json.Unmarshal(componentBytes, &reactionComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = reactionComponent
-	case "sticker":
-		var stickerComponent Sticker
-		if err := json.Unmarshal(componentBytes, &stickerComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = stickerComponent
-	case "video":
-		var videoComponent Video
-		if err := json.Unmarshal(componentBytes, &videoComponent); err != nil {
-			return nil, err
-		}
-		messageComponent = videoComponent
-	case "interactive":
-		var interactiveComponent Interactive
-		if err := json.Unmarshal(componentBytes, &interactiveComponent); err != nil {
-			return nil, err
-		}
-		switch interactiveComponent.Type {
-		case "cta_url":
-			var interactiveCTAUrlComponent InteractiveCTAUrl
-			if err := json.Unmarshal(componentBytes, &interactiveCTAUrlComponent); err != nil {
-				return nil, err
-			}
-			messageComponent = interactiveCTAUrlComponent
-		case "list":
-			var interactiveListComponent InteractiveList
-			if err := json.Unmarshal(componentBytes, &interactiveListComponent); err != nil {
-				return nil, err
-			}
-			messageComponent = interactiveListComponent
-		case "carousel":
-			var interactiveCarouselComponent InteractiveCarousel
-			if err := json.Unmarshal(componentBytes, &interactiveCarouselComponent); err != nil {
-				return nil, err
-			}
-			messageComponent = interactiveCarouselComponent
-		case "button":
-			var interactiveButtonComponent InteractiveButton
-			if err := json.Unmarshal(componentBytes, &interactiveButtonComponent); err != nil {
-				return nil, err
-			}
-			messageComponent = interactiveButtonComponent
-		case "location_request_message":
-			var locationRequestComponent LocationRequest
-			if err := json.Unmarshal(componentBytes, &locationRequestComponent); err != nil {
-				return nil, err
-			}
-			messageComponent = locationRequestComponent
-		default:
-			return nil, fmt.Errorf("unsupported interactive message component type: %s", interactiveComponent.Type)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported message component type: %s", componentType)
+	interactiveMessageRegistry = map[string]MessageComponent{
+		"cta_url":                  &InteractiveCTAUrl{},
+		"list":                     &InteractiveList{},
+		"carousel":                 &InteractiveCarousel{},
+		"button":                   &InteractiveButton{},
+		"location_request_message": &LocationRequest{},
 	}
-	if err := messageComponent.Validate(); err != nil {
+)
+
+func New(componentType string, component map[string]any) (MessageComponent, error) {
+	var messageStruct MessageComponent
+	var ok bool
+	messageType := MessageType(componentType)
+	if messageType == InteractiveMessageType {
+		messageStruct, ok = interactiveMessageRegistry[component["type"].(string)]
+	} else {
+		messageStruct, ok = messageRegistry[MessageType(messageType)]
+	}
+	if !ok || messageStruct == nil {
+		return nil, fmt.Errorf("unsupported message type: %s", messageType)
+	}
+	messageBytes, err := json.Marshal(component)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message: %v", err)
+	}
+	if err := json.Unmarshal(messageBytes, &messageStruct); err != nil {
 		return nil, err
 	}
-	return messageComponent, nil
+	if err := messageStruct.Validate(); err != nil {
+		return nil, err
+	}
+	return messageStruct, nil
+	// switch componentType {
+	// case "text":
+	// 	var textComponent Text
+	// 	if err := json.Unmarshal(componentBytes, &textComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = textComponent
+	// case "audio":
+	// 	var audioComponent Audio
+	// 	if err := json.Unmarshal(componentBytes, &audioComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = audioComponent
+	// case "contacts":
+	// 	var contactsComponent Contacts
+	// 	if err := json.Unmarshal(componentBytes, &contactsComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = contactsComponent
+	// case "document":
+	// 	var documentComponent Document
+	// 	if err := json.Unmarshal(componentBytes, &documentComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = documentComponent
+	// case "image":
+	// 	var imageComponent Image
+	// 	if err := json.Unmarshal(componentBytes, &imageComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = imageComponent
+	// case "location":
+	// 	var locationComponent Location
+	// 	if err := json.Unmarshal(componentBytes, &locationComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = locationComponent
+	// case "reaction":
+	// 	var reactionComponent Reaction
+	// 	if err := json.Unmarshal(componentBytes, &reactionComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = reactionComponent
+	// case "sticker":
+	// 	var stickerComponent Sticker
+	// 	if err := json.Unmarshal(componentBytes, &stickerComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = stickerComponent
+	// case "video":
+	// 	var videoComponent Video
+	// 	if err := json.Unmarshal(componentBytes, &videoComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	messageComponent = videoComponent
+	// case "interactive":
+	// 	var interactiveComponent Interactive
+	// 	if err := json.Unmarshal(componentBytes, &interactiveComponent); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	switch interactiveComponent.Type {
+	// 	case "cta_url":
+	// 		var interactiveCTAUrlComponent InteractiveCTAUrl
+	// 		if err := json.Unmarshal(componentBytes, &interactiveCTAUrlComponent); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		messageComponent = interactiveCTAUrlComponent
+	// 	case "list":
+	// 		var interactiveListComponent InteractiveList
+	// 		if err := json.Unmarshal(componentBytes, &interactiveListComponent); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		messageComponent = interactiveListComponent
+	// 	case "carousel":
+	// 		var interactiveCarouselComponent InteractiveCarousel
+	// 		if err := json.Unmarshal(componentBytes, &interactiveCarouselComponent); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		messageComponent = interactiveCarouselComponent
+	// 	case "button":
+	// 		var interactiveButtonComponent InteractiveButton
+	// 		if err := json.Unmarshal(componentBytes, &interactiveButtonComponent); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		messageComponent = interactiveButtonComponent
+	// 	case "location_request_message":
+	// 		var locationRequestComponent LocationRequest
+	// 		if err := json.Unmarshal(componentBytes, &locationRequestComponent); err != nil {
+	// 			return nil, err
+	// 		}
+	// 		messageComponent = locationRequestComponent
+	// 	default:
+	// 		return nil, fmt.Errorf("unsupported interactive message component type: %s", interactiveComponent.Type)
+	// 	}
+	// default:
+	// 	return nil, fmt.Errorf("unsupported message component type: %s", componentType)
+	// }
+	// if err := messageComponent.Validate(); err != nil {
+	// 	return nil, err
+	// }
+	// return messageComponent, nil
 }
 
 type Interactive struct {

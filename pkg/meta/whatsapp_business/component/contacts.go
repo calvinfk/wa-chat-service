@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type Contacts []Contact
@@ -58,8 +57,8 @@ type Url struct {
 	Type *string `json:"type,omitempty"` // e.g., "home", "company"
 }
 
-func (c Contacts) GetType() string {
-	return "contacts"
+func (c Contacts) GetType() MessageType {
+	return ContactsMessageType
 }
 
 func (c Contacts) GetPayload() map[string]any {
@@ -73,25 +72,20 @@ func (c Contacts) GetPayload() map[string]any {
 		contactPayloads = append(contactPayloads, contactPayload)
 	}
 	return map[string]any{
-		c.GetType(): contactPayloads,
+		string(c.GetType()): contactPayloads,
 	}
-}
-
-func (c Contacts) GetPayloadString() string {
-	payload := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(payload)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c Contacts) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	validatePayload := struct {
 		Contacts Contacts `json:"contacts" validate:"dive"`
 	}{
 		Contacts: c,
 	}
 	return validator.Validate(validatePayload)
+}
+
+func (c Contacts) GetMessage() string {
+	return "(Contacts)"
 }

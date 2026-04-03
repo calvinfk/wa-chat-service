@@ -3,6 +3,7 @@ package whatsapp_service
 import (
 	"context"
 	"log"
+	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
@@ -21,7 +22,12 @@ func (ws *WhatsappService) SendMessage(ctx context.Context, phoneNumberID, to st
 	response, err := ws.whatsappClient.SendMessage(phoneNumberID, to, payload)
 	if err != nil {
 		if waError, ok := err.(whatsapp_business.WhatsAppBusinessError); ok && (waError.ErrorData.Code == whatsapp_business.PARAMETER_NOT_VALID || waError.ErrorData.Code == whatsapp_business.REQUIRED_PARAMETER_MISSING) {
-			log.Println("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] Parameter not valid, payload:", payload.GetPayloadString())
+			payloadData, err := formatter.AnyToJsonString(payload.GetPayload())
+			if err != nil {
+				log.Println("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] Failed to convert payload to JSON")
+			} else {
+				log.Println("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] Parameter not valid, payload:", payloadData)
+			}
 		}
 	}
 	return response, err

@@ -17,10 +17,8 @@ import (
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
-	"wa_chat_service/pkg/database"
 	"wa_chat_service/pkg/google"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	"wa_chat_service/pkg/transaction"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -28,7 +26,7 @@ import (
 func Run(config *config.Config) {
 	log.Printf("[INFO][internal/app/app/Run] Starting %s, version %s, in %s mode", config.App.Name, config.App.Version, config.App.Environment)
 
-	dbPostgres := database.OpenPostgresConnection(config.Database.URL)
+	// dbPostgres := database.OpenPostgresConnection(config.Database.URL)
 	whatsappClient := whatsapp_business.NewWhatsappBusiness(config.WABusiness.Version, config.WABusiness.AccessToken)
 	firebaseClient := google.OpenFirebaseConnection(config.GCP.ProjectID)
 	gcpStorageClient := google.OpenGCPStorageConnection()
@@ -44,7 +42,7 @@ func Run(config *config.Config) {
 	if err != nil {
 		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
 	}
-	_ = transaction.NewTxManager(dbPostgres, firestoreClient)
+	// _ = transaction.NewTxManager(dbPostgres, firestoreClient)
 
 	// Service
 	accessTokenService := access_token_service.NewAccessTokenService(config)
@@ -96,13 +94,13 @@ func Run(config *config.Config) {
 		log.Printf("[ERROR][internal/app/app/Run] Server forced to shutdown: %v", err)
 	}
 	log.Println("[INFO][internal/app/app/Run] Closing database connection...")
-	if sqlDB, err := dbPostgres.DB(); err != nil {
-		log.Printf("[ERROR][internal/app/app.go][Run] Error getting database connection: %v", err)
-	} else {
-		if err := sqlDB.Close(); err != nil {
-			log.Printf("[ERROR][internal/app/app.go][Run] Error closing database connection: %v", err)
-		}
-	}
+	// if sqlDB, err := dbPostgres.DB(); err != nil {
+	// 	log.Printf("[ERROR][internal/app/app.go][Run] Error getting database connection: %v", err)
+	// } else {
+	// 	if err := sqlDB.Close(); err != nil {
+	// 		log.Printf("[ERROR][internal/app/app.go][Run] Error closing database connection: %v", err)
+	// 	}
+	// }
 
 	log.Println("[INFO][internal/app/app/Run] Server exiting")
 }

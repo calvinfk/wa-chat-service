@@ -2,7 +2,6 @@ package whatsapp_business_component
 
 import (
 	"wa_chat_service/pkg/formatter"
-	"wa_chat_service/pkg/validate_struct"
 )
 
 type Location struct {
@@ -12,8 +11,8 @@ type Location struct {
 	Address   *string `json:"address,omitempty"`
 }
 
-func (c Location) GetType() string {
-	return "location"
+func (c Location) GetType() MessageType {
+	return LocationMessageType
 }
 
 func (c Location) GetPayload() map[string]any {
@@ -22,25 +21,25 @@ func (c Location) GetPayload() map[string]any {
 		panic(err)
 	}
 	return map[string]any{
-		c.GetType(): jsonData,
+		string(c.GetType()): jsonData,
 	}
-}
-
-func (c Location) GetPayloadString() string {
-	jsonData := c.GetPayload()[c.GetType()]
-	jsonString, err := formatter.AnyToJsonString(jsonData)
-	if err != nil {
-		panic(err)
-	}
-	return jsonString
 }
 
 func (c Location) Validate() error {
-	validator := validate_struct.New()
+	validator := formatter.Validator()
 	data := struct {
 		Location Location `json:"location" validate:"required"`
 	}{
 		Location: c,
 	}
 	return validator.Validate(data)
+}
+
+func (c Location) GetMessage() string {
+	if c.Name != nil {
+		return *c.Name
+	} else if c.Address != nil {
+		return *c.Address
+	}
+	return "(Location " + c.Latitude + ", " + c.Longitude + ")"
 }
