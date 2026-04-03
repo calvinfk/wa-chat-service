@@ -17,33 +17,13 @@ func NewMessageRepository(db *firestore.Client) *MessageRepository {
 	return &MessageRepository{db: db}
 }
 
-func (r *MessageRepository) Insert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
+func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
 	var err error
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		docRef := r.db.
 			Collection("chats").Doc(message.ChatID).
 			Collection("messages").Doc(message.DocumentID)
 		err := tx.Set(docRef, message)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	if tx == nil {
-		err = r.db.RunTransaction(ctx, execDB)
-	} else {
-		err = execDB(ctx, tx)
-	}
-	return message, err
-}
-
-func (r *MessageRepository) Update(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
-	var err error
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		docRef := r.db.
-			Collection("chats").Doc(message.ChatID).
-			Collection("messages").Doc(message.DocumentID)
-		_, err := docRef.Set(ctx, message, firestore.Merge([]string{"status", "updated_at"}))
 		if err != nil {
 			return err
 		}

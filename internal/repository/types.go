@@ -23,10 +23,8 @@ type (
 	}
 
 	Message interface {
-		// Inserts a message entry.
-		Insert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
-		// Updates a message entry.
-		Update(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
+		// Inserts or updates a message entry.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
 		// Insert Log Message entry.
 		InsertLog(ctx context.Context, tx *firestore.Transaction, data model.MessageLog) (model.MessageLog, error)
 	}

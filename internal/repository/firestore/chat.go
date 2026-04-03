@@ -5,6 +5,8 @@ import (
 	"wa_chat_service/internal/model"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ChatRepository struct {
@@ -21,9 +23,19 @@ func NewChatRepository(db *firestore.Client) *ChatRepository {
 func (r *ChatRepository) Insert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, error) {
 	var err error
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		docRef := r.db.
-			Collection("chats").Doc(chat.DocumentID)
-		return tx.Set(docRef, chat)
+		doc := r.db.Collection("chats").Doc(chat.DocumentID)
+		err := tx.Update(doc, []firestore.Update{
+			{Path: "last_message", Value: chat.LastMessage},
+			{Path: "updated_at", Value: chat.UpdatedAt},
+		})
+		if err == nil {
+			return nil
+		}
+		if status.Code(err) != codes.NotFound {
+			return err
+		}
+		err = tx.Set(doc, chat)
+		return err
 	}
 	if tx == nil {
 		err = r.db.RunTransaction(ctx, execDB)
