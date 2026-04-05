@@ -34,6 +34,8 @@ type (
 		GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error)
 		// GenerateV4GetObjectSignedURL generates a signed URL for accessing an object in Google Cloud Storage. It takes the bucket name and object name as parameters and returns the signed URL as a string if the generation is successful, or an error if there is an issue during the generation process.
 		GenerateV4GetObjectSignedURL(bucketName, objectName string, expiration time.Duration) (string, error)
+		// DeleteFile deletes a file from Google Cloud Storage. It takes the bucket name and object name as parameters and returns an error if there is an issue during the deletion process.
+		DeleteFile(ctx context.Context, bucketName, objectName string) error
 	}
 
 	GoogleFirebase interface {
@@ -47,10 +49,15 @@ type (
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
 		// UploadFile uploads a file to Firebase Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file. It returns the public URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
 		UploadFile(ctx context.Context, filePath string, file []byte) (*storage.ObjectAttrs, error)
+		// DeleteFile deletes a file from Firebase Storage. It takes the file path as a parameter and returns an error if there is an issue during the deletion process.
+		DeleteFile(ctx context.Context, filePath string) error
 	}
 
 	WhatsappService interface {
 		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error)
 		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error)
+		UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
+		GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error)
+		DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error)
 	}
 )

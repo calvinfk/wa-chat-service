@@ -37,11 +37,11 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 	docRef := r.db.Collection("storage_medias").Doc(documentID)
 	docSnap, err := docRef.Get(ctx)
 	if err != nil {
-		return model.StorageMedia{}, err
+		return r.storageMedia, err
 	}
 	var media model.StorageMedia
 	if err := docSnap.DataTo(&media); err != nil {
-		return model.StorageMedia{}, err
+		return r.storageMedia, err
 	}
 	return media, nil
 }
@@ -49,14 +49,41 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 func (r *StorageMediaRepository) GetByAccessURL(ctx context.Context, accessURL string) (model.StorageMedia, error) {
 	docs, err := r.db.Collection(r.storageMedia.TableName()).Where("access_url", "==", accessURL).Limit(1).Documents(ctx).GetAll()
 	if err != nil {
-		return model.StorageMedia{}, err
+		return r.storageMedia, err
 	}
 	if len(docs) == 0 {
-		return model.StorageMedia{}, errs.ErrGenericNotFound
+		return r.storageMedia, errs.ErrGenericNotFound
 	}
 	var media model.StorageMedia
 	if err := docs[0].DataTo(&media); err != nil {
-		return model.StorageMedia{}, err
+		return r.storageMedia, err
 	}
 	return media, nil
+}
+
+func (r *StorageMediaRepository) GetByMediaID(ctx context.Context, mediaID string) (model.StorageMedia, error) {
+	docs, err := r.db.Collection(r.storageMedia.TableName()).Where("media_id", "==", mediaID).Limit(1).Documents(ctx).GetAll()
+	if err != nil {
+		return r.storageMedia, err
+	}
+	if len(docs) == 0 {
+		return r.storageMedia, errs.ErrGenericNotFound
+	}
+	var media model.StorageMedia
+	if err := docs[0].DataTo(&media); err != nil {
+		return r.storageMedia, err
+	}
+	media.DocumentID = docs[0].Ref.ID
+	return media, nil
+}
+
+func (r *StorageMediaRepository) Delete(ctx context.Context, tx *firestore.Transaction, documentID string) error {
+	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
+		docRef := r.db.Collection("storage_medias").Doc(documentID)
+		return tx.Delete(docRef)
+	}
+	if tx != nil {
+		return execDB(ctx, tx)
+	}
+	return r.db.RunTransaction(ctx, execDB)
 }

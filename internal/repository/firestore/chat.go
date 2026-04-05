@@ -2,7 +2,6 @@ package repository_firestore
 
 import (
 	"context"
-	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
@@ -57,7 +56,6 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 	} else {
 		err = execDB(ctx, tx)
 	}
-	log.Println("[INFO][internal/repository/firestore/chat.go][Upsert] Upsert transaction completed with error:", err)
 	return chat, err
 }
 

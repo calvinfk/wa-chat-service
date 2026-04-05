@@ -24,6 +24,7 @@ type (
 	StorageMedia interface {
 		UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error)
 		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error)
+		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
 	}
 
 	Chat interface {

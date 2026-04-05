@@ -36,3 +36,20 @@ type WhatsAppBusinessError struct {
 func (v WhatsAppBusinessError) Error() string {
 	return v.ErrorData.Message
 }
+
+type UploadMediaResponse struct {
+	ID string `json:"id"`
+}
+
+type GetMediaURLResponse struct {
+	MessagingProduct string `json:"messaging_product"`
+	URL              string `json:"url"`
+	MimeType         string `json:"mime_type"`
+	Sha256           string `json:"sha256"`
+	FileSize         int64  `json:"file_size"`
+	ID               string `json:"id"`
+}
+
+type DeleteMediaResponse struct {
+	Success bool `json:"success"`
+}

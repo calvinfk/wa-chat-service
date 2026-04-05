@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"wa_chat_service/config"
 
 	gs "cloud.google.com/go/storage"
@@ -101,4 +102,18 @@ func (s *GoogleFirebaseService) UploadFile(ctx context.Context, filePath string,
 		return nil, fmt.Errorf("error getting object attributes: %v", err)
 	}
 	return attrs, nil
+}
+
+func (s *GoogleFirebaseService) DeleteFile(ctx context.Context, filePath string) error {
+	filePath = strings.TrimPrefix(filePath, "gs://")
+	filePath = strings.TrimPrefix(filePath, s.cfg.ProjectID+".firebasestorage.app/")
+	bucket, err := s.firebaseStorageClient.DefaultBucket()
+	if err != nil {
+		return fmt.Errorf("error getting bucket: %v", err)
+	}
+	object := bucket.Object(filePath)
+	if err := object.Delete(ctx); err != nil {
+		return fmt.Errorf("error deleting file: %v", err)
+	}
+	return nil
 }

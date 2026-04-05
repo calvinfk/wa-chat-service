@@ -3,11 +3,14 @@ package storage_media_usecase
 import (
 	"context"
 	"log"
+	"net/http"
 	"path/filepath"
+	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -15,17 +18,21 @@ import (
 
 type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
+	phoneNumberRepository  repository.PhoneNumber
 	firebaseService        service.GoogleFirebase
 	googleStorageService   service.GoogleStorage
-	appURL                 string
+	encryptService         service.Encrypt
+	whatsappService        service.WhatsappService
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, firebaseService service.GoogleFirebase, googleStorageService service.GoogleStorage, appURL string) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, firebaseService service.GoogleFirebase, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappService) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
+		phoneNumberRepository:  phoneNumberRepository,
 		firebaseService:        firebaseService,
 		googleStorageService:   googleStorageService,
-		appURL:                 appURL,
+		encryptService:         encryptService,
+		whatsappService:        whatsappService,
 	}
 }
 
@@ -36,8 +43,18 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to generate UUID:", err)
 		return response, true, err
 	}
+	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		return response, true, err
+	}
+	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
+		return response, true, err
+	}
+	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
 	originalFileName := inputData.File.Filename
-	// upload to firebase storage
 	filePath := "whatsapp-media/" + documentID.String() + filepath.Ext(inputData.File.Filename)
 	file, err := inputData.File.Open()
 	if err != nil {
@@ -46,11 +63,20 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	defer file.Close()
 	fileData := make([]byte, inputData.File.Size)
+	// read the whole file into fileData
 	_, err = file.Read(fileData)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to read file data:", err)
 		return response, true, err
 	}
+	// upload media to WhatsApp Business API
+	mediaID, httpCode, err := u.whatsappService.UploadMedia(ctx, whatsappClient, fileData, originalFileName, inputData.File.Header.Get("Content-Type"))
+	if err != nil {
+		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload media to WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
+		return response, httpCode == http.StatusInternalServerError, err
+	}
+
+	// upload to firebase storage
 	attrs, err := u.firebaseService.UploadFile(ctx, filePath, fileData)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload file:", err)
@@ -64,9 +90,12 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	media := model.StorageMedia{
 		DocumentID:   documentID.String(),
+		MediaID:      mediaID,
 		OriginalName: originalFileName,
+		MimeType:     inputData.File.Header.Get("Content-Type"),
 		URL:          fileURL,
 		AccessURL:    url,
+		CreatedAt:    time.Now().Unix(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
@@ -99,4 +128,39 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 	}
 
 	return rc, attrs, false, nil
+}
+
+func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error) {
+	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		return true, err
+	}
+	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
+		return true, err
+	}
+	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
+	media, err := u.storageMediaRepository.GetByMediaID(ctx, inputData.MediaID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to get media data from repository:", err)
+		return true, err
+	}
+	httpCode, err := u.whatsappService.DeleteMedia(ctx, whatsappClient, media.MediaID)
+	if err != nil {
+		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
+		return httpCode == http.StatusInternalServerError, err
+	}
+	err = u.storageMediaRepository.Delete(ctx, nil, media.DocumentID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media data from repository:", err)
+		return true, err
+	}
+	err = u.firebaseService.DeleteFile(ctx, media.URL)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete file from Firebase Storage:", err)
+		return true, err
+	}
+	return false, nil
 }

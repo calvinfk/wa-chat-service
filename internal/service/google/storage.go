@@ -91,3 +91,8 @@ func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(bucketName, objectNa
 
 	return url, nil
 }
+
+func (s *GoogleStorageService) DeleteFile(ctx context.Context, bucketName, objectName string) error {
+	obj := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID).Object(objectName)
+	return obj.Delete(ctx)
+}
