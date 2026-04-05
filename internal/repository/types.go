@@ -35,4 +35,8 @@ type (
 		// Gets media entry by document ID.
 		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
 	}
+
+	PhoneNumber interface {
+		GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (model.PhoneNumber, error)
+	}
 )

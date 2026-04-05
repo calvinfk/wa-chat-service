@@ -15,6 +15,12 @@ run:
 migrate:
 	go run ./cmd/migrate/migrate.go $(ARGS)
 
+encrypt:
+	go run ./cmd/encrypt/encrypt.go encrypt=$(ARGS)
+
+decrypt:
+	go run ./cmd/encrypt/encrypt.go decrypt=$(ARGS)
+
 # 4. Build the final Windows Binary
 build:
 	go build -o $(APP_NAME).exe $(MAIN_PATH)

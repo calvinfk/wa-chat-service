@@ -3,15 +3,12 @@ package google_service
 import (
 	"context"
 	"fmt"
-	"mime/multipart"
-	"path/filepath"
 	"strings"
 	"time"
 	"wa_chat_service/config"
 	"wa_chat_service/pkg/errs"
 
 	"cloud.google.com/go/storage"
-	"github.com/google/uuid"
 )
 
 type GoogleStorageService struct {
@@ -51,31 +48,6 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 	}
 	return fmt.Sprintf("gs://%s/%s", bucketID, destinationPath), nil
 }
-
-func (s *GoogleStorageService) UploadReportAttachment(ctx context.Context, data *multipart.FileHeader, reportNo string) (string, string, error) {
-	if data == nil {
-		return "", "", errs.ErrGenericEmptyFile
-	}
-	file, err := data.Open()
-	if err != nil {
-		return "", "", err
-	}
-	defer file.Close()
-
-	fileData := make([]byte, data.Size)
-	_, err = file.Read(fileData)
-	if err != nil {
-		return "", "", err
-	}
-	fileName := s.generateAttachmentName(reportNo, filepath.Ext(data.Filename))
-	contentType := data.Header.Get("Content-Type")
-	fileURL, err := s.UploadFile(ctx, fileData, s.cfg.AttachmentBucket, fileName, contentType)
-	if err != nil {
-		return "", "", err
-	}
-	return fileName, fileURL, nil
-}
-
 func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error) {
 	// Parse the file URL to extract bucket and object names
 	parts := strings.Split(strings.TrimPrefix(fileURL, "gs://"), "/")
@@ -98,12 +70,17 @@ func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string) (*st
 
 }
 
-func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(bucketName, objectName string) (string, error) {
+func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(bucketName, objectName string, expiration time.Duration) (string, error) {
 	// 1. Define the permissions and duration
+	maxV4 := 7 * 24 * time.Hour
+	if expiration <= 0 || expiration > maxV4 {
+		expiration = maxV4
+	}
+
 	opts := &storage.SignedURLOptions{
 		Scheme:  storage.SigningSchemeV4,
 		Method:  "GET",
-		Expires: time.Now().Add(time.Duration(s.cfg.AttachmentLinkExpiry) * time.Second),
+		Expires: time.Now().Add(expiration),
 	}
 
 	// 2. Generate the URL
@@ -113,22 +90,4 @@ func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(bucketName, objectNa
 	}
 
 	return url, nil
-}
-
-func (s *GoogleStorageService) generateAttachmentName(reportNo, ext string) string {
-	reportNoFormatted := strings.ReplaceAll(reportNo, "/", "_")
-	uuidPart := uuid.New().String()
-	return fmt.Sprintf("%s/%s%s", reportNoFormatted, uuidPart, ext)
-}
-
-func (s *GoogleStorageService) GenerateAttachmentURL(fileName string) (string, error) {
-	fileURL, err := s.GenerateV4GetObjectSignedURL(s.cfg.AttachmentBucket, fileName)
-	if err != nil {
-		return "", err
-	}
-	return fileURL, nil
-}
-
-func (s *GoogleStorageService) GetAttachmentLinkExpiration() time.Duration {
-	return time.Duration(s.cfg.AttachmentLinkExpiry) * time.Second
 }

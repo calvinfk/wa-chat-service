@@ -31,6 +31,7 @@ const (
 	TextMessageType        MessageType = "text"
 	UnsupportedMessageType MessageType = "unsupported"
 	VideoMessageType       MessageType = "video"
+	TemplateMessageType    MessageType = "template"
 )
 
 var (
@@ -44,7 +45,9 @@ var (
 		StickerMessageType:  &Sticker{},
 		TextMessageType:     &Text{},
 		VideoMessageType:    &Video{},
+		TemplateMessageType: &Template{},
 	}
+
 	interactiveMessageRegistry = map[string]MessageComponent{
 		"cta_url":                  &InteractiveCTAUrl{},
 		"list":                     &InteractiveList{},

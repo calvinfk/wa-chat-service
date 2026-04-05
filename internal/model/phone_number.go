@@ -1,7 +1,12 @@
 package model
 
+import "github.com/google/uuid"
+
 type PhoneNumber struct {
-	ID          string `gorm:"primaryKey"`
-	AccountID   string `gorm:"not null;unique"`
-	PhoneNumber string `gorm:"not null;unique"`
+	DocumentID    uuid.UUID `firestore:"-"`
+	WabaID        string    `firestore:"waba_id"`
+	AccessToken   string    `firestore:"access_token"` // encrypted
+	PhoneNumberID string    `firestore:"phone_number_id"`
+	Name          string    `firestore:"name"`
+	CreatedAt     int64     `firestore:"created_at"`
 }

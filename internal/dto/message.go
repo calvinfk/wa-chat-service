@@ -9,4 +9,7 @@ type (
 		Type          string `json:"type" validate:"required"` // text, image, video, etc
 		Payload       map[string]any
 	}
+	TemplateListRequest struct {
+		PhoneNumberID string `query:"phone_number_id" validate:"required"`
+	}
 )

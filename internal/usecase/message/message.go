@@ -10,26 +10,42 @@ import (
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
 type MessageUsecase struct {
-	messageRepository repository.Message
-	chatRepository    repository.Chat
-	whatsappService   service.WhatsappService
+	messageRepository     repository.Message
+	chatRepository        repository.Chat
+	phoneNumberRepository repository.PhoneNumber
+	whatsappService       service.WhatsappService
+	encryptService        service.Encrypt
 }
 
-func NewMessageUsecase(messageRepository repository.Message, chatRepository repository.Chat, whatsappService service.WhatsappService) *MessageUsecase {
+func NewMessageUsecase(messageRepository repository.Message, chatRepository repository.Chat, phoneNumberRepository repository.PhoneNumber, whatsappService service.WhatsappService, encryptService service.Encrypt) *MessageUsecase {
 	return &MessageUsecase{
-		messageRepository: messageRepository,
-		chatRepository:    chatRepository,
-		whatsappService:   whatsappService,
+		messageRepository:     messageRepository,
+		chatRepository:        chatRepository,
+		phoneNumberRepository: phoneNumberRepository,
+		whatsappService:       whatsappService,
+		encryptService:        encryptService,
 	}
 }
 
 func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error) {
 	var err error
 	var response model.Message
+	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		return response, true, err
+	}
+	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
+		return response, true, err
+	}
+	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
 	component, err := whatsapp_business_component.New(inputData.Type, inputData.Payload)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate message component:", err)
@@ -49,7 +65,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert chat:", err)
 		return response, true, err
 	}
-	sendResponse, err := u.whatsappService.SendMessage(ctx, inputData.PhoneNumberID, inputData.RecipientID, component)
+	sendResponse, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
 		return response, true, err
@@ -76,4 +92,28 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		return response, true, err
 	}
 	return response, false, nil
+}
+
+func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]any, bool, error) {
+	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		if err.Error() == "no more items in iterator" {
+			log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Phone number not found:", err)
+			return nil, false, fmt.Errorf("phone number not found")
+		}
+		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get phone number:", err)
+		return nil, true, err
+	}
+	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to decrypt access token:", err)
+		return nil, true, err
+	}
+	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
+	templateList, err := u.whatsappService.GetTemplateList(ctx, whatsappClient)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get template list:", err)
+		return nil, true, err
+	}
+	return templateList, false, nil
 }

@@ -18,7 +18,6 @@ import (
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	"wa_chat_service/pkg/google"
-	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -27,7 +26,6 @@ func Run(config *config.Config) {
 	log.Printf("[INFO][internal/app/app/Run] Starting %s, version %s, in %s mode", config.App.Name, config.App.Version, config.App.Environment)
 
 	// dbPostgres := database.OpenPostgresConnection(config.Database.URL)
-	whatsappClient := whatsapp_business.NewWhatsappBusiness(config.WABusiness.Version, config.WABusiness.AccessToken)
 	firebaseClient := google.OpenFirebaseConnection(config.GCP.ProjectID)
 	gcpStorageClient := google.OpenGCPStorageConnection()
 	firestoreClient, err := firebaseClient.Firestore(context.Background())
@@ -49,17 +47,18 @@ func Run(config *config.Config) {
 	encryptService := encrypt_service.NewEncryptService(&config.Encrypt)
 	googleStorageService := google_service.NewGoogleStorageService(gcpStorageClient, &config.GCP)
 	googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseMessagingClient, firebaseStorageClient)
-	whatsappService := whatsapp_service.NewWhatsappService(whatsappClient)
+	whatsappService := whatsapp_service.NewWhatsappService()
 
 	// Repository
 	activityLogRepository := repository_firestore.NewActivityLogRepository(firestoreClient)
 	messageRepository := repository_firestore.NewMessageRepository(firestoreClient)
 	chatRepository := repository_firestore.NewChatRepository(firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(firestoreClient)
+	phoneNumberRepository := repository_firestore.NewPhoneNumberRepository(firestoreClient)
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
-	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, whatsappService)
+	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, whatsappService, encryptService)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, googleFirebaseService, googleStorageService)
 
 	// Router Handler

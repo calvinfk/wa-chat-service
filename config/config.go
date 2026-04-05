@@ -10,12 +10,11 @@ import (
 type (
 	// Main configuration struct that holds all application settings, including app metadata, CORS settings, database connection info, and JOSE/JWT configuration.
 	Config struct {
-		App        App
-		CORS       CORS
-		Database   Database
-		Encrypt    Encrypt
-		GCP        GCP
-		WABusiness WABusiness
+		App      App
+		CORS     CORS
+		Database Database
+		Encrypt  Encrypt
+		GCP      GCP
 	}
 
 	// Application metadata and server configuration, such as name, version, environment, port, and URL.
@@ -55,11 +54,6 @@ type (
 		AttachmentBucket     string `env:"GCP_ATTACHMENT_BUCKET,required"`
 		AttachmentMaxSize    int64  `env:"GCP_ATTACHMENT_MAX_SIZE,default=10485760"` // in bytes (default 10 MB)
 	}
-
-	WABusiness struct {
-		Version     string `env:"WA_BUSINESS_VERSION,default=v25.0"`
-		AccessToken string `env:"WA_BUSINESS_ACCESS_TOKEN,required"`
-	}
 )
 
 // Reads environment variables and constructs a Config struct, validating required fields and returning an error if any are missing or invalid.
@@ -95,12 +89,6 @@ func New() (*Config, error) {
 		return nil, err
 	}
 	cfg.GCP = gcp
-
-	waBusiness, err := waBusinessEnv()
-	if err != nil {
-		return nil, err
-	}
-	cfg.WABusiness = waBusiness
 
 	return cfg, nil
 }
@@ -259,24 +247,6 @@ func gcpEnv() (GCP, error) {
 	}
 	if len(errors) > 0 {
 		return GCP{}, fmt.Errorf("missing required GCP environment variables: %s", strings.Join(errors, ", "))
-	}
-	return cfg, nil
-}
-
-func waBusinessEnv() (WABusiness, error) {
-	cfg := WABusiness{
-		Version:     os.Getenv("WA_BUSINESS_VERSION"),
-		AccessToken: os.Getenv("WA_BUSINESS_ACCESS_TOKEN"),
-	}
-	errors := []string{}
-	if cfg.AccessToken == "" {
-		errors = append(errors, "WA_BUSINESS_ACCESS_TOKEN is required")
-	}
-	if cfg.Version == "" {
-		cfg.Version = "v25.0"
-	}
-	if len(errors) > 0 {
-		return WABusiness{}, fmt.Errorf("missing required WA Business environment variables: %s", strings.Join(errors, ", "))
 	}
 	return cfg, nil
 }

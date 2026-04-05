@@ -5,4 +5,5 @@ type StorageMedia struct {
 	OriginalName string `firestore:"original_name"`
 	URL          string `firestore:"url"`
 	AccessURL    string `firestore:"access_url"`
+	CreatedAt    int64  `firestore:"created_at"`
 }

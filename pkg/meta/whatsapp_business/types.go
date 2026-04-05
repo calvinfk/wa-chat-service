@@ -1,6 +1,9 @@
 package whatsapp_business
 
 type Client struct {
+	BaseURL         string
+	WabaID          string
+	PhoneNumberID   string
 	Version         string
 	UserAccessToken string
 }

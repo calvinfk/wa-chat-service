@@ -22,6 +22,7 @@ func NewChatHandler(messageUsecase usecase.Message) HandlerV1 {
 
 func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	api.Post("/chat/send", h.SendMessage)
+	api.Get("/chat/template-list", h.GetTemplateList)
 }
 
 func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
@@ -47,5 +48,16 @@ func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
 
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) GetTemplateList(ctx fiber.Ctx) error {
+	var requestData dto.TemplateListRequest
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	templates, serverError, err := h.messageUsecase.GetTemplateList(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved template list", templates)
 	return ctx.Status(code).JSON(response)
 }

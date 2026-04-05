@@ -7,26 +7,27 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"os"
+	"strings"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
-func NewWhatsappBusiness(version, userAccessToken string) *Client {
+func New(userAccessToken string, wabaID string, phoneNumberID string) *Client {
 	return &Client{
-		Version:         version,
+		BaseURL:         "https://graph.facebook.com",
+		Version:         os.Getenv("META_GRAPH_API_VERSION"),
 		UserAccessToken: userAccessToken,
+		WabaID:          wabaID,
+		PhoneNumberID:   phoneNumberID,
 	}
 }
 
-func (wb *Client) GetMessageEndpoint(phoneNumberID string) string {
-	return fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", wb.Version, phoneNumberID)
-}
-
-func (wb *Client) postAPI(endpoint string, payload any) ([]byte, int, error) {
+func (wb *Client) accessAPI(endpoint string, method string, payload any) ([]byte, int, error) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, 0, err
 	}
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(method, endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -45,6 +46,15 @@ func (wb *Client) postAPI(endpoint string, payload any) ([]byte, int, error) {
 	return body, resp.StatusCode, nil
 }
 
+func (wb *Client) GetBaseURLVersion() string {
+	var urlBuilder strings.Builder
+	urlBuilder.WriteString(wb.BaseURL)
+	if wb.Version != "" {
+		urlBuilder.WriteString("/" + wb.Version)
+	}
+	return urlBuilder.String()
+}
+
 func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_business_component.MessageComponent) (MessageResponse, error) {
 	payloadData := map[string]any{
 		"messaging_product": "whatsapp",
@@ -53,7 +63,8 @@ func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_busines
 		"type":              payload.GetType(),
 	}
 	maps.Copy(payloadData, payload.GetPayload())
-	body, httpCode, err := wb.postAPI(wb.GetMessageEndpoint(phoneNumberID), payloadData)
+	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), phoneNumberID)
+	body, httpCode, err := wb.accessAPI(endpoint, "POST", payloadData)
 	if err != nil {
 		return MessageResponse{}, err
 	} else if httpCode != http.StatusOK {
@@ -68,4 +79,26 @@ func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_busines
 		return MessageResponse{}, err
 	}
 	return response, nil
+}
+
+func (wb *Client) GetTemplateList() ([]any, error) {
+	endpoint := fmt.Sprintf("%s/%s/message_templates", wb.GetBaseURLVersion(), wb.WabaID)
+	body, httpCode, err := wb.accessAPI(endpoint, "GET", nil)
+	if err != nil {
+		return nil, err
+	}
+	if httpCode != http.StatusOK {
+		var responseError WhatsAppBusinessError
+		if err := json.Unmarshal(body, &responseError); err != nil {
+			return nil, fmt.Errorf("unexpected http code: %d", httpCode)
+		}
+		return nil, responseError
+	}
+	var response struct {
+		Data []any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+	return response.Data, nil
 }

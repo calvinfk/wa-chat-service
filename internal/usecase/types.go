@@ -16,6 +16,7 @@ type (
 
 	Message interface {
 		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
+		GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]any, bool, error)
 	}
 
 	StorageMedia interface {

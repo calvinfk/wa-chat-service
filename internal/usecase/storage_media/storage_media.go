@@ -55,7 +55,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		return response, true, err
 	}
 	fileURL := "gs://" + attrs.Bucket + "/" + attrs.Name
-	url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(attrs.Bucket, attrs.Name)
+	url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(attrs.Bucket, attrs.Name, 0)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to generate attachment URL:", err)
 		return response, true, err
