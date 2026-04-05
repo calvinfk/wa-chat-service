@@ -17,13 +17,13 @@ func NewWhatsappService() *WhatsappService {
 }
 
 func (ws *WhatsappService) SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
-	response, httpCode, err := client.SendMessage(client.PhoneNumberID, "individual", to, payload)
+	response, httpCode, err := client.SendMessage(client.PhoneNumberID, to, "individual", payload)
 	if err != nil {
 		if httpCode == http.StatusBadRequest {
 			waError, ok := err.(whatsapp_business.WhatsAppBusinessError)
 			if ok {
-				log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] WhatsApp Business API error: %s (code: %d, subcode: %d)", waError.ErrorData.Message, waError.ErrorData.Code, waError.ErrorData.ErrorSubcode)
 				payloadData, err := formatter.AnyToJsonString(payload.GetPayload())
+				log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] WhatsApp Business API error: %s (code: %d, subcode: %d)", waError.ErrorData.Message, waError.ErrorData.Code, waError.ErrorData.ErrorSubcode)
 				if err != nil {
 					log.Println("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] Failed to convert payload to JSON")
 				} else {

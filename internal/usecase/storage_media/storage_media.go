@@ -17,13 +17,15 @@ type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
 	firebaseService        service.GoogleFirebase
 	googleStorageService   service.GoogleStorage
+	appURL                 string
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, firebaseService service.GoogleFirebase, googleStorageService service.GoogleStorage) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, firebaseService service.GoogleFirebase, googleStorageService service.GoogleStorage, appURL string) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
 		firebaseService:        firebaseService,
 		googleStorageService:   googleStorageService,
+		appURL:                 appURL,
 	}
 }
 

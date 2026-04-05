@@ -10,6 +10,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
@@ -17,20 +18,29 @@ import (
 )
 
 type MessageUsecase struct {
-	messageRepository     repository.Message
-	chatRepository        repository.Chat
-	phoneNumberRepository repository.PhoneNumber
-	whatsappService       service.WhatsappService
-	encryptService        service.Encrypt
+	messageRepository      repository.Message
+	chatRepository         repository.Chat
+	phoneNumberRepository  repository.PhoneNumber
+	storageMediaRepository repository.StorageMedia
+	whatsappService        service.WhatsappService
+	encryptService         service.Encrypt
 }
 
-func NewMessageUsecase(messageRepository repository.Message, chatRepository repository.Chat, phoneNumberRepository repository.PhoneNumber, whatsappService service.WhatsappService, encryptService service.Encrypt) *MessageUsecase {
+func NewMessageUsecase(
+	messageRepository repository.Message,
+	chatRepository repository.Chat,
+	phoneNumberRepository repository.PhoneNumber,
+	storageMediaRepository repository.StorageMedia,
+	whatsappService service.WhatsappService,
+	encryptService service.Encrypt,
+) *MessageUsecase {
 	return &MessageUsecase{
-		messageRepository:     messageRepository,
-		chatRepository:        chatRepository,
-		phoneNumberRepository: phoneNumberRepository,
-		whatsappService:       whatsappService,
-		encryptService:        encryptService,
+		messageRepository:      messageRepository,
+		chatRepository:         chatRepository,
+		phoneNumberRepository:  phoneNumberRepository,
+		storageMediaRepository: storageMediaRepository,
+		whatsappService:        whatsappService,
+		encryptService:         encryptService,
 	}
 }
 
@@ -64,10 +74,24 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		CreatedAt:     time.Now().Unix(),
 		UpdatedAt:     time.Now().Unix(),
 	}
-	_, err = u.chatRepository.Insert(ctx, nil, chat)
+	_, err = u.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert chat:", err)
+		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to Upsert chat:", err)
 		return response, true, err
+	}
+	var mediaURL *string
+	if media := whatsapp_business_component.GetMedia(component); media != nil {
+		if media.Link != nil {
+			storedMedia, err := u.storageMediaRepository.GetByAccessURL(ctx, *media.Link)
+			if err == nil {
+				mediaURL = &storedMedia.URL
+			} else {
+				log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get media by access URL, using original media link:", err)
+				mediaURL = media.Link
+			}
+		} else if media.ID != nil {
+			// deal with media ID
+		}
 	}
 	sendResponse, httpCode, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
 	if err != nil {
@@ -85,11 +109,12 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		MessageCategory: "-",
 		SenderName:      inputData.SenderName,
 		Payload:         payloadData,
-		Content:         component.GetMessage(),
+		MediaURL:        mediaURL,
 		Status:          "-",
 		CreatedAt:       time.Now().Unix(),
 		UpdatedAt:       time.Now().Unix(),
 	}
+
 	response, err = u.messageRepository.Upsert(ctx, nil, message)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upsert message:", err)
@@ -103,7 +128,7 @@ func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.Temp
 	if err != nil {
 		if err.Error() == "no more items in iterator" {
 			log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Phone number not found:", err)
-			return nil, false, fmt.Errorf("phone number not found")
+			return nil, false, errs.ErrGenericNotFound
 		}
 		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get phone number:", err)
 		return nil, true, err

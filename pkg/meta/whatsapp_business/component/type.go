@@ -183,6 +183,23 @@ func New(componentType string, component map[string]any) (MessageComponent, erro
 	// return messageComponent, nil
 }
 
+func GetMedia(component MessageComponent) *Media {
+	switch component.GetType() {
+	case AudioMessageType:
+		return &component.(*Audio).Media
+	case DocumentMessageType:
+		return &component.(*Document).Media
+	case ImageMessageType:
+		return &component.(*Image).Media
+	case StickerMessageType:
+		return &component.(*Sticker).Media
+	case VideoMessageType:
+		return &component.(*Video).Media
+	default:
+		return nil
+	}
+}
+
 type Interactive struct {
 	Type string `json:"type" validate:"required,oneof=cta_url list carousel button"`
 }

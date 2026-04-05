@@ -21,17 +21,18 @@ func NewMessageRepository(db *firestore.Client) *MessageRepository {
 }
 
 func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
-	var err error
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		docRef := r.db.
 			Collection("chats").Doc(message.ChatID).
 			Collection("messages").Doc(message.DocumentID)
-		err := tx.Set(docRef, message)
-		if err != nil {
-			return err
+		txErr := tx.Set(docRef, message)
+		if txErr != nil {
+			return txErr
 		}
 		return nil
 	}
+
+	var err error
 	if tx == nil {
 		err = r.db.RunTransaction(ctx, execDB)
 	} else {

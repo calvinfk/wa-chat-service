@@ -18,8 +18,8 @@ type (
 	}
 
 	Chat interface {
-		// Inserts a chat entry.
-		Insert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)
+		// Inserts or updates a chat entry.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)
 		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], error)
 	}
 
@@ -36,6 +36,8 @@ type (
 		Insert(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) (model.StorageMedia, error)
 		// Gets media entry by document ID.
 		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
+		// Gets media entry by access URL.
+		GetByAccessURL(ctx context.Context, accessURL string) (model.StorageMedia, error)
 	}
 
 	PhoneNumber interface {

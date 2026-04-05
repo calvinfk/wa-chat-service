@@ -59,8 +59,8 @@ func Run(config *config.Config) {
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
-	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, whatsappService, encryptService)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, googleFirebaseService, googleStorageService)
+	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, storageMediaRepository, whatsappService, encryptService)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, googleFirebaseService, googleStorageService, config.App.URL)
 	chatUsecase := chat_usecase.NewChatUsecase(chatRepository)
 
 	// Router Handler

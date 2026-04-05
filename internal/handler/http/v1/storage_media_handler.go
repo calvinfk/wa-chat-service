@@ -22,8 +22,11 @@ func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia) *StorageMe
 }
 
 func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
-	router.Post("/upload", h.UploadMedia)
-	router.Get("/get", h.GetMedia)
+	storageMediaRouter := router.Group("/storage-media")
+	{
+		storageMediaRouter.Post("/upload", h.UploadMedia)
+		storageMediaRouter.Get("/get", h.GetMedia)
+	}
 }
 
 func (h *StorageMediaHandler) UploadMedia(ctx fiber.Ctx) error {

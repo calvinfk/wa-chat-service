@@ -3,6 +3,7 @@ package repository_firestore
 import (
 	"context"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 
 	"cloud.google.com/go/firestore"
 )
@@ -40,6 +41,21 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 	}
 	var media model.StorageMedia
 	if err := docSnap.DataTo(&media); err != nil {
+		return model.StorageMedia{}, err
+	}
+	return media, nil
+}
+
+func (r *StorageMediaRepository) GetByAccessURL(ctx context.Context, accessURL string) (model.StorageMedia, error) {
+	docs, err := r.db.Collection(r.storageMedia.TableName()).Where("access_url", "==", accessURL).Limit(1).Documents(ctx).GetAll()
+	if err != nil {
+		return model.StorageMedia{}, err
+	}
+	if len(docs) == 0 {
+		return model.StorageMedia{}, errs.ErrGenericNotFound
+	}
+	var media model.StorageMedia
+	if err := docs[0].DataTo(&media); err != nil {
 		return model.StorageMedia{}, err
 	}
 	return media, nil

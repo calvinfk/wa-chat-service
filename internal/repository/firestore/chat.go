@@ -2,6 +2,7 @@ package repository_firestore
 
 import (
 	"context"
+	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
@@ -23,28 +24,40 @@ func NewChatRepository(db *firestore.Client) *ChatRepository {
 	}
 }
 
-func (r *ChatRepository) Insert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, error) {
-	var err error
+func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, error) {
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		doc := r.db.Collection("chats").Doc(chat.DocumentID)
-		err := tx.Update(doc, []firestore.Update{
+		_, getErr := tx.Get(doc)
+		if getErr != nil {
+			if status.Code(getErr) != codes.NotFound {
+				return getErr
+			}
+
+			setErr := tx.Set(doc, chat)
+			if setErr != nil {
+				return setErr
+			}
+			return nil
+		}
+
+		updateErr := tx.Update(doc, []firestore.Update{
 			{Path: "last_message", Value: chat.LastMessage},
 			{Path: "updated_at", Value: chat.UpdatedAt},
 		})
-		if err == nil {
-			return nil
+		if updateErr != nil {
+			return updateErr
 		}
-		if status.Code(err) != codes.NotFound {
-			return err
-		}
-		err = tx.Set(doc, chat)
-		return err
+
+		return nil
 	}
+
+	var err error
 	if tx == nil {
 		err = r.db.RunTransaction(ctx, execDB)
 	} else {
 		err = execDB(ctx, tx)
 	}
+	log.Println("[INFO][internal/repository/firestore/chat.go][Upsert] Upsert transaction completed with error:", err)
 	return chat, err
 }
 
