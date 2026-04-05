@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -15,6 +17,8 @@ import (
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
+
+	"github.com/google/uuid"
 )
 
 type MessageUsecase struct {
@@ -24,6 +28,7 @@ type MessageUsecase struct {
 	storageMediaRepository repository.StorageMedia
 	whatsappService        service.WhatsappService
 	encryptService         service.Encrypt
+	googleFirebaseService  service.GoogleFirebase
 }
 
 func NewMessageUsecase(
@@ -33,6 +38,7 @@ func NewMessageUsecase(
 	storageMediaRepository repository.StorageMedia,
 	whatsappService service.WhatsappService,
 	encryptService service.Encrypt,
+	googleFirebaseService service.GoogleFirebase,
 ) *MessageUsecase {
 	return &MessageUsecase{
 		messageRepository:      messageRepository,
@@ -41,6 +47,7 @@ func NewMessageUsecase(
 		storageMediaRepository: storageMediaRepository,
 		whatsappService:        whatsappService,
 		encryptService:         encryptService,
+		googleFirebaseService:  googleFirebaseService,
 	}
 }
 
@@ -79,15 +86,59 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to Upsert chat:", err)
 		return response, true, err
 	}
-	var mediaURL *string
+	var storageMediaID *string
 	if media := whatsapp_business_component.GetMedia(component); media != nil {
 		if media.Link != nil {
 			storedMedia, err := u.storageMediaRepository.GetByAccessURL(ctx, *media.Link)
 			if err == nil {
-				mediaURL = &storedMedia.URL
+				storageMediaID = &storedMedia.DocumentID
 			} else {
-				log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get media by access URL, using original media link:", err)
-				mediaURL = media.Link
+				// create new storage media record with original media link as access URL
+				newMediaID, err := uuid.NewV7()
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to generate new media ID:", err)
+					return response, true, err
+				}
+				// download the file
+				fileData, urlHeaders, err := formatter.DownloadFile(*media.Link)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to download media file:", err)
+					return response, true, err
+				}
+				// upload to firebase storage
+
+				filename := urlHeaders.Get("Content-Disposition")
+				if filename == "" {
+					// check the url path for filename if Content-Disposition header is not present
+					urlParts := strings.Split(*media.Link, "/")
+					if len(urlParts) > 0 {
+						urlParts[len(urlParts)-1] = strings.Split(urlParts[len(urlParts)-1], "?")[0] // remove query params
+						// check if the last part of the URL path has a valid filename format (e.g., has an extension)
+						if strings.Contains(urlParts[len(urlParts)-1], ".") {
+							filename = urlParts[len(urlParts)-1]
+						}
+					}
+					if filename == "" {
+						filename = fmt.Sprintf("%s.%s", newMediaID.String(), strings.Split(urlHeaders.Get("Content-Type"), "/")[1]) // default filename if not provided
+					}
+				}
+				filePath := "whatsapp-media/" + newMediaID.String() + filepath.Ext(filename)
+				attrs, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upload media file to storage:", err)
+					return response, true, err
+				}
+				newMedia := model.StorageMedia{
+					DocumentID:   newMediaID.String(),
+					OriginalName: filename,
+					MimeType:     attrs.ContentType,
+					URL:          *media.Link,
+					CreatedAt:    time.Now().Unix(),
+				}
+				_, err = u.storageMediaRepository.Insert(ctx, nil, newMedia)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert new storage media record:", err)
+				}
 			}
 		} else if media.ID != nil {
 			// deal with media ID
@@ -109,12 +160,11 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		MessageCategory: "-",
 		SenderName:      inputData.SenderName,
 		Payload:         payloadData,
-		MediaURL:        mediaURL,
+		StorageMediaID:  storageMediaID,
 		Status:          "-",
 		CreatedAt:       time.Now().Unix(),
 		UpdatedAt:       time.Now().Unix(),
 	}
-
 	response, err = u.messageRepository.Upsert(ctx, nil, message)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upsert message:", err)

@@ -59,7 +59,7 @@ func Run(config *config.Config) {
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
-	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, storageMediaRepository, whatsappService, encryptService)
+	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, storageMediaRepository, whatsappService, encryptService, googleFirebaseService)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, phoneNumberRepository, googleFirebaseService, googleStorageService, encryptService, whatsappService)
 	chatUsecase := chat_usecase.NewChatUsecase(chatRepository)
 

@@ -10,6 +10,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"cloud.google.com/go/storage"
@@ -90,11 +91,10 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	media := model.StorageMedia{
 		DocumentID:   documentID.String(),
-		MediaID:      mediaID,
+		MediaID:      &mediaID,
 		OriginalName: originalFileName,
 		MimeType:     inputData.File.Header.Get("Content-Type"),
 		URL:          fileURL,
-		AccessURL:    url,
 		CreatedAt:    time.Now().Unix(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
@@ -103,7 +103,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		return response, true, err
 	}
 
-	response.FromModel(media)
+	response.FromModel(media, url)
 	return response, false, nil
 }
 
@@ -142,15 +142,35 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 		return true, err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
-	media, err := u.storageMediaRepository.GetByMediaID(ctx, inputData.MediaID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to get media data from repository:", err)
-		return true, err
+	var media *model.StorageMedia
+	if inputData.MediaID != "" {
+		mediaData, err := u.storageMediaRepository.GetByMediaID(ctx, inputData.MediaID)
+		if err == nil {
+			media = &mediaData
+		} else if err != errs.ErrGenericNotFound {
+			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to get media data from repository:", err)
+			return true, err
+		}
 	}
-	httpCode, err := u.whatsappService.DeleteMedia(ctx, whatsappClient, media.MediaID)
-	if err != nil {
-		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
-		return httpCode == http.StatusInternalServerError, err
+	if inputData.ID != "" {
+		mediaData, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
+		if err == nil {
+			media = &mediaData
+		} else if err != errs.ErrGenericNotFound {
+			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to get media data from repository:", err)
+			return true, err
+		}
+	}
+	if media == nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Media not found with provided ID or MediaID")
+		return true, errs.ErrGenericNotFound
+	}
+	if media.MediaID != nil {
+		httpCode, err := u.whatsappService.DeleteMedia(ctx, whatsappClient, *media.MediaID)
+		if err != nil {
+			log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
+			return httpCode == http.StatusInternalServerError, err
+		}
 	}
 	err = u.storageMediaRepository.Delete(ctx, nil, media.DocumentID)
 	if err != nil {

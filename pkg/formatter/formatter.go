@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
@@ -217,4 +219,32 @@ func (v *structValidator) GetErrorMessages(err error) map[string]string {
 		}
 	}
 	return FormatErrors(err, nil)
+}
+
+func GetURLHeaders(fileURL string) (http.Header, error) {
+	// Implementation for checking MIME type based on file URL
+	log.Println("[INFO][formatter/formatter.go][GetURLHeaders] Checking URL headers for:", fileURL)
+	client := http.Client{}
+	resp, err := client.Head(fileURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return resp.Header, nil
+}
+
+func DownloadFile(fileURL string) ([]byte, http.Header, error) {
+	client := http.Client{}
+	resp, err := client.Get(fileURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	fileData := make([]byte, resp.ContentLength)
+	_, err = resp.Body.Read(fileData)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fileData, resp.Header, nil
 }
