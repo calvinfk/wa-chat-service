@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"maps"
 	"mime/multipart"
 	"net/http"
@@ -134,7 +133,6 @@ func (wb *Client) UploadMedia(fileBytes []byte, filename string, mimeType string
 	}
 	req, err := http.NewRequest("POST", endpoint, &buf)
 	if err != nil {
-		log.Println("[ERROR][whatsapp_business/whatsapp_business.go][UploadMedia] Failed to create HTTP request:", err)
 		return emptyResponse, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
@@ -142,22 +140,19 @@ func (wb *Client) UploadMedia(fileBytes []byte, filename string, mimeType string
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("[ERROR][whatsapp_business/whatsapp_business.go][UploadMedia] Failed to send HTTP request:", err)
 		return emptyResponse, 0, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("[ERROR][whatsapp_business/whatsapp_business.go][UploadMedia] Failed to read HTTP response body:", err)
 		return emptyResponse, 0, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		var responseError WhatsAppBusinessError
 		if err := json.Unmarshal(body, &responseError); err != nil {
-			log.Println("[ERROR][whatsapp_business/whatsapp_business.go][UploadMedia] Failed to unmarshal response error:", err)
+
 			return emptyResponse, resp.StatusCode, fmt.Errorf("unexpected http code: %d", resp.StatusCode)
 		}
-		log.Println("[ERROR][whatsapp_business/whatsapp_business.go][UploadMedia] Response error:", responseError)
 		return emptyResponse, resp.StatusCode, responseError
 	}
 	var response UploadMediaResponse
