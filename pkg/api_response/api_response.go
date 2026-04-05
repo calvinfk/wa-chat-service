@@ -9,14 +9,15 @@ import (
 )
 
 type ApiResponse struct {
-	Code    int               `json:"code"`
-	Message string            `json:"message"`
-	Data    any               `json:"data"`
-	Errors  map[string]string `json:"errors"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
+	// Errors  map[string]string `json:"errors"`
+	Errors any `json:"errors"`
 }
 
 // NewApiResponse creates a standardized API response based on the provided parameters. It determines the appropriate HTTP status code and message based on whether there was a server error, a client error, or a successful operation, and formats the response accordingly.
-func NewApiResponse(serverError bool, err error, successMessage string, data any) (int, ApiResponse) {
+func NewApiResponse(serverError bool, err any, successMessage string, data any) (int, ApiResponse) {
 	var response ApiResponse
 	if serverError {
 		response.Code = http.StatusInternalServerError
@@ -32,8 +33,13 @@ func NewApiResponse(serverError bool, err error, successMessage string, data any
 			response.Data = nil
 			response.Errors = errors
 			response.Message = "Validation error"
-		} else {
-			switch err {
+		} else if errMap, ok := err.(map[string]string); ok {
+			response.Code = http.StatusBadRequest
+			response.Data = nil
+			response.Errors = errMap
+			response.Message = "Validation error"
+		} else if errors, ok := err.(error); ok {
+			switch errors {
 			case errs.ErrGenericForbidden:
 				response.Code = http.StatusForbidden
 				response.Data = nil
@@ -45,7 +51,12 @@ func NewApiResponse(serverError bool, err error, successMessage string, data any
 				response.Data = nil
 				response.Errors = nil
 			}
-			response.Message = formatter.CapitalizeFirstLetter(err.Error())
+			response.Message = formatter.CapitalizeFirstLetter(errors.Error())
+		} else {
+			response.Code = http.StatusBadRequest
+			response.Data = nil
+			response.Errors = err
+			response.Message = "Bad request"
 		}
 	} else {
 		response.Code = http.StatusOK

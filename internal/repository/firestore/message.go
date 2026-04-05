@@ -2,7 +2,10 @@ package repository_firestore
 
 import (
 	"context"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/filter_request"
+	"wa_chat_service/pkg/formatter"
 
 	"cloud.google.com/go/firestore"
 )
@@ -55,4 +58,34 @@ func (r *MessageRepository) InsertLog(ctx context.Context, tx *firestore.Transac
 		err = execDB(ctx, tx)
 	}
 	return messageLog, err
+}
+
+func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], error) {
+	var response filter_request.FilterResponse[dto.MessageGetByChatIDResponse]
+	filters, sort, paginate, err := filter_request.InitializeFilter(requestData, r.message.AllowedFilterFields(), r.message.AllowedSortFields())
+	if err != nil {
+		return response, err
+	}
+	collection := r.db.Collection("chats").Doc(requestData.SpecificFilter.ChatID).Collection(r.message.TableName())
+	query := collection.Query
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	if err != nil {
+		return response, err
+	}
+	var result []dto.MessageGetByChatIDResponse
+	for _, doc := range docs {
+		var message model.Message
+		docData := doc.Data()
+		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["chat_id"] = doc.Ref.Parent.Parent.ID
+		err := formatter.MapToStruct(docData, &message)
+		if err != nil {
+			return response, err
+		}
+		var data dto.MessageGetByChatIDResponse
+		data.FromModel(message)
+		result = append(result, data)
+	}
+	response = filter_request.NewFilterResponse(result, paginate, totalData)
+	return response, nil
 }

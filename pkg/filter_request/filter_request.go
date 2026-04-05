@@ -45,7 +45,10 @@ func (r *FilterRequest[T]) Validate() map[string]string {
 	maps.Copy(errors, r.SpecificFilter.Validate())
 	maps.Copy(errors, r.Paginate.Validate())
 	maps.Copy(errors, r.Sort.Validate())
-	return errors
+	if len(errors) > 0 {
+		return errors
+	}
+	return nil
 }
 
 // isEmpty checks if a given string is empty, "null", or equal to the string representation of a nil UUID. This function is used to determine whether a filter value should be considered as not provided or invalid when processing filter requests.
@@ -56,10 +59,14 @@ func isEmpty(str string) bool {
 // NewFilterResponse creates a new instance of FilterResponse based on the provided result slice, pagination information, and total item count. It calculates the total number of pages based on the total items and page size, and returns a structured response that can be used to standardize the format of API responses for filtered requests.
 func NewFilterResponse[T any](results []T, paginate Paginate, totalItems int64) FilterResponse[T] {
 	r := FilterResponse[T]{
-		Results:    results,
 		Page:       paginate.Page,
 		TotalItems: totalItems,
 		PageSize:   paginate.PageSize,
+	}
+	if len(results) == 0 {
+		r.Results = nil
+	} else {
+		r.Results = results
 	}
 	if r.PageSize > 0 {
 		r.TotalPages = int((totalItems + int64(r.PageSize) - 1) / int64(r.PageSize))
@@ -140,21 +147,17 @@ func ApplyFilterGorm[T any](query *gorm.DB, data *[]T, filters []Filter, paginat
 	return totalData, nil
 }
 
-func ApplyFilterFirestore[T any](ctx context.Context, ref *firestore.CollectionRef, results *[]T, filters []Filter, paginate Paginate, sort Sort) (int64, error) {
-	if results == nil {
-		return 0, ErrNilPointer
-	}
-	query := ref.Query
+func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []Filter, paginate Paginate, sort Sort) ([]*firestore.DocumentSnapshot, int64, error) {
 	for _, filter := range filters {
 		query = query.Where(filter.Field, parseOperatorToFirestoreCondition(filter.Operator), filter.Value)
 	}
 	countResult, err := query.NewAggregationQuery().WithCount("all").Get(ctx)
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	count, ok := countResult["all"]
 	if !ok {
-		return 0, ErrInvalidCountAlias
+		return nil, 0, ErrInvalidCountAlias
 	}
 	totalData := count.(*firestorepb.Value).GetIntegerValue()
 	startsAt := (paginate.Page - 1) * paginate.PageSize
@@ -163,15 +166,18 @@ func ApplyFilterFirestore[T any](ctx context.Context, ref *firestore.CollectionR
 	).Offset(startsAt).Limit(paginate.PageSize).Documents(ctx)
 	docs, err := page.GetAll()
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
-	for _, doc := range docs {
-		var data T
-		err := formatter.MapToStruct(doc.Data(), &data)
-		if err != nil {
-			return 0, err
-		}
-		*results = append(*results, data)
-	}
-	return totalData, nil
+	// for _, doc := range docs {
+	// 	var data T
+	// 	docData := doc.Data()
+	// 	log.Println("[DEBUG][ApplyFilterFirestore] docData:", docData)
+	// 	docData[firestore.DocumentID] = doc.Ref.ID
+	// 	err := formatter.MapToStruct(docData, &data)
+	// 	if err != nil {
+	// 		return nil, 0, err
+	// 	}
+	// 	*results = append(*results, data)
+	// }
+	return docs, totalData, nil
 }

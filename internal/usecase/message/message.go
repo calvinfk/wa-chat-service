@@ -10,6 +10,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
@@ -54,12 +55,14 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	}
 	// create chat header if not exist
 	chat := model.Chat{
-		DocumentID:  fmt.Sprintf("%s-%s", inputData.RecipientID, inputData.PhoneNumberID),
-		ChatType:    "individual",
-		LastMessage: component.GetMessage(),
-		DisplayName: inputData.RecipientName,
-		CreatedAt:   time.Now().Unix(),
-		UpdatedAt:   time.Now().Unix(),
+		DocumentID:    fmt.Sprintf("%s-%s", inputData.RecipientID, inputData.PhoneNumberID),
+		PhoneNumberID: inputData.PhoneNumberID,
+		RecipientID:   inputData.RecipientID,
+		ChatType:      "individual",
+		LastMessage:   component.GetMessage(),
+		DisplayName:   inputData.RecipientName,
+		CreatedAt:     time.Now().Unix(),
+		UpdatedAt:     time.Now().Unix(),
 	}
 	_, err = u.chatRepository.Insert(ctx, nil, chat)
 	if err != nil {
@@ -117,4 +120,14 @@ func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.Temp
 		return nil, httpCode != http.StatusBadRequest, err
 	}
 	return templateList, false, nil
+}
+
+func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error) {
+	var response filter_request.FilterResponse[dto.MessageGetByChatIDResponse]
+	messages, err := u.messageRepository.GetMessageByChatID(ctx, requestData)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/message/message.go][GetMessagesByChatID] Failed to get messages by chat ID:", err)
+		return response, true, err
+	}
+	return messages, false, nil
 }

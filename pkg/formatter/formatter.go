@@ -206,3 +206,15 @@ func (v *structValidator) Validate(out any) error {
 	}
 	return v.validate.Struct(out)
 }
+
+func (v *structValidator) GetErrorMessages(err error) map[string]string {
+	if err == nil {
+		return nil
+	}
+	if _, ok := err.(validator.ValidationErrors); !ok {
+		return map[string]string{
+			"error": err.Error(),
+		}
+	}
+	return FormatErrors(err, nil)
+}

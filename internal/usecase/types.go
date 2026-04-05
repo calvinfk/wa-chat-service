@@ -4,6 +4,7 @@ import (
 	"context"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/filter_request"
 
 	"cloud.google.com/go/storage"
 )
@@ -17,10 +18,15 @@ type (
 	Message interface {
 		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
 		GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]any, bool, error)
+		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error)
 	}
 
 	StorageMedia interface {
 		UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error)
 		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error)
+	}
+
+	Chat interface {
+		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], bool, error)
 	}
 )

@@ -15,6 +15,7 @@ import (
 	google_service "wa_chat_service/internal/service/google"
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
+	chat_usecase "wa_chat_service/internal/usecase/chat"
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	"wa_chat_service/pkg/google"
@@ -60,12 +61,14 @@ func Run(config *config.Config) {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
 	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, whatsappService, encryptService)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, googleFirebaseService, googleStorageService)
+	chatUsecase := chat_usecase.NewChatUsecase(chatRepository)
 
 	// Router Handler
 	routerHandlerV1 := http_v1.RouterHandlerV1{
 		ActivityLogUsecase:    activityLogUsecase,
 		MessageUsecase:        messageUsecase,
 		StorageMediaUsecase:   storageMediaUsecase,
+		ChatUsecase:           chatUsecase,
 		AccessTokenService:    accessTokenService,
 		EncryptService:        encryptService,
 		GoogleStorageService:  googleStorageService,

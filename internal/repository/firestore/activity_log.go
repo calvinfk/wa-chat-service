@@ -51,18 +51,27 @@ func (r *ActivityLogRepository) Insert(ctx context.Context, tx *firestore.Transa
 
 func (r *ActivityLogRepository) GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.ActivityLogFilterRequest]) (filter_request.FilterResponse[dto.ActivityLogResponse], error) {
 	var response filter_request.FilterResponse[dto.ActivityLogResponse]
-	var activityLogs []model.ActivityLog
+	// var activityLogs []model.ActivityLog
 	filters, sort, paginate, err := filter_request.InitializeFilter(filter, r.model.AllowedFilterFields(), r.model.AllowedSortFields())
 	if err != nil {
 		return response, err
 	}
-	query := r.firestoreClient.Collection(r.model.TableName())
-	totalData, err := filter_request.ApplyFilterFirestore(ctx, query, &activityLogs, filters, paginate, sort)
+	collection := r.firestoreClient.Collection(r.model.TableName())
+	query := collection.Query
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	if err != nil {
+		return response, err
+	}
 	var result []dto.ActivityLogResponse
-	for _, activityLog := range activityLogs {
-		var data dto.ActivityLogResponse
-		data.FromModel(activityLog)
-		result = append(result, data)
+	for _, doc := range docs {
+		var data model.ActivityLog
+		err := doc.DataTo(&data)
+		if err != nil {
+			return response, err
+		}
+		var responseData dto.ActivityLogResponse
+		responseData.FromModel(data)
+		result = append(result, responseData)
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

@@ -6,23 +6,32 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
+	"wa_chat_service/pkg/filter_request"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type ChatHandler struct {
 	messageUsecase usecase.Message
+	chatUsecase    usecase.Chat
 }
 
-func NewChatHandler(messageUsecase usecase.Message) HandlerV1 {
+func NewChatHandler(messageUsecase usecase.Message, chatUsecase usecase.Chat) HandlerV1 {
 	return &ChatHandler{
 		messageUsecase: messageUsecase,
+		chatUsecase:    chatUsecase,
 	}
 }
 
 func (h *ChatHandler) RegisterRoute(api fiber.Router) {
-	api.Post("/chat/send", h.SendMessage)
-	api.Get("/chat/template-list", h.GetTemplateList)
+	chatGroup := api.Group("/chat")
+	{
+		chatGroup.Post("/send", h.SendMessage)
+		chatGroup.Get("/template-list", h.GetTemplateList)
+		chatGroup.Get("/by-phone-number-id", h.GetChatByPhoneNumberID)
+		chatGroup.Get("/messages", h.GetMessagesByChatID)
+	}
+
 }
 
 func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
@@ -59,5 +68,43 @@ func (h *ChatHandler) GetTemplateList(ctx fiber.Ctx) error {
 	}
 	templates, serverError, err := h.messageUsecase.GetTemplateList(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved template list", templates)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) GetChatByPhoneNumberID(ctx fiber.Ctx) error {
+	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	if validationErrors := requestData.Validate(); validationErrors != nil {
+		code, response := api_response.NewApiResponse(false, validationErrors, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved chats", chats)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) GetMessagesByChatID(ctx fiber.Ctx) error {
+	var requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	if validationErrors := requestData.Validate(); validationErrors != nil {
+		code, response := api_response.NewApiResponse(false, validationErrors, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved messages", messages)
 	return ctx.Status(code).JSON(response)
 }

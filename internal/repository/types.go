@@ -20,6 +20,7 @@ type (
 	Chat interface {
 		// Inserts a chat entry.
 		Insert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)
+		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], error)
 	}
 
 	Message interface {
@@ -27,6 +28,7 @@ type (
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
 		// Insert Log Message entry.
 		InsertLog(ctx context.Context, tx *firestore.Transaction, data model.MessageLog) (model.MessageLog, error)
+		GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], error)
 	}
 
 	StorageMedia interface {
