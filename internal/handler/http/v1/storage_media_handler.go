@@ -27,6 +27,7 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 		storageMediaRouter.Post("/upload", h.UploadMedia)
 		storageMediaRouter.Get("/get", h.GetMedia)
 		storageMediaRouter.Delete("/delete", h.DeleteMedia)
+		storageMediaRouter.Post("/upload-media-id", h.UploadMediaUsingMediaID)
 	}
 }
 
@@ -80,5 +81,17 @@ func (h *StorageMediaHandler) DeleteMedia(ctx fiber.Ctx) error {
 	}
 	deleted, err := h.storageMediaUsecase.DeleteMedia(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(false, err, "Media deleted successfully", deleted)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *StorageMediaHandler) UploadMediaUsingMediaID(ctx fiber.Ctx) error {
+	var requestData dto.StorageMediaUploadUsingMediaIDRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][UploadMediaUsingMediaID] Failed to bind request data:", err)
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	id, serverError, err := h.storageMediaUsecase.UploadMediaUsingMediaID(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", fiber.Map{"id": id})
 	return ctx.Status(code).JSON(response)
 }

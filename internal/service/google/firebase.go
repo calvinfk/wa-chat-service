@@ -84,24 +84,25 @@ func (s *GoogleFirebaseService) SendNotificationToTopic(ctx context.Context, tit
 	return nil
 }
 
-func (s *GoogleFirebaseService) UploadFile(ctx context.Context, filePath string, file []byte) (*gs.ObjectAttrs, error) {
+func (s *GoogleFirebaseService) UploadFile(ctx context.Context, filePath string, file []byte) (string, *gs.ObjectAttrs, error) {
 	bucket, err := s.firebaseStorageClient.DefaultBucket()
 	if err != nil {
-		return nil, fmt.Errorf("error getting bucket: %v", err)
+		return "", nil, fmt.Errorf("error getting bucket: %v", err)
 	}
 	object := bucket.Object(filePath)
 	writer := object.NewWriter(ctx)
 	if _, err := writer.Write(file); err != nil {
-		return nil, fmt.Errorf("error writing file: %v", err)
+		return "", nil, fmt.Errorf("error writing file: %v", err)
 	}
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("error closing writer: %v", err)
+		return "", nil, fmt.Errorf("error closing writer: %v", err)
 	}
 	attrs, err := object.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting object attributes: %v", err)
+		return "", nil, fmt.Errorf("error getting object attributes: %v", err)
 	}
-	return attrs, nil
+
+	return fmt.Sprintf("gs://%s/%s", attrs.Bucket, filePath), attrs, nil
 }
 
 func (s *GoogleFirebaseService) DeleteFile(ctx context.Context, filePath string) error {

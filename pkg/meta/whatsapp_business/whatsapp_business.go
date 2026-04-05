@@ -182,26 +182,26 @@ func (wb *Client) GetMediaURL(mediaID string) (GetMediaURLResponse, int, error) 
 	return response, httpCode, nil
 }
 
-func (wb *Client) DownloadMedia(mediaURL string) ([]byte, int, error) {
+func (wb *Client) DownloadMedia(mediaURL string) ([]byte, http.Header, int, error) {
 	req, err := http.NewRequest("GET", mediaURL, nil)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("failed to download media, status code: %d", resp.StatusCode)
+		return nil, resp.Header, resp.StatusCode, fmt.Errorf("failed to download media, status code: %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, resp.StatusCode, err
+		return nil, resp.Header, resp.StatusCode, err
 	}
-	return body, resp.StatusCode, nil
+	return body, resp.Header, resp.StatusCode, nil
 }
 
 func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) {
@@ -222,4 +222,12 @@ func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) 
 		return DeleteMediaResponse{}, httpCode, err
 	}
 	return response, httpCode, nil
+}
+
+func ParseMediaExtension(mimeType string) string {
+	extension, exists := mimeTypeExtensionMap[mimeType]
+	if !exists {
+		return ""
+	}
+	return extension
 }

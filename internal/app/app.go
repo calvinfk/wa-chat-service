@@ -18,6 +18,7 @@ import (
 	chat_usecase "wa_chat_service/internal/usecase/chat"
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
+	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/google"
 
 	"github.com/gofiber/fiber/v3"
@@ -76,8 +77,9 @@ func Run(config *config.Config) {
 	}
 
 	app := fiber.New(fiber.Config{
-		AppName:   config.App.Name,
-		BodyLimit: 16 * 1024 * 1024, // 16MB
+		AppName:         config.App.Name,
+		BodyLimit:       16 * 1024 * 1024, // 16MB
+		StructValidator: formatter.Validator(),
 	})
 
 	http_internal.NewRouter(app, config, routerHandlerV1)

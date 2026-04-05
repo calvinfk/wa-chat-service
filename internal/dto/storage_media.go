@@ -28,6 +28,11 @@ type (
 		MediaID       string `query:"media_id" validate:"required_without=ID"`
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
 	}
+
+	StorageMediaUploadUsingMediaIDRequest struct {
+		MediaID       string `json:"media_id" validate:"required"`
+		PhoneNumberID string `json:"phone_number_id" validate:"required"`
+	}
 )
 
 func (r *StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL string) {

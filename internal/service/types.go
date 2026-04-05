@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/http"
 	"time"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
@@ -48,7 +49,7 @@ type (
 		// SendNotificationToTopic sends a notification to the specified topic in Firebase Cloud Messaging. It takes the notification title, body, and the topic name as parameters. It returns an error if there is an issue during the sending process.
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
 		// UploadFile uploads a file to Firebase Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file. It returns the public URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
-		UploadFile(ctx context.Context, filePath string, file []byte) (*storage.ObjectAttrs, error)
+		UploadFile(ctx context.Context, filePath string, file []byte) (string, *storage.ObjectAttrs, error)
 		// DeleteFile deletes a file from Firebase Storage. It takes the file path as a parameter and returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, filePath string) error
 	}
@@ -58,6 +59,7 @@ type (
 		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error)
 		UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
 		GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error)
+		DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)
 		DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error)
 	}
 )

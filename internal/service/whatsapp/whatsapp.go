@@ -70,13 +70,13 @@ func (ws *WhatsappService) GetMediaURL(ctx context.Context, client *whatsapp_bus
 	return mediaURLResponse.URL, httpCode, nil
 }
 
-func (ws *WhatsappService) DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaURL string) ([]byte, int, error) {
-	mediaData, httpCode, err := client.DownloadMedia(mediaURL)
+func (ws *WhatsappService) DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaURL string) ([]byte, http.Header, int, error) {
+	mediaData, urlHeaders, httpCode, err := client.DownloadMedia(mediaURL)
 	if err != nil {
 		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][DownloadMedia] Failed to download media from URL %s: %v", mediaURL, err)
-		return nil, httpCode, err
+		return nil, nil, httpCode, err
 	}
-	return mediaData, httpCode, nil
+	return mediaData, urlHeaders, httpCode, nil
 }
 
 func (ws *WhatsappService) DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error) {

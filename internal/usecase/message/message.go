@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -106,9 +107,9 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 					return response, true, err
 				}
 				// upload to firebase storage
-
-				filename := urlHeaders.Get("Content-Disposition")
-				if filename == "" {
+				var filename string
+				contentDisposition := urlHeaders.Get("Content-Disposition")
+				if contentDisposition == "" {
 					// check the url path for filename if Content-Disposition header is not present
 					urlParts := strings.Split(*media.Link, "/")
 					if len(urlParts) > 0 {
@@ -118,12 +119,20 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 							filename = urlParts[len(urlParts)-1]
 						}
 					}
-					if filename == "" {
-						filename = fmt.Sprintf("%s.%s", newMediaID.String(), strings.Split(urlHeaders.Get("Content-Type"), "/")[1]) // default filename if not provided
+				} else {
+					// extract filename from Content-Disposition header
+					_, params, err := mime.ParseMediaType(contentDisposition)
+					if err == nil {
+						filename = params["filename"]
+						log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Extracted filename:", filename)
 					}
 				}
+				log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Extracted filename:", filename)
+				if filename == "" {
+					filename = fmt.Sprintf("%s.%s", newMediaID.String(), strings.Split(urlHeaders.Get("Content-Type"), "/")[1]) // default filename if not provided
+				}
 				filePath := "whatsapp-media/" + newMediaID.String() + filepath.Ext(filename)
-				attrs, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
+				url, attrs, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
 				if err != nil {
 					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upload media file to storage:", err)
 					return response, true, err
@@ -132,7 +141,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 					DocumentID:   newMediaID.String(),
 					OriginalName: filename,
 					MimeType:     attrs.ContentType,
-					URL:          *media.Link,
+					URL:          url,
 					CreatedAt:    time.Now().Unix(),
 				}
 				_, err = u.storageMediaRepository.Insert(ctx, nil, newMedia)

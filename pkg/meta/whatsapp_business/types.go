@@ -1,5 +1,34 @@
 package whatsapp_business
 
+var (
+	mimeTypeExtensionMap = map[string]string{
+		"audio/aac":  ".aac",
+		"audio/amr":  ".amr",
+		"audio/mpeg": ".mp3",
+		"audio/mp4":  ".m4a",
+		"audio/ogg":  ".ogg",
+
+		"text/plain":               ".txt",
+		"application/vnd.ms-excel": ".xls",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+		"application/msword": ".doc",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   ".docx",
+		"application/vnd.ms-powerpoint":                                             ".ppt",
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+		"application/pdf": ".pdf",
+
+		"image/jpeg": ".jpeg",
+		"image/png":  ".png",
+
+		"image/webp": ".webp",
+
+		"video/3gpp": ".3gp",
+		"video/mp4":  ".mp4",
+
+		// "image/gif": ".gif",
+	}
+)
+
 type Client struct {
 	BaseURL         string
 	WabaID          string
