@@ -55,10 +55,10 @@ func (wb *Client) GetBaseURLVersion() string {
 	return urlBuilder.String()
 }
 
-func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_business_component.MessageComponent) (MessageResponse, error) {
+func (wb *Client) SendMessage(phoneNumberID, to, recipientType string, payload whatsapp_business_component.MessageComponent) (MessageResponse, int, error) {
 	payloadData := map[string]any{
 		"messaging_product": "whatsapp",
-		"recipient_type":    "individual",
+		"recipient_type":    recipientType,
 		"to":                to,
 		"type":              payload.GetType(),
 	}
@@ -66,39 +66,39 @@ func (wb *Client) SendMessage(phoneNumberID, to string, payload whatsapp_busines
 	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), phoneNumberID)
 	body, httpCode, err := wb.accessAPI(endpoint, "POST", payloadData)
 	if err != nil {
-		return MessageResponse{}, err
+		return MessageResponse{}, httpCode, err
 	} else if httpCode != http.StatusOK {
 		var responseError WhatsAppBusinessError
 		if err := json.Unmarshal(body, &responseError); err != nil {
-			return MessageResponse{}, fmt.Errorf("unexpected http code: %d", httpCode)
+			return MessageResponse{}, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
 		}
-		return MessageResponse{}, responseError
+		return MessageResponse{}, httpCode, responseError
 	}
 	var response MessageResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return MessageResponse{}, err
+		return MessageResponse{}, httpCode, err
 	}
-	return response, nil
+	return response, httpCode, nil
 }
 
-func (wb *Client) GetTemplateList() ([]any, error) {
+func (wb *Client) GetTemplateList() ([]any, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/message_templates", wb.GetBaseURLVersion(), wb.WabaID)
 	body, httpCode, err := wb.accessAPI(endpoint, "GET", nil)
 	if err != nil {
-		return nil, err
+		return nil, httpCode, err
 	}
 	if httpCode != http.StatusOK {
 		var responseError WhatsAppBusinessError
 		if err := json.Unmarshal(body, &responseError); err != nil {
-			return nil, fmt.Errorf("unexpected http code: %d", httpCode)
+			return nil, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
 		}
-		return nil, responseError
+		return nil, httpCode, responseError
 	}
 	var response struct {
 		Data []any `json:"data"`
 	}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, err
+		return nil, httpCode, err
 	}
-	return response.Data, nil
+	return response.Data, httpCode, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -65,10 +66,10 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert chat:", err)
 		return response, true, err
 	}
-	sendResponse, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
+	sendResponse, httpCode, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
-		return response, true, err
+		return response, httpCode != http.StatusBadRequest, err
 	}
 	payloadData, err := formatter.AnyToJsonString(component.GetPayload())
 	if err != nil {
@@ -110,10 +111,10 @@ func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.Temp
 		return nil, true, err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
-	templateList, err := u.whatsappService.GetTemplateList(ctx, whatsappClient)
+	templateList, httpCode, err := u.whatsappService.GetTemplateList(ctx, whatsappClient)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get template list:", err)
-		return nil, true, err
+		return nil, httpCode != http.StatusBadRequest, err
 	}
 	return templateList, false, nil
 }

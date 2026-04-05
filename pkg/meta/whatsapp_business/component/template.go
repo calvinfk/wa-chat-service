@@ -3,9 +3,9 @@ package whatsapp_business_component
 import "wa_chat_service/pkg/formatter"
 
 type Template struct {
-	Name       string               `json:"name" validate:"required"`
-	Language   LanguageCode         `json:"language" validate:"required"`
-	Components *[]TemplateComponent `json:"components,omitempty" validate:"omitempty,dive"`
+	Name       string       `json:"name" validate:"required"`
+	Language   LanguageCode `json:"language" validate:"required"`
+	Components *[]any       `json:"components,omitempty" validate:"omitempty,dive"`
 }
 
 type LanguageCode struct {

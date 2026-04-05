@@ -18,3 +18,21 @@ type MessageResponse struct {
 		ID string `json:"id"`
 	} `json:"messages"`
 }
+
+type WhatsAppBusinessError struct {
+	ErrorData struct {
+		Message   string            `json:"message"`
+		Type      string            `json:"type"`
+		Code      WhatsappErrorCode `json:"code"`
+		ErrorData struct {
+			MessagingProduct string `json:"messaging_product"`
+			Details          string `json:"details"`
+		} `json:"error_data"`
+		ErrorSubcode int    `json:"error_subcode"`
+		FbtraceID    string `json:"fbtrace_id"`
+	} `json:"error"`
+}
+
+func (v WhatsAppBusinessError) Error() string {
+	return v.ErrorData.Message
+}

@@ -50,7 +50,7 @@ type (
 	}
 
 	WhatsappService interface {
-		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, error)
-		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, error)
+		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error)
+		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error)
 	}
 )
