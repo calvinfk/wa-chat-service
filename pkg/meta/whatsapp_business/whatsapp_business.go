@@ -70,11 +70,7 @@ func (wb *Client) SendMessage(phoneNumberID, to, recipientType string, payload w
 	if err != nil {
 		return MessageResponse{}, httpCode, err
 	} else if httpCode != http.StatusOK {
-		var responseError WhatsAppBusinessError
-		if err := json.Unmarshal(body, &responseError); err != nil {
-			return MessageResponse{}, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
-		}
-		return MessageResponse{}, httpCode, responseError
+		return parseMetaErrorResponse(MessageResponse{}, body, httpCode)
 	}
 	var response MessageResponse
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -90,11 +86,7 @@ func (wb *Client) GetTemplateList() ([]any, int, error) {
 		return nil, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		var responseError WhatsAppBusinessError
-		if err := json.Unmarshal(body, &responseError); err != nil {
-			return nil, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
-		}
-		return nil, httpCode, responseError
+		return parseMetaErrorResponse([]any{}, body, httpCode)
 	}
 	var response struct {
 		Data []any `json:"data"`
@@ -148,12 +140,7 @@ func (wb *Client) UploadMedia(fileBytes []byte, filename string, mimeType string
 		return emptyResponse, 0, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		var responseError WhatsAppBusinessError
-		if err := json.Unmarshal(body, &responseError); err != nil {
-
-			return emptyResponse, resp.StatusCode, fmt.Errorf("unexpected http code: %d", resp.StatusCode)
-		}
-		return emptyResponse, resp.StatusCode, responseError
+		return parseMetaErrorResponse(emptyResponse, body, resp.StatusCode)
 	}
 	var response UploadMediaResponse
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -169,11 +156,7 @@ func (wb *Client) GetMediaURL(mediaID string) (GetMediaURLResponse, int, error) 
 		return GetMediaURLResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		var responseError WhatsAppBusinessError
-		if err := json.Unmarshal(body, &responseError); err != nil {
-			return GetMediaURLResponse{}, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
-		}
-		return GetMediaURLResponse{}, httpCode, responseError
+		return parseMetaErrorResponse(GetMediaURLResponse{}, body, httpCode)
 	}
 	var response GetMediaURLResponse
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -211,11 +194,7 @@ func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) 
 		return DeleteMediaResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		var responseError WhatsAppBusinessError
-		if err := json.Unmarshal(body, &responseError); err != nil {
-			return DeleteMediaResponse{}, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
-		}
-		return DeleteMediaResponse{}, httpCode, responseError
+		return parseMetaErrorResponse(DeleteMediaResponse{}, body, httpCode)
 	}
 	var response DeleteMediaResponse
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -230,4 +209,12 @@ func ParseMediaExtension(mimeType string) string {
 		return ""
 	}
 	return extension
+}
+
+func parseMetaErrorResponse[T any](emptyResponse T, body []byte, httpCode int) (T, int, error) {
+	var responseError WhatsAppBusinessError
+	if err := json.Unmarshal(body, &responseError); err != nil {
+		return emptyResponse, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
+	}
+	return emptyResponse, httpCode, responseError
 }
