@@ -91,7 +91,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	var sto *model.StorageMedia
 	if media := whatsapp_business_component.GetMedia(component); media != nil {
 		if media.Link != nil {
-			storedMedia, err := u.storageMediaRepository.GetByAccessURL(ctx, *media.Link)
+			storedMedia, err := u.storageMediaRepository.GetByURL(ctx, *media.Link)
 			if err == nil {
 				storageMediaID = &storedMedia.DocumentID
 				sto = &storedMedia

@@ -48,24 +48,29 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to get phone number:", err)
 		return response, true, err
 	}
 	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to decrypt access token:", err)
 		return response, true, err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
-	originalFileName := inputData.File.Filename
-	filePath := "whatsapp-media/" + documentID.String() + filepath.Ext(inputData.File.Filename)
-	file, err := inputData.File.Open()
+	files := inputData.File
+	if len(files) == 0 {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] No file provided in the request")
+		return response, true, fmt.Errorf("no file provided")
+	}
+	originalFileName := files[0].Filename
+	filePath := "whatsapp-media/" + documentID.String() + filepath.Ext(files[0].Filename)
+	file, err := files[0].Open()
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to open file:", err)
 		return response, true, err
 	}
 	defer file.Close()
-	fileData := make([]byte, inputData.File.Size)
+	fileData := make([]byte, files[0].Size)
 	// read the whole file into fileData
 	_, err = file.Read(fileData)
 	if err != nil {
@@ -73,7 +78,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		return response, true, err
 	}
 	// upload media to WhatsApp Business API
-	mediaID, httpCode, err := u.whatsappService.UploadMedia(ctx, whatsappClient, fileData, originalFileName, inputData.File.Header.Get("Content-Type"))
+	mediaID, httpCode, err := u.whatsappService.UploadMedia(ctx, whatsappClient, fileData, originalFileName, files[0].Header.Get("Content-Type"))
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload media to WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
 		return response, httpCode >= http.StatusInternalServerError, err
@@ -94,7 +99,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		DocumentID:   documentID.String(),
 		MediaID:      &mediaID,
 		OriginalName: originalFileName,
-		MimeType:     inputData.File.Header.Get("Content-Type"),
+		MimeType:     files[0].Header.Get("Content-Type"),
 		URL:          fileURL,
 		CreatedAt:    time.Now().Unix(),
 	}

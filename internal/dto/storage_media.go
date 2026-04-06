@@ -7,8 +7,8 @@ import (
 
 type (
 	StorageMediaUploadRequest struct {
-		File          *multipart.FileHeader `form:"file" validate:"required,file"`
-		PhoneNumberID string                `form:"phone_number_id" validate:"required"`
+		File          []*multipart.FileHeader `form:"file" validate:"min_files=1,max_files=1"`
+		PhoneNumberID string                  `form:"phone_number_id" validate:"required"`
 	}
 	StorageMediaGetRequest struct {
 		ID string `query:"id" validate:"required"`

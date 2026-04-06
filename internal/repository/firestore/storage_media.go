@@ -46,8 +46,8 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 	return media, nil
 }
 
-func (r *StorageMediaRepository) GetByAccessURL(ctx context.Context, accessURL string) (model.StorageMedia, error) {
-	docs, err := r.db.Collection(r.storageMedia.TableName()).Where("access_url", "==", accessURL).Limit(1).Documents(ctx).GetAll()
+func (r *StorageMediaRepository) GetByURL(ctx context.Context, url string) (model.StorageMedia, error) {
+	docs, err := r.db.Collection(r.storageMedia.TableName()).Where("url", "==", url).Limit(1).Documents(ctx).GetAll()
 	if err != nil {
 		return r.storageMedia, err
 	}

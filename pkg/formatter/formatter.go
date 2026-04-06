@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -193,6 +195,23 @@ func Validator() *structValidator {
 			}
 		}
 		return false
+	})
+	v.RegisterValidation("min_files", func(fl validator.FieldLevel) bool {
+		files, ok := fl.Field().Interface().([]*multipart.FileHeader)
+		if !ok {
+			return false
+		}
+		min, _ := strconv.Atoi(fl.Param())
+		return len(files) >= min
+	})
+
+	v.RegisterValidation("max_files", func(fl validator.FieldLevel) bool {
+		files, ok := fl.Field().Interface().([]*multipart.FileHeader)
+		if !ok {
+			return false
+		}
+		max, _ := strconv.Atoi(fl.Param())
+		return len(files) <= max
 	})
 	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
 	// TODO: check if from google storage, check the extension is allowed
