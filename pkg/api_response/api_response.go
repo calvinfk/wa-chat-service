@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -33,6 +34,12 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 			response.Data = nil
 			response.Errors = errors
 			response.Message = "Validation error"
+		} else if waErrors, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
+			response.Code = http.StatusBadRequest
+			response.Data = nil
+			response.Errors = waErrors
+			response.Message = "WhatsApp Business API error"
+
 		} else if errMap, ok := err.(map[string]string); ok {
 			response.Code = http.StatusBadRequest
 			response.Data = nil
