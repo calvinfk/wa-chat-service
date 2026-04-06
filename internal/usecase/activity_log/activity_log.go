@@ -22,8 +22,13 @@ func NewActivityLogUsecase(activityLogRepository repository.ActivityLog) *Activi
 
 func (uc *ActivityLogUsecase) Insert(ctx context.Context, inputData dto.ActivityLogCreateRequest) (model.ActivityLog, bool, error) {
 	var err error
+	var userID *string
+	if inputData.UserID != nil {
+		userIDStr := inputData.UserID.String()
+		userID = &userIDStr
+	}
 	activityLog := model.ActivityLog{
-		UserID:      inputData.UserID,
+		UserID:      userID,
 		Type:        inputData.Type,
 		Description: inputData.Description,
 	}

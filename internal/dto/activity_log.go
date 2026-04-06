@@ -26,14 +26,14 @@ type (
 
 	// Data returned in the response when retrieving activity log entries.
 	ActivityLogResponse struct {
-		ID          uuid.UUID  `json:"id"`
-		UserID      *uuid.UUID `json:"user_id"`
-		UserName    *string    `json:"user_name"`
-		UserRole    *string    `json:"user_role"`
-		UserEmail   *string    `json:"user_email"`
-		Type        string     `json:"type"`
-		Description string     `json:"description"`
-		CreatedAt   time.Time  `json:"created_at"`
+		ID          string    `json:"id"`
+		UserID      *string   `json:"user_id"`
+		UserName    *string   `json:"user_name"`
+		UserRole    *string   `json:"user_role"`
+		UserEmail   *string   `json:"user_email"`
+		Type        string    `json:"type"`
+		Description string    `json:"description"`
+		CreatedAt   time.Time `json:"created_at"`
 	}
 )
 

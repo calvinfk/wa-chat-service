@@ -2,8 +2,10 @@ package repository_firestore
 
 import (
 	"context"
+	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
 
@@ -11,13 +13,14 @@ import (
 )
 
 type MessageRepository struct {
-	message    model.Message
-	messageLog model.MessageLog
-	db         *firestore.Client
+	message              model.Message
+	messageLog           model.MessageLog
+	db                   *firestore.Client
+	googleStorageService service.GoogleStorage
 }
 
-func NewMessageRepository(db *firestore.Client) *MessageRepository {
-	return &MessageRepository{db: db}
+func NewMessageRepository(db *firestore.Client, googleStorageService service.GoogleStorage) *MessageRepository {
+	return &MessageRepository{db: db, googleStorageService: googleStorageService}
 }
 
 func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
@@ -83,8 +86,41 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		if err != nil {
 			return response, err
 		}
+		// get storage media if exist
+		if message.StorageMediaID != nil {
+			var storageMedia model.StorageMedia
+			storageMediaDoc, err := r.db.Collection(storageMedia.TableName()).Doc(*message.StorageMediaID).Get(ctx)
+			if err == nil && storageMediaDoc.Exists() {
+				storageMediaData := storageMediaDoc.Data()
+				storageMediaData[firestore.DocumentID] = storageMediaDoc.Ref.ID
+				err := formatter.MapToStruct(storageMediaData, &storageMedia)
+				if err != nil {
+					log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to map storage media data:", err)
+				} else {
+					message.StorageMedia = &storageMedia
+				}
+			} else {
+				log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] No storage media found for ID:", *message.StorageMediaID, "err: ", err) // log if no storage media found
+			}
+		}
+		// sign storage media url
+		var sto *dto.StorageMediaUploadResponse
+		if message.StorageMedia != nil {
+			bucketName, objectName, err := r.googleStorageService.ParseGoogleStorageURL(message.StorageMedia.URL)
+			if err != nil {
+				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to parse storage media URL:", err)
+			}
+			signedURL, err := r.googleStorageService.GenerateV4GetObjectSignedURL(bucketName, objectName, 0)
+			if err != nil {
+				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL:", err)
+			} else {
+				var storageMediaUploadResponse dto.StorageMediaUploadResponse
+				storageMediaUploadResponse.FromModel(*message.StorageMedia, signedURL)
+				sto = &storageMediaUploadResponse
+			}
+		}
 		var data dto.MessageGetByChatIDResponse
-		data.FromModel(message)
+		data.FromModel(message, sto)
 		result = append(result, data)
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)

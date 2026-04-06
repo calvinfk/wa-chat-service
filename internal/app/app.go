@@ -53,7 +53,7 @@ func Run(config *config.Config) {
 
 	// Repository
 	activityLogRepository := repository_firestore.NewActivityLogRepository(firestoreClient)
-	messageRepository := repository_firestore.NewMessageRepository(firestoreClient)
+	messageRepository := repository_firestore.NewMessageRepository(firestoreClient, googleStorageService)
 	chatRepository := repository_firestore.NewChatRepository(firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(firestoreClient)
 	phoneNumberRepository := repository_firestore.NewPhoneNumberRepository(firestoreClient)

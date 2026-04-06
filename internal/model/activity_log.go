@@ -2,8 +2,6 @@ package model
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type (
@@ -12,11 +10,11 @@ type (
 	// The ID is generated as a UUID.
 	// The CreatedAt field is automatically managed by GORM to track when record is created.
 	ActivityLog struct {
-		ID          uuid.UUID  `json:"id" firestore:"id"`
-		UserID      *uuid.UUID `json:"user_id" firestore:"user_id"`
-		Type        string     `json:"type" firestore:"type"`
-		Description string     `json:"description" firestore:"description"`
-		CreatedAt   time.Time  `json:"created_at" firestore:"created_at"`
+		ID          string    `json:"__name__" firestore:"id"`
+		UserID      *string   `json:"user_id" firestore:"user_id"`
+		Type        string    `json:"type" firestore:"type"`
+		Description string    `json:"description" firestore:"description"`
+		CreatedAt   time.Time `json:"created_at" firestore:"created_at"`
 	}
 )
 

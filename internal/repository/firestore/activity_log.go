@@ -25,17 +25,18 @@ func NewActivityLogRepository(firestoreClient *firestore.Client) *ActivityLogRep
 
 func (r *ActivityLogRepository) Insert(ctx context.Context, tx *firestore.Transaction, data model.ActivityLog) (model.ActivityLog, error) {
 	var err error
-	data.ID, err = uuid.NewV7()
+	logID, err := uuid.NewV7()
 	if err != nil {
 		return r.model, err
 	}
+	data.ID = logID.String()
 	data.CreatedAt = time.Now()
 	dataMap, err := formatter.StructToMap(data, true)
 	if err != nil {
 		return r.model, err
 	}
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		docRef := r.firestoreClient.Collection(r.model.TableName()).Doc(data.ID.String())
+		docRef := r.firestoreClient.Collection(r.model.TableName()).Doc(data.ID)
 		return tx.Create(docRef, dataMap)
 	}
 	if tx == nil {

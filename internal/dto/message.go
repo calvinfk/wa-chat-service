@@ -22,13 +22,14 @@ type (
 		ChatID string `query:"chat_id" validate:"required"`
 	}
 	MessageGetByChatIDResponse struct {
-		ID              string  `json:"id"`               // id from whatsapp
-		ChatID          string  `json:"chat_id"`          // reference to chat document
-		StorageMediaID  *string `json:"storage_media_id"` // reference to media document if message has media
-		MessageType     string  `json:"message_type"`     // text, image, video, etc
-		MessageCategory string  `json:"message_category"` // marketing, authentication, utility, service
-		SenderName      string  `json:"sender_name"`      // sender name for individual chat, group name for group chat
-		Payload         string  `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
+		ID              string                      `json:"id"`               // id from whatsapp
+		ChatID          string                      `json:"chat_id"`          // reference to chat document
+		StorageMediaID  *string                     `json:"storage_media_id"` // reference to media document if message has media
+		StorageMedia    *StorageMediaUploadResponse `json:"storage_media"`
+		MessageType     string                      `json:"message_type"`     // text, image, video, etc
+		MessageCategory string                      `json:"message_category"` // marketing, authentication, utility, service
+		SenderName      string                      `json:"sender_name"`      // sender name for individual chat, group name for group chat
+		Payload         string                      `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
 		// Content         string `json:"content"`          // extracted content from payload, can be used for searching or displaying in UI
 		Status    string `json:"status"` // -, sent, delivered, read
 		CreatedAt int64  `json:"created_at"`
@@ -45,10 +46,11 @@ func (r MessageGetByChatIDRequest) Validate() map[string]string {
 	return nil
 }
 
-func (r *MessageGetByChatIDResponse) FromModel(data model.Message) {
+func (r *MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaUploadResponse) {
 	r.ID = data.DocumentID
 	r.ChatID = data.ChatID
 	r.StorageMediaID = data.StorageMediaID
+	r.StorageMedia = storageMedia
 	r.MessageType = data.MessageType
 	r.MessageCategory = data.MessageCategory
 	r.SenderName = data.SenderName

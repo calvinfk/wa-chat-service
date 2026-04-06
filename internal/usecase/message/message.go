@@ -88,11 +88,13 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		return response, true, err
 	}
 	var storageMediaID *string
+	var sto *model.StorageMedia
 	if media := whatsapp_business_component.GetMedia(component); media != nil {
 		if media.Link != nil {
 			storedMedia, err := u.storageMediaRepository.GetByAccessURL(ctx, *media.Link)
 			if err == nil {
 				storageMediaID = &storedMedia.DocumentID
+				sto = &storedMedia
 			} else {
 				// create new storage media record with original media link as access URL
 				newMediaID, err := uuid.NewV7()
@@ -124,10 +126,8 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 					_, params, err := mime.ParseMediaType(contentDisposition)
 					if err == nil {
 						filename = params["filename"]
-						log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Extracted filename:", filename)
 					}
 				}
-				log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Extracted filename:", filename)
 				if filename == "" {
 					filename = fmt.Sprintf("%s.%s", newMediaID.String(), strings.Split(urlHeaders.Get("Content-Type"), "/")[1]) // default filename if not provided
 				}
@@ -148,9 +148,75 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 				if err != nil {
 					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert new storage media record:", err)
 				}
+				storageMediaID = &newMedia.DocumentID
+				sto = &newMedia
+				log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Successfully stored media with ID:", newMedia.DocumentID)
 			}
 		} else if media.ID != nil {
-			// deal with media ID
+			// check if media with the given media ID already exists in storage before attempting to download from Meta
+			storedMedia, err := u.storageMediaRepository.GetByMediaID(ctx, *media.ID)
+			if err == nil {
+				storageMediaID = &storedMedia.DocumentID
+				sto = &storedMedia
+			} else {
+				// download from meta then upload to firebase storage
+				downloadURL, httpCode, err := u.whatsappService.GetMediaURL(ctx, whatsappClient, *media.ID)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get media download URL:", err)
+					return response, true, err
+				}
+				if httpCode != http.StatusOK {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get media download URL, HTTP code:", httpCode)
+					return response, true, fmt.Errorf("failed to get media download URL, HTTP code: %d", httpCode)
+				}
+				// proceed with the download and upload logic
+				fileData, urlHeaders, err := formatter.DownloadFile(downloadURL)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to download media file from Meta:", err)
+					return response, true, err
+				}
+				// upload to firebase storage
+				newMediaID, err := uuid.NewV7()
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to generate new media ID:", err)
+					return response, true, err
+				}
+				mimeType := urlHeaders.Get("Content-Type")
+				fileExtension := whatsapp_business.ParseMediaExtension(mimeType)
+				var filename string
+				contentDisposition := urlHeaders.Get("Content-Disposition")
+				if contentDisposition != "" {
+					// extract filename from Content-Disposition header
+					_, params, err := mime.ParseMediaType(contentDisposition)
+					if err == nil {
+						filename = params["filename"]
+					}
+				}
+				if filename == "" {
+					filename = fmt.Sprintf("%s.%s", newMediaID.String(), fileExtension) // default filename
+				}
+				filePath := "whatsapp-media/" + filename
+				url, _, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upload media file to storage:", err)
+					return response, true, err
+				}
+				newMedia := model.StorageMedia{
+					DocumentID:   newMediaID.String(),
+					OriginalName: filename,
+					MimeType:     mimeType,
+					URL:          url,
+					MediaID:      media.ID,
+					CreatedAt:    time.Now().Unix(),
+				}
+				_, err = u.storageMediaRepository.Insert(ctx, nil, newMedia)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to insert new storage media record:", err)
+				}
+				storageMediaID = &newMedia.DocumentID
+				sto = &newMedia
+				log.Println("[INFO][internal/usecase/message/message.go][SendMessage] Successfully stored media with ID:", newMedia.DocumentID)
+			}
 		}
 	}
 	sendResponse, httpCode, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
@@ -170,6 +236,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		SenderName:      inputData.SenderName,
 		Payload:         payloadData,
 		StorageMediaID:  storageMediaID,
+		StorageMedia:    sto,
 		Status:          "-",
 		CreatedAt:       time.Now().Unix(),
 		UpdatedAt:       time.Now().Unix(),

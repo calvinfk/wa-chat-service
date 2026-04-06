@@ -96,3 +96,13 @@ func (s *GoogleStorageService) DeleteFile(ctx context.Context, bucketName, objec
 	obj := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID).Object(objectName)
 	return obj.Delete(ctx)
 }
+
+func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (bucketName, objectName string, err error) {
+	parts := strings.Split(strings.TrimPrefix(fileURL, "gs://"), "/")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("invalid file URL: %s", fileURL)
+	}
+	bucketName = parts[0]
+	objectName = strings.Join(parts[1:], "/")
+	return bucketName, objectName, nil
+}

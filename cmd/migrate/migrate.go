@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"wa_chat_service/config"
-	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/database"
 
 	"github.com/joho/godotenv"
@@ -35,12 +34,7 @@ func main() {
 		log.Fatalf("Error initializing config: %v", err)
 	}
 	db := database.OpenPostgresConnection(config.Database.URL)
-	models := []any{
-		&model.ActivityLog{},
-		&model.Tenant{},
-		&model.WhatsappBusinessAccount{},
-		&model.PhoneNumber{},
-	}
+	models := []any{}
 
 	args := os.Args
 	if len(args) == 1 {

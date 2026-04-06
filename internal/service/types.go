@@ -37,6 +37,7 @@ type (
 		GenerateV4GetObjectSignedURL(bucketName, objectName string, expiration time.Duration) (string, error)
 		// DeleteFile deletes a file from Google Cloud Storage. It takes the bucket name and object name as parameters and returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, bucketName, objectName string) error
+		ParseGoogleStorageURL(fileURL string) (bucketName, objectName string, err error)
 	}
 
 	GoogleFirebase interface {

@@ -73,16 +73,12 @@ func (h *ChatHandler) GetTemplateList(ctx fiber.Ctx) error {
 
 func (h *ChatHandler) GetChatByPhoneNumberID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]
-	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(code).JSON(response)
-	}
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	if validationErrors := requestData.Validate(); validationErrors != nil {
-		code, response := api_response.NewApiResponse(false, validationErrors, "", nil)
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
 	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), requestData)
@@ -92,16 +88,12 @@ func (h *ChatHandler) GetChatByPhoneNumberID(ctx fiber.Ctx) error {
 
 func (h *ChatHandler) GetMessagesByChatID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]
-	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(code).JSON(response)
-	}
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	if validationErrors := requestData.Validate(); validationErrors != nil {
-		code, response := api_response.NewApiResponse(false, validationErrors, "", nil)
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
 	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), requestData)
