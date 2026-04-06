@@ -76,7 +76,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	mediaID, httpCode, err := u.whatsappService.UploadMedia(ctx, whatsappClient, fileData, originalFileName, inputData.File.Header.Get("Content-Type"))
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload media to WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
-		return response, httpCode == http.StatusInternalServerError, err
+		return response, httpCode >= http.StatusInternalServerError, err
 	}
 
 	// upload to firebase storage
@@ -170,7 +170,7 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 		httpCode, err := u.whatsappService.DeleteMedia(ctx, whatsappClient, *media.MediaID)
 		if err != nil {
 			log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
-			return httpCode == http.StatusInternalServerError, err
+			return httpCode >= http.StatusInternalServerError, err
 		}
 	}
 	err = u.storageMediaRepository.Delete(ctx, nil, media.DocumentID)
@@ -201,13 +201,13 @@ func (u *StorageMediaUsecase) UploadMediaUsingMediaID(ctx context.Context, input
 	url, httpCode, err := u.whatsappService.GetMediaURL(ctx, whatsappClient, inputData.MediaID)
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to get media URL from WhatsApp Business API: %v", err)
-		return "", httpCode == http.StatusInternalServerError, err
+		return "", httpCode >= http.StatusInternalServerError, err
 	}
 	// upload to firebase storage
 	fileData, urlHeaders, httpCode, err := u.whatsappService.DownloadMedia(ctx, whatsappClient, url)
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to download media from URL %s: %v", url, err)
-		return "", httpCode == http.StatusInternalServerError, err
+		return "", httpCode >= http.StatusInternalServerError, err
 	}
 	mimeType := urlHeaders.Get("Content-Type")
 	fileExtension := whatsapp_business.ParseMediaExtension(mimeType)

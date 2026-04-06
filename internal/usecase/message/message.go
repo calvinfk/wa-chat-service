@@ -222,7 +222,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	sendResponse, httpCode, err := u.whatsappService.SendMessage(ctx, whatsappClient, inputData.RecipientID, component)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
-		return response, httpCode != http.StatusBadRequest, err
+		return response, httpCode >= http.StatusInternalServerError, err
 	}
 	payloadData, err := formatter.AnyToJsonString(component.GetPayload())
 	if err != nil {
@@ -268,7 +268,7 @@ func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.Temp
 	templateList, httpCode, err := u.whatsappService.GetTemplateList(ctx, whatsappClient)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get template list:", err)
-		return nil, httpCode != http.StatusBadRequest, err
+		return nil, httpCode >= http.StatusInternalServerError, err
 	}
 	return templateList, false, nil
 }
