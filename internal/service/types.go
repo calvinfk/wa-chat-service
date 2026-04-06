@@ -35,8 +35,10 @@ type (
 		GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error)
 		// GenerateV4GetObjectSignedURL generates a signed URL for accessing an object in Google Cloud Storage. It takes the bucket name and object name as parameters and returns the signed URL as a string if the generation is successful, or an error if there is an issue during the generation process.
 		GenerateV4GetObjectSignedURL(bucketName, objectName string, expiration time.Duration) (string, error)
+		GenerateV4GetObjectSignedURLFromURL(fileURL string, expiration time.Duration) (string, error)
 		// DeleteFile deletes a file from Google Cloud Storage. It takes the bucket name and object name as parameters and returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, bucketName, objectName string) error
+		DeleteFileByURL(ctx context.Context, fileURL string) error
 		ParseGoogleStorageURL(fileURL string) (bucketName, objectName string, err error)
 	}
 

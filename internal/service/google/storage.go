@@ -92,9 +92,25 @@ func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(bucketName, objectNa
 	return url, nil
 }
 
+func (s *GoogleStorageService) GenerateV4GetObjectSignedURLFromURL(fileURL string, expiration time.Duration) (string, error) {
+	bucketName, objectName, err := s.ParseGoogleStorageURL(fileURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse Google Storage URL: %w", err)
+	}
+	return s.GenerateV4GetObjectSignedURL(bucketName, objectName, expiration)
+}
+
 func (s *GoogleStorageService) DeleteFile(ctx context.Context, bucketName, objectName string) error {
 	obj := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID).Object(objectName)
 	return obj.Delete(ctx)
+}
+
+func (s *GoogleStorageService) DeleteFileByURL(ctx context.Context, fileURL string) error {
+	bucketName, objectName, err := s.ParseGoogleStorageURL(fileURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse Google Storage URL: %w", err)
+	}
+	return s.DeleteFile(ctx, bucketName, objectName)
 }
 
 func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (bucketName, objectName string, err error) {

@@ -38,10 +38,13 @@ type (
 		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
 		// Gets media entry by URL.
 		GetByURL(ctx context.Context, url string) (model.StorageMedia, error)
+		GetByAccessURL(ctx context.Context, accessURL string) (model.StorageMedia, error)
 		// Gets media entry by media ID.
 		GetByMediaID(ctx context.Context, mediaID string) (model.StorageMedia, error)
 		// Deletes media entry by document ID.
 		Delete(ctx context.Context, tx *firestore.Transaction, documentID string) error
+		// Updates media entry by document ID.
+		UpdateAccessURL(ctx context.Context, tx *firestore.Transaction, documentID string, accessURL string) error
 	}
 
 	PhoneNumber interface {

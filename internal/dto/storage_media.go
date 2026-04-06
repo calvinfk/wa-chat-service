@@ -35,11 +35,11 @@ type (
 	}
 )
 
-func (r *StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL string) {
+func (r *StorageMediaUploadResponse) FromModel(media model.StorageMedia) {
 	r.ID = media.DocumentID
 	r.OriginalName = media.OriginalName
 	r.MimeType = media.MimeType
 	r.MediaID = media.MediaID
 	// r.URL = media.URL
-	r.AccessURL = accessURL
+	r.AccessURL = media.AccessURL
 }

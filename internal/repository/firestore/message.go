@@ -106,18 +106,9 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		// sign storage media url
 		var sto *dto.StorageMediaUploadResponse
 		if message.StorageMedia != nil {
-			bucketName, objectName, err := r.googleStorageService.ParseGoogleStorageURL(message.StorageMedia.URL)
-			if err != nil {
-				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to parse storage media URL:", err)
-			}
-			signedURL, err := r.googleStorageService.GenerateV4GetObjectSignedURL(bucketName, objectName, 0)
-			if err != nil {
-				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL:", err)
-			} else {
-				var storageMediaUploadResponse dto.StorageMediaUploadResponse
-				storageMediaUploadResponse.FromModel(*message.StorageMedia, signedURL)
-				sto = &storageMediaUploadResponse
-			}
+			var storageMediaUploadResponse dto.StorageMediaUploadResponse
+			storageMediaUploadResponse.FromModel(*message.StorageMedia)
+			sto = &storageMediaUploadResponse
 		}
 		var data dto.MessageGetByChatIDResponse
 		data.FromModel(message, sto)

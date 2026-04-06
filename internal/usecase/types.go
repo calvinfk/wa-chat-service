@@ -26,6 +26,7 @@ type (
 		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error)
 		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
 		UploadMediaUsingMediaID(ctx context.Context, inputData dto.StorageMediaUploadUsingMediaIDRequest) (string, bool, error)
+		StoreMediaFromURL(ctx context.Context, fileURL string) (model.StorageMedia, bool, error)
 	}
 
 	Chat interface {

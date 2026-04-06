@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -266,4 +267,39 @@ func DownloadFile(fileURL string) ([]byte, http.Header, error) {
 		return nil, nil, err
 	}
 	return fileData, resp.Header, nil
+}
+
+func IsGCSSignedURLExpired(signedURL string) (bool, error) {
+	u, err := url.Parse(signedURL)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	q := u.Query()
+
+	// Try V4 first
+	if date := q.Get("X-Goog-Date"); date != "" {
+		if expiresIn := q.Get("X-Goog-Expires"); expiresIn != "" {
+			startTime, err := time.Parse("20060102T150405Z", date)
+			if err != nil {
+				return false, err
+			}
+			seconds, err := strconv.ParseInt(expiresIn, 10, 64)
+			if err != nil {
+				return false, err
+			}
+			return time.Now().After(startTime.Add(time.Duration(seconds) * time.Second)), nil
+		}
+	}
+
+	// Fall back to V2
+	if expires := q.Get("Expires"); expires != "" {
+		unixTime, err := strconv.ParseInt(expires, 10, 64)
+		if err != nil {
+			return false, err
+		}
+		return time.Now().After(time.Unix(unixTime, 0)), nil
+	}
+
+	return false, fmt.Errorf("unrecognized or missing expiration parameters")
 }
