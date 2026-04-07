@@ -1,15 +1,61 @@
-# WA Chat Webhook
+# WA Chat Service
 
-Go service for API processing with Fiber v3, Firestore activity logging, PostgreSQL connectivity utilities, and Google Cloud integrations (Storage + Firebase).
+Go service built with Fiber v3 for WhatsApp chat operations, media handling, and Firestore-backed data access.
 
-## Current API Surface
+## API Base URL
 
-Base path: `/api`
+All routes are mounted under:
 
-- `GET /api/ping` - public health check.
-- `GET /api/ping-protected` - protected health check.
+`/api`
 
-Response format is standardized as:
+## API Endpoints
+
+### Health
+
+- `GET /api/ping` - public health check
+- `GET /api/ping-protected` - protected health check (see Authentication Notes)
+
+### Chat (`/api/v1/chat`)
+
+- `POST /send`
+  - Body (JSON): `phone_number_id`, `recipient_id`, `recipient_name`, `sender_name`, `type`, and payload keyed by `type`
+  - Example for text message payload:
+    ```json
+    {
+      "phone_number_id": "123",
+      "recipient_id": "628123456789",
+      "recipient_name": "Recipient",
+      "sender_name": "Agent",
+      "type": "text",
+      "text": {
+        "body": "Hello"
+      }
+    }
+    ```
+- `GET /template-list`
+  - Query: `phone_number_id`
+- `GET /by-phone-number-id`
+  - Query: `phone_number_id`
+  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+- `GET /messages`
+  - Query: `chat_id`
+  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+
+### Storage Media (`/api/v1/storage-media`)
+
+- `POST /upload`
+  - Multipart form-data: `file` (single file), `phone_number_id`
+- `GET /get`
+  - Query: `id`
+  - Returns streamed media bytes (`Content-Type` from stored object metadata)
+- `DELETE /delete`
+  - Query: `phone_number_id` and one of `id` or `media_id`
+- `POST /upload-media-id`
+  - Body (JSON): `media_id`, `phone_number_id`
+
+## Standard JSON Response Shape
+
+Most JSON endpoints return:
 
 ```json
 {
@@ -20,40 +66,30 @@ Response format is standardized as:
 }
 ```
 
+Notes:
+
+- Validation and business errors are normalized into `errors` and `message`.
+- `GET /api/v1/storage-media/get` is a file stream endpoint and does not return this JSON envelope on success.
+
 ## Authentication Notes
 
-- Access token middleware currently reads the token from cookie `access_token`.
-- The cookie value is expected to be AES-encrypted (configured by `AES_ENCRYPTION_KEY`).
-- Protected endpoints use middleware that checks `userID` and token parsing result from context.
+- Token parsing middleware exists and expects an AES-encrypted token in cookie `access_token`.
+- The protected guard (`/api/ping-protected`) checks `jwt_error_message` and `userID` from request context.
+- In current router wiring, `AccessToken` middleware is commented out, so `/api/ping-protected` will return `401 Unauthorized` until token middleware is enabled for incoming requests.
 
-## Project Structure
+## Global Middleware
 
-```text
-.
-|-- cmd/
-|   `-- app/
-|-- config/
-|-- internal/
-|   |-- app/
-|   |-- dto/
-|   |-- handler/
-|   |   `-- http/
-|   |       |-- middleware/
-|   |       `-- v1/
-|   |-- model/
-|   |-- repository/
-|   |   |-- firestore/
-|   |   `-- postgres/
-|   |-- service/
-|   `-- usecase/
-|-- pkg/
-```
+- Request logger
+- Panic recovery
+- CORS (config-driven)
+- OPTIONS preflight short-circuit
+- Request body/file-size guard at 16 MB (`413` when exceeded)
 
 ## Configuration
 
-The application reads environment variables from `.env` (loaded by `godotenv` in development).
+The app loads `.env` via `godotenv` in development and then builds config from environment variables.
 
-Required/important variables from `.env.example`:
+Required variables:
 
 - `APP_NAME`
 - `APP_VERSION`
@@ -65,30 +101,29 @@ Required/important variables from `.env.example`:
 - `GCP_PROJECT_ID`
 - `GCP_TASK_API_KEY`
 - `GCP_ATTACHMENT_BUCKET`
-- `GOOGLE_APPLICATION_CREDENTIALS`
+- `CORS_ENABLED`
 
-Optional but commonly used:
+Optional/common variables:
 
-- `CORS_ENABLED`, `CORS_ALLOW_*`
-- `GCP_ATTACHMENT_LINK_EXPIRY`
-- `GCP_ATTACHMENT_MAX_SIZE`
-- `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- `APP_SECURE_COOKIE`
+- `CORS_ALLOW_ORIGINS`
+- `CORS_ALLOW_METHODS`
+- `CORS_ALLOW_HEADERS`
+- `CORS_EXPOSE_HEADERS`
+- `CORS_ALLOW_CREDENTIALS`
+- `GCP_ATTACHMENT_LINK_EXPIRY` (seconds, `-1` to disable)
+- `GCP_ATTACHMENT_MAX_SIZE` (bytes)
+- `GOOGLE_APPLICATION_CREDENTIALS` (recommended for local/dev if using ADC)
 
 ## Running Locally
 
-1. Copy env file and fill values.
-
-```bash
-cp .env.example .env
-```
-
-Windows PowerShell:
+1. Create `.env` from `.env.example` and fill required values.
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-2. Run the app.
+2. Start the app.
 
 ```bash
 make run
@@ -102,20 +137,24 @@ go run ./cmd/app/main.go
 
 ## Running with Docker
 
-Build and run with compose:
-
 ```bash
 docker compose up --build
 ```
 
-Or use Make target:
+Or:
 
 ```bash
 make docker
 ```
 
-## Development Notes
+## Bootstrap Behavior
 
-- The app initializes PostgreSQL connection, Firebase app/client, and GCP storage client during bootstrap.
-- Activity logs are persisted to Firestore via middleware on incoming requests.
-- `internal/handler/http/v1/router.go` is currently a placeholder for future v1 endpoints.
+At startup, the service initializes:
+
+- Firebase app
+- Firestore client
+- Firebase Messaging client
+- Firebase Storage client
+- Google Cloud Storage client
+
+PostgreSQL connection bootstrap is currently not active in `internal/app/app.go` (the connection code is present but commented out).
