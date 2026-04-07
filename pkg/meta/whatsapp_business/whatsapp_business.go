@@ -203,6 +203,20 @@ func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) 
 	return response, httpCode, nil
 }
 
+func (wb *Client) GetHeaders(url string) (http.Header, error) {
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return resp.Header, nil
+}
+
 func ParseMediaExtension(mimeType string) string {
 	extension, exists := mimeTypeExtensionMap[mimeType]
 	if !exists {

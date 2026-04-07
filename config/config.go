@@ -48,11 +48,8 @@ type (
 	}
 
 	GCP struct {
-		ProjectID            string `env:"GCP_PROJECT_ID,required"`
-		TaskAPIKey           string `env:"GCP_TASK_API_KEY,required"`
-		AttachmentLinkExpiry int    `env:"GCP_ATTACHMENT_LINK_EXPIRY,default=3600"` // in seconds
-		AttachmentBucket     string `env:"GCP_ATTACHMENT_BUCKET,required"`
-		AttachmentMaxSize    int64  `env:"GCP_ATTACHMENT_MAX_SIZE,default=10485760"` // in bytes (default 10 MB)
+		ProjectID     string `env:"GCP_PROJECT_ID,required"`
+		DefaultBucket string // default bucket for general use
 	}
 )
 
@@ -215,36 +212,13 @@ func encryptEnv() (Encrypt, error) {
 
 func gcpEnv() (GCP, error) {
 	cfg := GCP{
-		ProjectID:            os.Getenv("GCP_PROJECT_ID"),
-		TaskAPIKey:           os.Getenv("GCP_TASK_API_KEY"),
-		AttachmentLinkExpiry: 3600, // default to 1 hour
-		AttachmentBucket:     os.Getenv("GCP_ATTACHMENT_BUCKET"),
-		AttachmentMaxSize:    10485760, // default to 10 MB
+		ProjectID: os.Getenv("GCP_PROJECT_ID"),
 	}
 	errors := []string{}
 	if cfg.ProjectID == "" {
 		errors = append(errors, "GCP_PROJECT_ID is required")
 	}
-	if cfg.TaskAPIKey == "" {
-		errors = append(errors, "GCP_TASK_API_KEY is required")
-	}
-	if expiry := os.Getenv("GCP_ATTACHMENT_LINK_EXPIRY"); expiry != "" {
-		if val, err := strconv.Atoi(expiry); err == nil && val >= -1 {
-			cfg.AttachmentLinkExpiry = val
-		} else {
-			errors = append(errors, "GCP_ATTACHMENT_LINK_EXPIRY must be a positive integer or -1 to disable")
-		}
-	}
-	if maxSize := os.Getenv("GCP_ATTACHMENT_MAX_SIZE"); maxSize != "" {
-		if val, err := strconv.ParseInt(maxSize, 10, 64); err == nil && val >= 0 {
-			cfg.AttachmentMaxSize = val
-		} else {
-			errors = append(errors, "GCP_ATTACHMENT_MAX_FILE must be a positive integer")
-		}
-	}
-	if cfg.AttachmentBucket == "" {
-		errors = append(errors, "GCP_ATTACHMENT_BUCKET is required")
-	}
+	cfg.DefaultBucket = cfg.ProjectID + ".firebasestorage.app"
 	if len(errors) > 0 {
 		return GCP{}, fmt.Errorf("missing required GCP environment variables: %s", strings.Join(errors, ", "))
 	}

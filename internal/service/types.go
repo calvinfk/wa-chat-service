@@ -28,18 +28,34 @@ type (
 	}
 
 	GoogleStorage interface {
-		// UploadFile uploads a file to Google Cloud Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file. It returns the public URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
-		UploadFile(ctx context.Context, fileData []byte, bucket string, destinationPath string, contentType string) (string, error)
-		// GetFile retrieves a file from Google Cloud Storage. It takes the file URL as a parameter and returns a storage.Reader for reading the file content, the file's attributes, and an error if there is an issue during the retrieval process.
-		// The storage.Reader allows you to read the file content directly from Google Cloud Storage. The caller is responsible for closing the reader after use to free up resources.
+		// Uploads a file to Google Cloud Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file.
+		// It returns the URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
+		UploadFile(ctx context.Context, fileData []byte, fileURL string) (*storage.ObjectAttrs, error)
+		// GetFile retrieves a file from Google Cloud Storage. It takes the file URL as a parameter
+		// It returns a reader for the file, the file's attributes, and an error if there is an issue during the retrieval process.
 		GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error)
-		// GenerateV4GetObjectSignedURL generates a signed URL for accessing an object in Google Cloud Storage. It takes the bucket name and object name as parameters and returns the signed URL as a string if the generation is successful, or an error if there is an issue during the generation process.
-		GenerateV4GetObjectSignedURL(bucketName, objectName string, expiration time.Duration) (string, error)
-		GenerateV4GetObjectSignedURLFromURL(fileURL string, expiration time.Duration) (string, error)
-		// DeleteFile deletes a file from Google Cloud Storage. It takes the bucket name and object name as parameters and returns an error if there is an issue during the deletion process.
-		DeleteFile(ctx context.Context, bucketName, objectName string) error
-		DeleteFileByURL(ctx context.Context, fileURL string) error
-		ParseGoogleStorageURL(fileURL string) (bucketName, objectName string, err error)
+		// DeleteFile deletes a file from Google Cloud Storage. It takes the file URL as a parameter
+		// It returns an error if there is an issue during the deletion process.
+		DeleteFile(ctx context.Context, fileURL string) error
+		// Generates a signed URL for accessing a file in Google Cloud Storage. It takes the file URL and the expiration duration for the signed URL as parameters. If the duration is 0, the signed URL will use the max duration.
+		// It returns the generated signed URL if successful, or an error if there is an issue during the URL generation process.
+		GenerateV4GetObjectSignedURL(fileURL string, expiration time.Duration) (string, error)
+		// ParseGoogleStorageURL parses a Google Cloud Storage URL and returns the bucket name and object name.
+		// It returns bucket name, object name, and an error if the URL is invalid.
+		ParseGoogleStorageURL(fileURL string) (bucketName, filePath string, err error)
+		// IsSignedURL checks if the provided file URL is a signed URL for a file in Google Cloud Storage. It takes the file URL as a parameter
+		// It returns true if the URL is a signed URL, or false and an error if the URL is invalid.
+		IsSignedURL(url string) (bool, error)
+		// IsValidSignedURL checks if the provided file URL is a valid signed URL for a file in the project's Google Cloud Storage and haven't expired. It takes the file URL as a parameter
+		// It returns true if the URL is a valid signed URL, or false and an error if the URL is invalid.
+		IsValidSignedURL(ctx context.Context, url string) (bool, error)
+		// GetDefaultFileURL generates a default file URL for accessing a file in Google Cloud Storage. It takes the file path as a parameter and returns the generated file URL.
+		// This method is used to generate a default file URL to access files using this service.
+		GetDefaultFileURL(filePath string) string
+		// GetFileURL generates a file URL for accessing a file in Google Cloud Storage. It takes the file URL as a parameter and returns the generated file URL.
+		// This method is used to generate a file URL to access files using this service. It can be used to generate a signed URL or a default URL based on the implementation.
+		GetFileURL(ctx context.Context, bucketName, filePath string) string
+		ParseSignedURLToFileURL(ctx context.Context, signedURL string) (string, error)
 	}
 
 	GoogleFirebase interface {
@@ -51,10 +67,6 @@ type (
 		UnsubscribeFromTopic(ctx context.Context, topics []string, tokens []string) error
 		// SendNotificationToTopic sends a notification to the specified topic in Firebase Cloud Messaging. It takes the notification title, body, and the topic name as parameters. It returns an error if there is an issue during the sending process.
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
-		// UploadFile uploads a file to Firebase Storage. It takes the file data as a byte slice, the destination path in the storage bucket, and the content type of the file. It returns the public URL of the uploaded file if the upload is successful, or an error if there is an issue during the upload process.
-		UploadFile(ctx context.Context, filePath string, file []byte) (string, *storage.ObjectAttrs, error)
-		// DeleteFile deletes a file from Firebase Storage. It takes the file path as a parameter and returns an error if there is an issue during the deletion process.
-		DeleteFile(ctx context.Context, filePath string) error
 	}
 
 	WhatsappService interface {

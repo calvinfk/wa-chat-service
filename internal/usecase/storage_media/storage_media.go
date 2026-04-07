@@ -17,24 +17,21 @@ import (
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
-	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
 )
 
 type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
 	phoneNumberRepository  repository.PhoneNumber
-	googleFirebaseService  service.GoogleFirebase
 	googleStorageService   service.GoogleStorage
 	encryptService         service.Encrypt
 	whatsappService        service.WhatsappService
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, googleFirebaseService service.GoogleFirebase, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappService) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappService) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
 		phoneNumberRepository:  phoneNumberRepository,
-		googleFirebaseService:  googleFirebaseService,
 		googleStorageService:   googleStorageService,
 		encryptService:         encryptService,
 		whatsappService:        whatsappService,
@@ -48,17 +45,6 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to generate UUID:", err)
 		return response, true, err
 	}
-	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to get phone number:", err)
-		return response, true, err
-	}
-	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to decrypt access token:", err)
-		return response, true, err
-	}
-	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
 	files := inputData.File
 	if len(files) == 0 {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] No file provided in the request")
@@ -73,69 +59,65 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	defer file.Close()
 	fileData := make([]byte, files[0].Size)
+
 	// read the whole file into fileData
 	_, err = file.Read(fileData)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to read file data:", err)
 		return response, true, err
 	}
-	// upload media to WhatsApp Business API
-	mediaID, httpCode, err := u.whatsappService.UploadMedia(ctx, whatsappClient, fileData, originalFileName, files[0].Header.Get("Content-Type"))
-	if err != nil {
-		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload media to WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
-		return response, httpCode >= http.StatusInternalServerError, err
-	}
 
 	// upload to firebase storage
-	fileURL, attrs, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
+	fileURL := u.googleStorageService.GetDefaultFileURL(filePath)
+	_, err = u.googleStorageService.UploadFile(ctx, fileData, fileURL)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to upload file:", err)
 		return response, true, err
 	}
-	url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(attrs.Bucket, attrs.Name, 0)
+	url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(fileURL, 0)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to generate attachment URL:", err)
 		return response, true, err
 	}
 	media := model.StorageMedia{
 		DocumentID:   documentID.String(),
-		MediaID:      &mediaID,
+		MediaID:      nil,
+		URL:          &fileURL,
 		OriginalName: originalFileName,
 		MimeType:     files[0].Header.Get("Content-Type"),
-		URL:          fileURL,
-		AccessURL:    url,
-		CreatedAt:    time.Now().Unix(),
+		CreatedAt:    time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to insert media data to repository:", err)
 		return response, true, err
 	}
-	response.FromModel(media)
+	response = response.FromModel(media, url)
 	return response, false, nil
 }
 
-func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error) {
+// TODO: if url not exists, check media id and stream that instead
+func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (dto.StorageMediaGetMediaResponse, bool, error) {
+	var response dto.StorageMediaGetMediaResponse
 	media, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Failed to get media data from repository:", err)
-		return nil, nil, true, err
+		return response, true, err
 	}
-	rc, attrs, err := u.googleStorageService.GetFile(ctx, media.URL)
+	if media.URL == nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Media URL is nil")
+		return response, true, fmt.Errorf("media URL is nil")
+	}
+	rc, attrs, err := u.googleStorageService.GetFile(ctx, *media.URL)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Failed to get file from Google Cloud Storage:", err)
-		return nil, nil, true, err
+		return response, true, err
 	}
-	defer rc.Close()
-
-	fileData := make([]byte, attrs.Size)
-	_, err = rc.Read(fileData)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Failed to read file data:", err)
-		return nil, nil, true, err
-	}
-
-	return rc, attrs, false, nil
+	response.Reader = rc
+	response.ContentType = attrs.ContentType
+	response.FileName = attrs.Name
+	response.Size = attrs.Size
+	return response, false, nil
 }
 
 func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error) {
@@ -180,45 +162,47 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 			return httpCode >= http.StatusInternalServerError, err
 		}
 	}
+	if media.URL != nil {
+		err = u.googleStorageService.DeleteFile(ctx, *media.URL)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete file from Google Cloud Storage:", err)
+			return true, err
+		}
+	}
 	err = u.storageMediaRepository.Delete(ctx, nil, media.DocumentID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media data from repository:", err)
 		return true, err
 	}
-	err = u.googleFirebaseService.DeleteFile(ctx, media.URL)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete file from Firebase Storage:", err)
-		return true, err
-	}
 	return false, nil
 }
 
-func (u *StorageMediaUsecase) UploadMediaUsingMediaID(ctx context.Context, inputData dto.StorageMediaUploadUsingMediaIDRequest) (string, bool, error) {
+func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error) {
+	var emptyResponse dto.StorageMediaSaveMediaIDResponse
 	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
-		return "", true, err
+		return emptyResponse, true, err
 	}
 	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
-		return "", true, err
+		return emptyResponse, true, err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
 	url, httpCode, err := u.whatsappService.GetMediaURL(ctx, whatsappClient, inputData.MediaID)
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to get media URL from WhatsApp Business API: %v", err)
-		return "", httpCode >= http.StatusInternalServerError, err
+		return emptyResponse, httpCode >= http.StatusInternalServerError, err
 	}
-	// upload to firebase storage
-	fileData, urlHeaders, httpCode, err := u.whatsappService.DownloadMedia(ctx, whatsappClient, url)
+	// download the file to get the mime type and original filename
+	var originalFileName string
+	urlHeaders, err := whatsappClient.GetHeaders(url)
 	if err != nil {
-		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to download media from URL %s: %v", url, err)
-		return "", httpCode >= http.StatusInternalServerError, err
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to get media headers:", err)
+		return emptyResponse, true, err
 	}
 	mimeType := urlHeaders.Get("Content-Type")
-	fileExtension := whatsapp_business.ParseMediaExtension(mimeType)
-	var originalFileName string
 	contentDisposition := urlHeaders.Get("Content-Disposition")
 	if contentDisposition != "" {
 		_, params, err := mime.ParseMediaType(contentDisposition)
@@ -227,63 +211,30 @@ func (u *StorageMediaUsecase) UploadMediaUsingMediaID(ctx context.Context, input
 		}
 	}
 	if originalFileName == "" {
-		originalFileName = fmt.Sprintf("%s.%s", inputData.MediaID, fileExtension)
+		originalFileName = fmt.Sprintf("%s.%s", inputData.MediaID, whatsapp_business.ParseMediaExtension(mimeType))
 	}
 	// store to repository
 	mediaDocumentID, err := uuid.NewV7()
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to generate UUID:", err)
-		return "", true, err
-	}
-	filePath := "whatsapp-media/" + mediaDocumentID.String() + fileExtension
-	fileURL, _, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to upload file from URL:", err)
-		return "", true, err
-	}
-	signedUrl, err := u.googleStorageService.GenerateV4GetObjectSignedURLFromURL(fileURL, 0)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to generate signed URL:", err)
-		return "", true, err
+		return emptyResponse, true, err
 	}
 	media := model.StorageMedia{
 		DocumentID:   mediaDocumentID.String(),
 		OriginalName: originalFileName,
 		MediaID:      &inputData.MediaID,
 		MimeType:     mimeType,
-		URL:          fileURL,
-		AccessURL:    signedUrl,
-		CreatedAt:    time.Now().Unix(),
+		CreatedAt:    time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to create media record in repository:", err)
-		return "", true, err
+		return emptyResponse, true, err
 	}
-	return media.DocumentID, false, nil
+	return emptyResponse.FromModel(media), false, nil
 }
 
-func (u *StorageMediaUsecase) UpdateMediaAccessURL(ctx context.Context, storageMediaID string) (string, bool, error) {
-	media, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UpdateMediaAccessURL] Failed to get media data from repository:", err)
-		return "", true, err
-	}
-	url, err := u.googleStorageService.GenerateV4GetObjectSignedURLFromURL(media.URL, 0)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UpdateMediaAccessURL] Failed to generate new access URL:", err)
-		return "", true, err
-	}
-	media.AccessURL = url
-	err = u.storageMediaRepository.UpdateAccessURL(ctx, nil, media.DocumentID, media.AccessURL)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UpdateMediaAccessURL] Failed to update media access URL in repository:", err)
-		return "", true, err
-	}
-	return url, false, nil
-}
-
-func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, fileURL string) (model.StorageMedia, bool, error) {
+func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, mediaURL string) (model.StorageMedia, bool, error) {
 	var emptyMedia model.StorageMedia
 	// create new storage media record with original media link as access URL
 	newMediaID, err := uuid.NewV7()
@@ -292,7 +243,7 @@ func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, fileURL str
 		return emptyMedia, true, err
 	}
 	// download the file
-	fileData, urlHeaders, err := formatter.DownloadFile(fileURL)
+	fileData, urlHeaders, err := formatter.DownloadFile(mediaURL)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to download media file:", err)
 		return emptyMedia, true, err
@@ -302,7 +253,7 @@ func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, fileURL str
 	contentDisposition := urlHeaders.Get("Content-Disposition")
 	if contentDisposition == "" {
 		// check the url path for filename if Content-Disposition header is not present
-		urlParts := strings.Split(fileURL, "/")
+		urlParts := strings.Split(mediaURL, "/")
 		if len(urlParts) > 0 {
 			urlParts[len(urlParts)-1] = strings.Split(urlParts[len(urlParts)-1], "?")[0] // remove query params
 			// check if the last part of the URL path has a valid filename format (e.g., has an extension)
@@ -321,23 +272,18 @@ func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, fileURL str
 		filename = fmt.Sprintf("%s.%s", newMediaID.String(), strings.Split(urlHeaders.Get("Content-Type"), "/")[1]) // default filename if not provided
 	}
 	filePath := "whatsapp-media/" + newMediaID.String() + filepath.Ext(filename)
-	url, attrs, err := u.googleFirebaseService.UploadFile(ctx, filePath, fileData)
+	fileURL := u.googleStorageService.GetDefaultFileURL(filePath)
+	attrs, err := u.googleStorageService.UploadFile(ctx, fileData, fileURL)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upload media file to storage:", err)
-		return emptyMedia, true, err
-	}
-	accessURL, err := u.googleStorageService.GenerateV4GetObjectSignedURLFromURL(url, 0)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to generate access URL for stored media:", err)
 		return emptyMedia, true, err
 	}
 	newMedia := model.StorageMedia{
 		DocumentID:   newMediaID.String(),
 		OriginalName: filename,
 		MimeType:     attrs.ContentType,
-		URL:          url,
-		AccessURL:    accessURL,
-		CreatedAt:    time.Now().Unix(),
+		URL:          &fileURL,
+		CreatedAt:    time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, newMedia)
 	if err != nil {

@@ -34,21 +34,20 @@ func Run(config *config.Config) {
 	if err != nil {
 		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firestore client: %v", err)
 	}
-	firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
-	if err != nil {
-		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
-	}
-	firebaseStorageClient, err := firebaseClient.Storage(context.Background())
-	if err != nil {
-		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
-	}
+	// firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
+	// if err != nil {
+	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
+	// }
+	// firebaseStorageClient, err := firebaseClient.Storage(context.Background())
+	// if err != nil {
+	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
+	// }
 	// _ = transaction.NewTxManager(dbPostgres, firestoreClient)
-
 	// Service
 	accessTokenService := access_token_service.NewAccessTokenService(config)
 	encryptService := encrypt_service.NewEncryptService(&config.Encrypt)
 	googleStorageService := google_service.NewGoogleStorageService(gcpStorageClient, &config.GCP)
-	googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseMessagingClient, firebaseStorageClient)
+	// googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, firebaseMessagingClient, firebaseStorageClient)
 	whatsappService := whatsapp_service.NewWhatsappService()
 
 	// Repository
@@ -60,20 +59,19 @@ func Run(config *config.Config) {
 
 	// Usecase
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(activityLogRepository)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, phoneNumberRepository, googleFirebaseService, googleStorageService, encryptService, whatsappService)
-	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, storageMediaRepository, storageMediaUsecase, whatsappService, encryptService, googleFirebaseService)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(storageMediaRepository, phoneNumberRepository, googleStorageService, encryptService, whatsappService)
+	messageUsecase := message_usecase.NewMessageUsecase(messageRepository, chatRepository, phoneNumberRepository, storageMediaRepository, storageMediaUsecase, whatsappService, encryptService, googleStorageService)
 	chatUsecase := chat_usecase.NewChatUsecase(chatRepository)
 
 	// Router Handler
 	routerHandlerV1 := http_v1.RouterHandlerV1{
-		ActivityLogUsecase:    activityLogUsecase,
-		MessageUsecase:        messageUsecase,
-		StorageMediaUsecase:   storageMediaUsecase,
-		ChatUsecase:           chatUsecase,
-		AccessTokenService:    accessTokenService,
-		EncryptService:        encryptService,
-		GoogleStorageService:  googleStorageService,
-		GoogleFirebaseService: googleFirebaseService,
+		ActivityLogUsecase:   activityLogUsecase,
+		MessageUsecase:       messageUsecase,
+		StorageMediaUsecase:  storageMediaUsecase,
+		ChatUsecase:          chatUsecase,
+		AccessTokenService:   accessTokenService,
+		EncryptService:       encryptService,
+		GoogleStorageService: googleStorageService,
 	}
 
 	app := fiber.New(fiber.Config{

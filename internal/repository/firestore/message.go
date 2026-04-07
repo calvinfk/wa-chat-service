@@ -13,8 +13,8 @@ import (
 )
 
 type MessageRepository struct {
-	message              model.Message
-	messageLog           model.MessageLog
+	message model.Message
+	// messageLog           model.MessageLog
 	db                   *firestore.Client
 	googleStorageService service.GoogleStorage
 }
@@ -42,26 +42,6 @@ func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transactio
 		err = execDB(ctx, tx)
 	}
 	return message, err
-}
-
-func (r *MessageRepository) InsertLog(ctx context.Context, tx *firestore.Transaction, messageLog model.MessageLog) (model.MessageLog, error) {
-	var err error
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		_, err := r.db.
-			Collection("chats").Doc(messageLog.ChatID).
-			Collection("messages_log").Doc(messageLog.DocumentID.String()).
-			Set(ctx, messageLog)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	if tx == nil {
-		err = r.db.RunTransaction(ctx, execDB)
-	} else {
-		err = execDB(ctx, tx)
-	}
-	return messageLog, err
 }
 
 func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], error) {
@@ -107,7 +87,12 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		var sto *dto.StorageMediaUploadResponse
 		if message.StorageMedia != nil {
 			var storageMediaUploadResponse dto.StorageMediaUploadResponse
-			storageMediaUploadResponse.FromModel(*message.StorageMedia)
+			signedUrl, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*message.StorageMedia.URL, 0)
+			if err != nil {
+				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL for storage media:", err)
+				signedUrl = ""
+			}
+			storageMediaUploadResponse.FromModel(*message.StorageMedia, signedUrl)
 			sto = &storageMediaUploadResponse
 		}
 		var data dto.MessageGetByChatIDResponse

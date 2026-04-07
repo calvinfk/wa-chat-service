@@ -27,7 +27,7 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 		storageMediaRouter.Post("/upload", h.UploadMedia)
 		storageMediaRouter.Get("/get", h.GetMedia)
 		storageMediaRouter.Delete("/delete", h.DeleteMedia)
-		storageMediaRouter.Post("/upload-media-id", h.UploadMediaUsingMediaID)
+		storageMediaRouter.Post("/save-media-id", h.SaveMediaID)
 	}
 }
 
@@ -53,20 +53,20 @@ func (h *StorageMediaHandler) GetMedia(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	// Stream the file from Google Cloud Storage
-	rc, attrs, serverError, err := h.storageMediaUsecase.GetMedia(ctx.Context(), requestData)
+	mediaResponse, serverError, err := h.storageMediaUsecase.GetMedia(ctx.Context(), requestData)
 	if serverError || err != nil {
 		code, response := api_response.NewApiResponse(serverError, err, "Failed to retrieve media", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	defer rc.Close() // Ensure the reader is closed after streaming
+	defer mediaResponse.Reader.Close() // Ensure the reader is closed after streaming
 
 	// 4. Set Headers to hide GCS and show your own info
-	ctx.Set("Content-Type", attrs.ContentType)
-	ctx.Set("Content-Disposition", "inline; filename="+attrs.Name)
+	ctx.Set("Content-Type", mediaResponse.ContentType)
+	ctx.Set("Content-Disposition", "inline; filename="+mediaResponse.FileName)
 	ctx.Set("Cache-Control", "private, max-age=3600")
-	ctx.Set("Content-Length", fmt.Sprintf("%d", attrs.Size))
+	ctx.Set("Content-Length", fmt.Sprintf("%d", mediaResponse.Size))
 
-	if _, err := io.Copy(ctx.Response().BodyWriter(), rc); err != nil {
+	if _, err := io.Copy(ctx.Response().BodyWriter(), mediaResponse.Reader); err != nil {
 		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][GetMedia] Failed to stream file to response:", err)
 		return err
 	}
@@ -84,14 +84,14 @@ func (h *StorageMediaHandler) DeleteMedia(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *StorageMediaHandler) UploadMediaUsingMediaID(ctx fiber.Ctx) error {
-	var requestData dto.StorageMediaUploadUsingMediaIDRequest
+func (h *StorageMediaHandler) SaveMediaID(ctx fiber.Ctx) error {
+	var requestData dto.StorageMediaSaveMediaIDRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][UploadMediaUsingMediaID] Failed to bind request data:", err)
+		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][SaveMediaID] Failed to bind request data:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	id, serverError, err := h.storageMediaUsecase.UploadMediaUsingMediaID(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", fiber.Map{"id": id})
+	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx.Context(), requestData)
+	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", data)
 	return ctx.Status(code).JSON(response)
 }

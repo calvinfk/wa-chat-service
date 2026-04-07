@@ -4,6 +4,10 @@
 docker-compose*.yml
 Dockerfile
 Makefile
+.vscode
+.idea
+.git
+.gitignore
 
 # Go related ignores
 **.out

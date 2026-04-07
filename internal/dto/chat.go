@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"time"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/formatter"
 )
@@ -10,12 +11,12 @@ type (
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
 	}
 	ChatGetByPhoneNumberIDResponse struct {
-		ID          string `json:"id"`        // {recipient_id}-{phone_number_id}
-		ChatType    string `json:"chat_type"` // individual or group
-		DisplayName string `json:"display_name"`
-		LastMessage string `json:"last_message"`
-		CreatedAt   int64  `json:"created_at"`
-		UpdatedAt   int64  `json:"updated_at"`
+		ID          string    `json:"id"`        // {recipient_id}-{phone_number_id}
+		ChatType    string    `json:"chat_type"` // individual or group
+		DisplayName string    `json:"display_name"`
+		LastMessage string    `json:"last_message"`
+		CreatedAt   time.Time `json:"created_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
 	}
 )
 

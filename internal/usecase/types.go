@@ -5,8 +5,6 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
-
-	"cloud.google.com/go/storage"
 )
 
 type (
@@ -23,10 +21,11 @@ type (
 
 	StorageMedia interface {
 		UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error)
-		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (*storage.Reader, *storage.ObjectAttrs, bool, error)
+		// the caller is responsible to close the reader after use
+		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (dto.StorageMediaGetMediaResponse, bool, error)
 		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
-		UploadMediaUsingMediaID(ctx context.Context, inputData dto.StorageMediaUploadUsingMediaIDRequest) (string, bool, error)
-		StoreMediaFromURL(ctx context.Context, fileURL string) (model.StorageMedia, bool, error)
+		SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error)
+		StoreMediaFromURL(ctx context.Context, mediaURL string) (model.StorageMedia, bool, error)
 	}
 
 	Chat interface {

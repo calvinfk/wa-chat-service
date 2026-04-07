@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"time"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/formatter"
 )
@@ -30,10 +31,12 @@ type (
 		MessageCategory string                      `json:"message_category"` // marketing, authentication, utility, service
 		SenderName      string                      `json:"sender_name"`      // sender name for individual chat, group name for group chat
 		Payload         string                      `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
-		// Content         string `json:"content"`          // extracted content from payload, can be used for searching or displaying in UI
-		Status    string `json:"status"` // -, sent, delivered, read
-		CreatedAt int64  `json:"created_at"`
-		UpdatedAt int64  `json:"updated_at"`
+		Status          string                      `json:"status"`           // -, sent, delivered, read
+		CreatedAt       time.Time                   `json:"created_at"`
+		SentAt          *time.Time                  `json:"sent_at,omitempty"`
+		DeliveredAt     *time.Time                  `json:"delivered_at,omitempty"`
+		ReadAt          *time.Time                  `json:"read_at,omitempty"`
+		Error           *string                     `json:"error,omitempty"` // error message if failed to send, json stringified from whatsapp error response
 	}
 )
 
@@ -57,5 +60,8 @@ func (r *MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia 
 	r.Payload = data.Payload
 	r.Status = data.Status
 	r.CreatedAt = data.CreatedAt
-	r.UpdatedAt = data.UpdatedAt
+	r.SentAt = data.SentAt
+	r.DeliveredAt = data.DeliveredAt
+	r.ReadAt = data.ReadAt
+	r.Error = data.Error
 }

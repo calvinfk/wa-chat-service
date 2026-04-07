@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type Message struct {
 	DocumentID      string        `json:"__name__" firestore:"-"`                                  // id from whatsapp
 	ChatID          string        `json:"chat_id" firestore:"-"`                                   // reference to chat document
@@ -10,8 +12,11 @@ type Message struct {
 	StorageMediaID  *string       `json:"storage_media_id,omitempty" firestore:"storage_media_id"` // reference to media document if message has media
 	StorageMedia    *StorageMedia `json:"storage_media,omitempty" firestore:"-"`                   // media document if message has media
 	Status          string        `json:"status" firestore:"status"`                               // -, sent, delivered, read
-	CreatedAt       int64         `json:"created_at" firestore:"created_at"`
-	UpdatedAt       int64         `json:"updated_at" firestore:"updated_at"`
+	CreatedAt       time.Time     `json:"created_at" firestore:"created_at"`
+	SentAt          *time.Time    `json:"sent_at,omitempty" firestore:"sent_at,omitempty"`
+	DeliveredAt     *time.Time    `json:"delivered_at,omitempty" firestore:"delivered_at,omitempty"`
+	ReadAt          *time.Time    `json:"read_at,omitempty" firestore:"read_at,omitempty"`
+	Error           *string       `json:"error,omitempty" firestore:"error,omitempty"` // error message if failed to send
 }
 
 func (m Message) TableName() string {
