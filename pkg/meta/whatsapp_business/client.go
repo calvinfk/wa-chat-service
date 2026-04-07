@@ -36,7 +36,7 @@ func (wb *Client) httpClient() *http.Client {
 	return &http.Client{}
 }
 
-func (wb *Client) accessAPI(endpoint string, method string, payload any) ([]byte, int, error) {
+func (wb *Client) accessAPI(method string, endpoint string, payload any) ([]byte, int, error) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, 0, err

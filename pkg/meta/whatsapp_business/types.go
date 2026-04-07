@@ -1,6 +1,6 @@
 package whatsapp_business
 
-import message_components "wa_chat_service/pkg/meta/whatsapp_business/message"
+import "wa_chat_service/pkg/meta/whatsapp_business/message_components"
 
 type UploadMediaResponse struct {
 	ID string `json:"id"`
@@ -33,7 +33,8 @@ type MessageResponse struct {
 		WaID  string `json:"wa_id"`
 	} `json:"contacts"`
 	Messages []struct {
-		ID string `json:"id"`
+		ID            string  `json:"id"`
+		MessageStatus *string `json:"message_status,omitempty"` // if sending a templatete message, this field will be present in the response
 	} `json:"messages"`
 }
 
@@ -47,4 +48,22 @@ type TemplateResponse struct {
 	Name                        string `json:"name" validate:"required"`
 	ParameterFormat             string `json:"parameter_format" validate:"required"`
 	Status                      string `json:"status" validate:"required"` // approved, rejected, etc
+}
+
+type TemplateCreateRequest struct {
+	Name            string `json:"name" validate:"required"`
+	Category        string `json:"category" validate:"required,oneof=marketing utility authentication"`
+	Language        string `json:"language" validate:"required"`
+	ParameterFormat string `json:"parameter_format" validate:"required,oneof=named positional"`
+	Components      []any  `json:"components" validate:"required"`
+}
+
+type TemplateCreateResponse struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Category string `json:"category"`
+}
+
+type TemplateDeleteResponse struct {
+	Success bool `json:"success"`
 }

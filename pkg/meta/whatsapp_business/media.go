@@ -59,7 +59,7 @@ func (wb *Client) UploadMedia(fileBytes []byte, filename string, mimeType string
 
 func (wb *Client) GetMediaURL(mediaID string) (GetMediaURLResponse, int, error) {
 	endpoint := fmt.Sprintf("%s/%s", wb.GetBaseURLVersion(), mediaID)
-	body, httpCode, err := wb.accessAPI(endpoint, "GET", nil)
+	body, httpCode, err := wb.accessAPI(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return GetMediaURLResponse{}, httpCode, err
 	}
@@ -74,7 +74,7 @@ func (wb *Client) GetMediaURL(mediaID string) (GetMediaURLResponse, int, error) 
 }
 
 func (wb *Client) DownloadMedia(mediaURL string) ([]byte, http.Header, int, error) {
-	req, err := http.NewRequest("GET", mediaURL, nil)
+	req, err := http.NewRequest(http.MethodGet, mediaURL, nil)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -96,7 +96,7 @@ func (wb *Client) DownloadMedia(mediaURL string) ([]byte, http.Header, int, erro
 
 func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) {
 	endpoint := fmt.Sprintf("%s/%s", wb.GetBaseURLVersion(), mediaID)
-	body, httpCode, err := wb.accessAPI(endpoint, "DELETE", nil)
+	body, httpCode, err := wb.accessAPI(http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return DeleteMediaResponse{}, httpCode, err
 	}

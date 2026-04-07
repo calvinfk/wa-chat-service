@@ -6,7 +6,7 @@ import (
 	"maps"
 	"net/http"
 
-	message_components "wa_chat_service/pkg/meta/whatsapp_business/message"
+	"wa_chat_service/pkg/meta/whatsapp_business/message_components"
 )
 
 func NewComponent(componentType string, component map[string]any) (MessageComponent, error) {
@@ -60,7 +60,7 @@ func (wb *Client) SendMessage(phoneNumberID, to, recipientType string, payload M
 	}
 	maps.Copy(payloadData, payload.GetPayload())
 	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), phoneNumberID)
-	body, httpCode, err := wb.accessAPI(endpoint, "POST", payloadData)
+	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payloadData)
 	if err != nil {
 		return MessageResponse{}, httpCode, err
 	} else if httpCode != http.StatusOK {

@@ -1,6 +1,6 @@
 package whatsapp_business
 
-import message_components "wa_chat_service/pkg/meta/whatsapp_business/message"
+import "wa_chat_service/pkg/meta/whatsapp_business/message_components"
 
 var mimeTypeExtensionMap = map[string]string{
 	"audio/aac":  ".aac",
