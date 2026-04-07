@@ -1,19 +1,19 @@
-package whatsapp_business_component
+package message_components
 
 import (
 	"wa_chat_service/pkg/formatter"
 )
 
-type Video struct {
+type Image struct {
 	Media
 	Caption *string `json:"caption,omitempty" validate:"omitempty,max=1024"`
 }
 
-func (c Video) GetType() MessageType {
-	return VideoMessageType
+func (c Image) GetType() MessageType {
+	return ImageMessageType
 }
 
-func (c Video) GetPayload() map[string]any {
+func (c Image) GetPayload() map[string]any {
 	jsonData, err := formatter.StructToMap(c, true)
 	if err != nil {
 		panic(err)
@@ -23,18 +23,19 @@ func (c Video) GetPayload() map[string]any {
 	}
 }
 
-func (c Video) Validate() error {
+func (c Image) Validate() error {
 	validator := formatter.Validator()
 	data := struct {
-		Video Video `json:"video" validate:"required"`
+		Image Image `json:"image" validate:"required"`
 	}{
-		Video: c,
+		Image: c,
 	}
 	return validator.Validate(data)
 }
-func (c Video) GetMessage() string {
+
+func (c Image) GetMessage() string {
 	if c.Caption != nil {
 		return *c.Caption
 	}
-	return "(Video)"
+	return "(Image)"
 }

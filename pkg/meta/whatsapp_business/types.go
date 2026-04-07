@@ -1,70 +1,6 @@
 package whatsapp_business
 
-var (
-	mimeTypeExtensionMap = map[string]string{
-		"audio/aac":  ".aac",
-		"audio/amr":  ".amr",
-		"audio/mpeg": ".mp3",
-		"audio/mp4":  ".m4a",
-		"audio/ogg":  ".ogg",
-
-		"text/plain":               ".txt",
-		"application/vnd.ms-excel": ".xls",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-		"application/msword": ".doc",
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   ".docx",
-		"application/vnd.ms-powerpoint":                                             ".ppt",
-		"application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-		"application/pdf": ".pdf",
-
-		"image/jpeg": ".jpeg",
-		"image/png":  ".png",
-
-		"image/webp": ".webp",
-
-		"video/3gpp": ".3gp",
-		"video/mp4":  ".mp4",
-
-		// "image/gif": ".gif",
-	}
-)
-
-type Client struct {
-	BaseURL         string
-	WabaID          string
-	PhoneNumberID   string
-	Version         string
-	UserAccessToken string
-}
-
-type MessageResponse struct {
-	MessagingProduct string `json:"messaging_product"`
-	Contacts         []struct {
-		Input string `json:"input"`
-		WaID  string `json:"wa_id"`
-	} `json:"contacts"`
-	Messages []struct {
-		ID string `json:"id"`
-	} `json:"messages"`
-}
-
-type WhatsAppBusinessError struct {
-	ErrorData struct {
-		Message   string            `json:"message"`
-		Type      string            `json:"type"`
-		Code      WhatsappErrorCode `json:"code"`
-		ErrorData struct {
-			MessagingProduct string `json:"messaging_product"`
-			Details          string `json:"details"`
-		} `json:"error_data"`
-		ErrorSubcode int    `json:"error_subcode"`
-		FbtraceID    string `json:"fbtrace_id"`
-	} `json:"error"`
-}
-
-func (v WhatsAppBusinessError) Error() string {
-	return v.ErrorData.Message
-}
+import message_components "wa_chat_service/pkg/meta/whatsapp_business/message"
 
 type UploadMediaResponse struct {
 	ID string `json:"id"`
@@ -81,4 +17,34 @@ type GetMediaURLResponse struct {
 
 type DeleteMediaResponse struct {
 	Success bool `json:"success"`
+}
+
+type MessageComponent interface {
+	GetType() message_components.MessageType
+	GetPayload() map[string]any
+	Validate() error
+	GetMessage() string
+}
+
+type MessageResponse struct {
+	MessagingProduct string `json:"messaging_product"`
+	Contacts         []struct {
+		Input string `json:"input"`
+		WaID  string `json:"wa_id"`
+	} `json:"contacts"`
+	Messages []struct {
+		ID string `json:"id"`
+	} `json:"messages"`
+}
+
+type TemplateResponse struct {
+	Category                    string `json:"category" validate:"required"`   // MARKETING, UTILITY, etc
+	Components                  []any  `json:"components" validate:"required"` // header, body, button, etc
+	ID                          string `json:"id" validate:"required"`
+	IsPrimaryDeviceDeliveryOnly bool   `json:"is_primary_device_delivery_only"`
+	Language                    string `json:"language" validate:"required"`
+	MessageSendTTLSeconds       int    `json:"message_send_ttl_seconds"`
+	Name                        string `json:"name" validate:"required"`
+	ParameterFormat             string `json:"parameter_format" validate:"required"`
+	Status                      string `json:"status" validate:"required"` // approved, rejected, etc
 }

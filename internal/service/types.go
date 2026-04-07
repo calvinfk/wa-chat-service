@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -70,8 +69,8 @@ type (
 	}
 
 	WhatsappBusiness interface {
-		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error)
-		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error)
+		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error)
+		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]whatsapp_business.TemplateResponse, int, error)
 		UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
 		GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error)
 		DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)

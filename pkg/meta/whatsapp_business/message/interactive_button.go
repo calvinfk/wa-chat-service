@@ -1,4 +1,4 @@
-package whatsapp_business_component
+package message_components
 
 import (
 	"wa_chat_service/pkg/formatter"

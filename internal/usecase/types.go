@@ -5,6 +5,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 )
 
 type (
@@ -15,7 +16,7 @@ type (
 
 	Message interface {
 		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
-		GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]any, bool, error)
+		GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]whatsapp_business.TemplateResponse, bool, error)
 		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error)
 	}
 

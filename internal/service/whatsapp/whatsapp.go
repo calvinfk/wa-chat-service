@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
 type WhatsappBusiness struct {
@@ -16,7 +15,7 @@ func NewWhatsappService() *WhatsappBusiness {
 	return &WhatsappBusiness{}
 }
 
-func (ws *WhatsappBusiness) SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
+func (ws *WhatsappBusiness) SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
 	response, httpCode, err := client.SendMessage(client.PhoneNumberID, to, "individual", payload)
 	if err != nil {
 		if httpCode == http.StatusBadRequest {
@@ -37,7 +36,7 @@ func (ws *WhatsappBusiness) SendMessage(ctx context.Context, client *whatsapp_bu
 	}
 	return response, httpCode, err
 }
-func (ws *WhatsappBusiness) GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error) {
+func (ws *WhatsappBusiness) GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]whatsapp_business.TemplateResponse, int, error) {
 	response, httpCode, err := client.GetTemplateList()
 	if err != nil {
 		return nil, httpCode, err

@@ -17,7 +17,6 @@ import (
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 
 	"github.com/google/uuid"
 )
@@ -69,7 +68,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		return response, true, err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
-	component, err := whatsapp_business_component.New(inputData.Type, inputData.Payload)
+	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate message component:", err)
 		return response, false, err
@@ -91,7 +90,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		return response, true, err
 	}
 	var sto *model.StorageMedia
-	if media := whatsapp_business_component.GetMedia(component); media != nil {
+	if media := whatsapp_business.GetMedia(component); media != nil {
 		if media.Link != nil {
 			isValid, err := u.googleStorageService.IsValidSignedURL(ctx, *media.Link)
 			if err != nil {
@@ -201,7 +200,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	return response, false, nil
 }
 
-func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]any, bool, error) {
+func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]whatsapp_business.TemplateResponse, bool, error) {
 	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		if err.Error() == "no more items in iterator" {
