@@ -8,20 +8,20 @@ import (
 )
 
 // Sets up CORS headers based on the provided configuration.
-func Cors(cfg *config.CORS) fiber.Handler {
-	if !cfg.CorsEnabled {
+func Cors(config *config.CORS) fiber.Handler {
+	if !config.CorsEnabled {
 		return func(ctx fiber.Ctx) error {
 			return ctx.Next()
 		}
 	}
-	config := cors.Config{
-		AllowMethods:     cfg.CorsAllowMethods,
-		AllowHeaders:     cfg.CorsAllowHeaders,
-		ExposeHeaders:    cfg.CorsExposeHeaders,
-		AllowCredentials: cfg.CorsAllowCredentials,
+	corsConfig := cors.Config{
+		AllowMethods:     config.CorsAllowMethods,
+		AllowHeaders:     config.CorsAllowHeaders,
+		ExposeHeaders:    config.CorsExposeHeaders,
+		AllowCredentials: config.CorsAllowCredentials,
 	}
-	if len(cfg.CorsAllowOrigins) > 0 {
-		config.AllowOrigins = cfg.CorsAllowOrigins
+	if len(config.CorsAllowOrigins) > 0 {
+		corsConfig.AllowOrigins = config.CorsAllowOrigins
 	}
-	return cors.New(config)
+	return cors.New(corsConfig)
 }

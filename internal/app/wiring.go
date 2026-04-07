@@ -1,0 +1,144 @@
+package app
+
+import (
+	"context"
+	"log"
+	"wa_chat_service/config"
+	"wa_chat_service/internal/repository"
+	repository_firestore "wa_chat_service/internal/repository/firestore"
+	"wa_chat_service/internal/service"
+	access_token_service "wa_chat_service/internal/service/access_token"
+	encrypt_service "wa_chat_service/internal/service/encrypt"
+	google_service "wa_chat_service/internal/service/google"
+	whatsapp_service "wa_chat_service/internal/service/whatsapp"
+	"wa_chat_service/internal/usecase"
+	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
+	chat_usecase "wa_chat_service/internal/usecase/chat"
+	message_usecase "wa_chat_service/internal/usecase/message"
+	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
+	"wa_chat_service/pkg/google"
+
+	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/storage"
+	firebase "firebase.google.com/go/v4"
+)
+
+type Clients struct {
+	// DbPostgres *gorm.DB
+	firebaseClient   *firebase.App
+	firestoreClient  *firestore.Client
+	gcpStorageClient *storage.Client
+}
+
+type Services struct {
+	AccessToken   service.AccessToken
+	Encrypt       service.Encrypt
+	GoogleStorage service.GoogleStorage
+	// GoogleFirebase *service.GoogleFirebase
+	WhatsappBusiness service.WhatsappBusiness
+}
+
+type Repositories struct {
+	ActivityLog  repository.ActivityLog
+	Chat         repository.Chat
+	Message      repository.Message
+	StorageMedia repository.StorageMedia
+	PhoneNumber  repository.PhoneNumber
+}
+
+type Usecases struct {
+	ActivityLog  usecase.ActivityLog
+	Chat         usecase.Chat
+	Message      usecase.Message
+	StorageMedia usecase.StorageMedia
+}
+
+func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
+	clients := newDefaultClients(config)
+	services := newDefaultServices(config, clients)
+	repositories := newDefaultRepositories(clients, services)
+	usecases := newDefaultUsecases(repositories, services)
+	return clients, services, repositories, usecases
+}
+
+func newDefaultClients(config *config.Config) Clients {
+	// dbPostgres := database.OpenPostgresConnection(config.Database.URL)
+	firebaseClient := google.OpenFirebaseConnection(config.GCP.ProjectID)
+	gcpStorageClient := google.OpenGCPStorageConnection()
+	firestoreClient, err := firebaseClient.Firestore(context.Background())
+	if err != nil {
+		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firestore client: %v", err)
+	}
+	// firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
+	// if err != nil {
+	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
+	// }
+	// firebaseStorageClient, err := firebaseClient.Storage(context.Background())
+	// if err != nil {
+	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
+	// }
+	// _ = transaction.NewTxManager(dbPostgres, firestoreClient)
+	return Clients{
+		// DbPostgres: dbPostgres,
+		firebaseClient:   firebaseClient,
+		firestoreClient:  firestoreClient,
+		gcpStorageClient: gcpStorageClient,
+	}
+}
+
+func newDefaultServices(config *config.Config, clients Clients) Services {
+	accessTokenService := access_token_service.NewAccessTokenService(config)
+	encryptService := encrypt_service.NewEncryptService(&config.Encrypt)
+	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &config.GCP)
+	// googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, clients.firebaseMessagingClient, clients.firebaseStorageClient)
+	whatsappService := whatsapp_service.NewWhatsappService()
+	return Services{
+		AccessToken:   accessTokenService,
+		Encrypt:       encryptService,
+		GoogleStorage: googleStorageService,
+		// GoogleFirebase: googleFirebaseService,
+		WhatsappBusiness: whatsappService,
+	}
+}
+
+func newDefaultRepositories(clients Clients, services Services) Repositories {
+	activityLogRepository := repository_firestore.NewActivityLogRepository(clients.firestoreClient)
+	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
+	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
+	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient)
+	phoneNumberRepository := repository_firestore.NewPhoneNumberRepository(clients.firestoreClient)
+	return Repositories{
+		ActivityLog:  activityLogRepository,
+		Chat:         chatRepository,
+		Message:      messageRepository,
+		StorageMedia: storageMediaRepository,
+		PhoneNumber:  phoneNumberRepository,
+	}
+}
+
+func newDefaultUsecases(repositories Repositories, services Services) Usecases {
+	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.PhoneNumber, services.GoogleStorage, services.Encrypt, services.WhatsappBusiness)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.PhoneNumber, repositories.StorageMedia, storageMediaUsecase, services.WhatsappBusiness, services.Encrypt, services.GoogleStorage)
+	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
+	return Usecases{
+		ActivityLog:  activityLogUsecase,
+		Message:      messageUsecase,
+		StorageMedia: storageMediaUsecase,
+		Chat:         chatUsecase,
+	}
+}
+
+func (c Clients) Shutdown() error {
+	// if c.DbPostgres != nil {
+	// 	log.Println("[INFO][internal/app/app.go][Clients.Shutdown] Closing database connection...")
+	// 	if sqlDB, err := c.DbPostgres.DB(); err != nil {
+	// 		log.Printf("[ERROR][internal/app/app.go][Clients.Shutdown] Error getting database connection: %v", err)
+	// 	} else {
+	// 		if err := sqlDB.Close(); err != nil {
+	// 			log.Printf("[ERROR][internal/app/app.go][Clients.Shutdown] Error closing database connection: %v", err)
+	// 		}
+	// 	}
+	// }
+	return nil
+}

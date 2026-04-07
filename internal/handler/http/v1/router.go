@@ -22,7 +22,7 @@ type HandlerV1 interface {
 	RegisterRoute(api fiber.Router)
 }
 
-func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, cfg *config.Config) {
+func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *config.Config) {
 	chatHandler := NewChatHandler(routerHandler.MessageUsecase, routerHandler.ChatUsecase)
 	chatHandler.RegisterRoute(api)
 	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase)

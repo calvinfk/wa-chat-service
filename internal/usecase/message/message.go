@@ -28,7 +28,7 @@ type MessageUsecase struct {
 	phoneNumberRepository  repository.PhoneNumber
 	storageMediaRepository repository.StorageMedia
 	storageMediaUsecase    usecase.StorageMedia
-	whatsappService        service.WhatsappService
+	whatsappService        service.WhatsappBusiness
 	encryptService         service.Encrypt
 	googleStorageService   service.GoogleStorage
 }
@@ -39,7 +39,7 @@ func NewMessageUsecase(
 	phoneNumberRepository repository.PhoneNumber,
 	storageMediaRepository repository.StorageMedia,
 	storageMediaUsecase usecase.StorageMedia,
-	whatsappService service.WhatsappService,
+	whatsappService service.WhatsappBusiness,
 	encryptService service.Encrypt,
 	googleStorageService service.GoogleStorage,
 ) *MessageUsecase {

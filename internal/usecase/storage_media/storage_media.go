@@ -25,10 +25,10 @@ type StorageMediaUsecase struct {
 	phoneNumberRepository  repository.PhoneNumber
 	googleStorageService   service.GoogleStorage
 	encryptService         service.Encrypt
-	whatsappService        service.WhatsappService
+	whatsappService        service.WhatsappBusiness
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappService) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappBusiness) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
 		phoneNumberRepository:  phoneNumberRepository,

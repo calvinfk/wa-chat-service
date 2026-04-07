@@ -11,14 +11,14 @@ import (
 )
 
 type GoogleFirebaseService struct {
-	cfg                     *config.GCP
+	config                  *config.GCP
 	firebaseMessagingClient *messaging.Client
 	firebaseStorageClient   *storage.Client
 }
 
-func NewGoogleFirebaseService(cfg *config.GCP, firebaseMessagingClient *messaging.Client, firebaseStorageClient *storage.Client) *GoogleFirebaseService {
+func NewGoogleFirebaseService(config *config.GCP, firebaseMessagingClient *messaging.Client, firebaseStorageClient *storage.Client) *GoogleFirebaseService {
 	return &GoogleFirebaseService{
-		cfg:                     cfg,
+		config:                  config,
 		firebaseMessagingClient: firebaseMessagingClient,
 		firebaseStorageClient:   firebaseStorageClient,
 	}

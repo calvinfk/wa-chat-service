@@ -14,13 +14,13 @@ import (
 
 type GoogleStorageService struct {
 	client *storage.Client
-	cfg    *config.GCP
+	config *config.GCP
 }
 
-func NewGoogleStorageService(client *storage.Client, cfg *config.GCP) *GoogleStorageService {
+func NewGoogleStorageService(client *storage.Client, config *config.GCP) *GoogleStorageService {
 	return &GoogleStorageService{
 		client: client,
-		cfg:    cfg,
+		config: config,
 	}
 }
 
@@ -32,7 +32,7 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Google Storage URL: %w", err)
 	}
-	bucket := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID)
+	bucket := s.client.Bucket(bucketName).UserProject(s.config.ProjectID)
 	if _, err := bucket.Attrs(ctx); err != nil {
 		if err == storage.ErrBucketNotExist {
 			return nil, fmt.Errorf("bucket %q does not exist", bucketName)
@@ -62,7 +62,7 @@ func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string) (*st
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse Google Storage URL: %w", err)
 	}
-	obj := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID).Object(filePath)
+	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -79,7 +79,7 @@ func (s *GoogleStorageService) DeleteFile(ctx context.Context, fileURL string) e
 	if err != nil {
 		return fmt.Errorf("failed to parse Google Storage URL: %w", err)
 	}
-	obj := s.client.Bucket(bucketName).UserProject(s.cfg.ProjectID).Object(filePath)
+	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
 	return obj.Delete(ctx)
 }
 
@@ -167,7 +167,7 @@ func (s *GoogleStorageService) IsValidSignedURL(ctx context.Context, url string)
 		return false, nil
 	}
 	// check if credential contains service account email
-	clientEmail, err := s.client.ServiceAccount(ctx, s.cfg.ProjectID)
+	clientEmail, err := s.client.ServiceAccount(ctx, s.config.ProjectID)
 	if err != nil {
 		return false, fmt.Errorf("error fetching service account: %v", err)
 	}
@@ -199,7 +199,7 @@ func (s *GoogleStorageService) IsValidSignedURL(ctx context.Context, url string)
 }
 
 func (s *GoogleStorageService) GetDefaultFileURL(filePath string) string {
-	return fmt.Sprintf("gs://%s/%s", s.cfg.DefaultBucket, filePath)
+	return fmt.Sprintf("gs://%s/%s", s.config.DefaultBucket, filePath)
 }
 
 func (s *GoogleStorageService) GetFileURL(ctx context.Context, bucketName, filePath string) string {

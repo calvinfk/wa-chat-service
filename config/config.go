@@ -55,44 +55,44 @@ type (
 
 // Reads environment variables and constructs a Config struct, validating required fields and returning an error if any are missing or invalid.
 func New() (*Config, error) {
-	cfg := &Config{}
+	config := &Config{}
 
 	app, err := appEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.App = app
+	config.App = app
 
 	cors, err := corsEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.CORS = cors
+	config.CORS = cors
 
 	database, err := databaseEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.Database = database
+	config.Database = database
 
 	encrypt, err := encryptEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.Encrypt = encrypt
+	config.Encrypt = encrypt
 
 	gcp, err := gcpEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.GCP = gcp
+	config.GCP = gcp
 
-	return cfg, nil
+	return config, nil
 }
 
 // Reads and validates application-related environment variables, returning an App struct or an error if any required variables are missing or invalid.
 func appEnv() (App, error) {
-	cfg := App{
+	config := App{
 		Name:         os.Getenv("APP_NAME"),
 		Version:      os.Getenv("APP_VERSION"),
 		Environment:  os.Getenv("APP_ENVIRONMENT"),
@@ -101,16 +101,16 @@ func appEnv() (App, error) {
 		SecureCookie: false,
 	}
 	errors := []string{}
-	if cfg.Name == "" {
+	if config.Name == "" {
 		errors = append(errors, "APP_NAME is required")
 	}
-	if cfg.Version == "" {
+	if config.Version == "" {
 		errors = append(errors, "APP_VERSION is required")
 	}
-	if cfg.Environment == "" {
+	if config.Environment == "" {
 		errors = append(errors, "APP_ENVIRONMENT is required")
 	}
-	if cfg.Environment != "development" && cfg.Environment != "production" && cfg.Environment != "staging" {
+	if config.Environment != "development" && config.Environment != "production" && config.Environment != "staging" {
 		errors = append(errors, "APP_ENVIRONMENT must be either 'development', 'production', or 'staging'")
 	}
 	if appPortString := os.Getenv("APP_PORT"); appPortString != "" {
@@ -118,12 +118,12 @@ func appEnv() (App, error) {
 		if err != nil || appPort <= 0 {
 			errors = append(errors, "APP_PORT must be a positive integer")
 		} else {
-			cfg.Port = appPort
+			config.Port = appPort
 		}
 	} else {
 		errors = append(errors, "APP_PORT is required")
 	}
-	if cfg.URL == "" {
+	if config.URL == "" {
 		errors = append(errors, "APP_URL is required")
 	}
 	if secureCookieString := os.Getenv("APP_SECURE_COOKIE"); secureCookieString != "" {
@@ -131,14 +131,14 @@ func appEnv() (App, error) {
 		if err != nil {
 			errors = append(errors, "APP_SECURE_COOKIE must be a boolean value")
 		} else {
-			cfg.SecureCookie = secureCookie
+			config.SecureCookie = secureCookie
 		}
 	}
 
 	if len(errors) > 0 {
 		return App{}, fmt.Errorf("missing required app environment variables: %s", strings.Join(errors, ", "))
 	}
-	return cfg, nil
+	return config, nil
 }
 
 // Reads and validates CORS-related environment variables, returning a CORS struct or an error if any required variables are missing or invalid.
@@ -147,80 +147,80 @@ func corsEnv() (CORS, error) {
 	if os.Getenv("CORS_ENABLED") == "" {
 		errors = append(errors, "CORS_ENABLED is required")
 	}
-	cfg := CORS{
+	config := CORS{
 		CorsEnabled: os.Getenv("CORS_ENABLED") == "true",
 	}
-	if !cfg.CorsEnabled {
-		cfg.CorsAllowOrigins = []string{}
-		cfg.CorsAllowMethods = []string{}
-		cfg.CorsAllowHeaders = []string{}
-		cfg.CorsExposeHeaders = []string{}
+	if !config.CorsEnabled {
+		config.CorsAllowOrigins = []string{}
+		config.CorsAllowMethods = []string{}
+		config.CorsAllowHeaders = []string{}
+		config.CorsExposeHeaders = []string{}
 	} else {
-		cfg.CorsAllowOrigins = strings.Split(os.Getenv("CORS_ALLOW_ORIGINS"), ",")
-		if len(cfg.CorsAllowOrigins) == 0 {
-			cfg.CorsAllowOrigins = []string{"*"}
+		config.CorsAllowOrigins = strings.Split(os.Getenv("CORS_ALLOW_ORIGINS"), ",")
+		if len(config.CorsAllowOrigins) == 0 {
+			config.CorsAllowOrigins = []string{"*"}
 		}
-		cfg.CorsAllowMethods = strings.Split(os.Getenv("CORS_ALLOW_METHODS"), ",")
-		if len(cfg.CorsAllowMethods) == 0 {
-			cfg.CorsAllowMethods = []string{"GET", "POST", "PUT", "OPTIONS"}
+		config.CorsAllowMethods = strings.Split(os.Getenv("CORS_ALLOW_METHODS"), ",")
+		if len(config.CorsAllowMethods) == 0 {
+			config.CorsAllowMethods = []string{"GET", "POST", "PUT", "OPTIONS"}
 		}
-		cfg.CorsAllowHeaders = strings.Split(os.Getenv("CORS_ALLOW_HEADERS"), ",")
-		if len(cfg.CorsAllowHeaders) == 0 {
-			cfg.CorsAllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Real-IP", "X-Forwarded-For", "X-Forwarded-Proto", "X-Target-Host", "X-Original-Host", "Access-Control-Allow-Origin"}
+		config.CorsAllowHeaders = strings.Split(os.Getenv("CORS_ALLOW_HEADERS"), ",")
+		if len(config.CorsAllowHeaders) == 0 {
+			config.CorsAllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Real-IP", "X-Forwarded-For", "X-Forwarded-Proto", "X-Target-Host", "X-Original-Host", "Access-Control-Allow-Origin"}
 		}
-		cfg.CorsExposeHeaders = strings.Split(os.Getenv("CORS_EXPOSE_HEADERS"), ",")
-		if len(cfg.CorsExposeHeaders) == 0 {
-			cfg.CorsExposeHeaders = []string{"Content-Length"}
+		config.CorsExposeHeaders = strings.Split(os.Getenv("CORS_EXPOSE_HEADERS"), ",")
+		if len(config.CorsExposeHeaders) == 0 {
+			config.CorsExposeHeaders = []string{"Content-Length"}
 		}
-		cfg.CorsAllowCredentials = os.Getenv("CORS_ALLOW_CREDENTIALS") == "true"
+		config.CorsAllowCredentials = os.Getenv("CORS_ALLOW_CREDENTIALS") == "true"
 	}
 	if len(errors) > 0 {
 		return CORS{}, fmt.Errorf("missing required CORS environment variables: %s", strings.Join(errors, ", "))
 	}
-	return cfg, nil
+	return config, nil
 }
 
 // Reads and validates database-related environment variables, returning a Database struct or an error if any required variables are missing or invalid.
 func databaseEnv() (Database, error) {
-	cfg := Database{
+	config := Database{
 		URL: os.Getenv("DATABASE_URL"),
 	}
 	errors := []string{}
-	if cfg.URL == "" {
+	if config.URL == "" {
 		errors = append(errors, "DATABASE_URL is required")
 	}
 	if len(errors) > 0 {
 		return Database{}, fmt.Errorf("missing required Database environment variables: %s", strings.Join(errors, ", "))
 	}
-	return cfg, nil
+	return config, nil
 }
 
 // Reads and validates AES encryption-related environment variables, returning an Encrypt struct or an error if any required variables are missing or invalid. For AES-GCM only AES_ENCRYPTION_KEY is required.
 func encryptEnv() (Encrypt, error) {
-	cfg := Encrypt{
+	config := Encrypt{
 		Key: []byte(os.Getenv("AES_ENCRYPTION_KEY")),
 	}
 	errors := []string{}
-	if len(cfg.Key) == 0 {
+	if len(config.Key) == 0 {
 		errors = append(errors, "AES_ENCRYPTION_KEY is required")
 	}
 	if len(errors) > 0 {
 		return Encrypt{}, fmt.Errorf("missing required Encrypt environment variables: %s", strings.Join(errors, ", "))
 	}
-	return cfg, nil
+	return config, nil
 }
 
 func gcpEnv() (GCP, error) {
-	cfg := GCP{
+	config := GCP{
 		ProjectID: os.Getenv("GCP_PROJECT_ID"),
 	}
 	errors := []string{}
-	if cfg.ProjectID == "" {
+	if config.ProjectID == "" {
 		errors = append(errors, "GCP_PROJECT_ID is required")
 	}
-	cfg.DefaultBucket = cfg.ProjectID + ".firebasestorage.app"
+	config.DefaultBucket = config.ProjectID + ".firebasestorage.app"
 	if len(errors) > 0 {
 		return GCP{}, fmt.Errorf("missing required GCP environment variables: %s", strings.Join(errors, ", "))
 	}
-	return cfg, nil
+	return config, nil
 }

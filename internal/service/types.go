@@ -69,7 +69,7 @@ type (
 		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
 	}
 
-	WhatsappService interface {
+	WhatsappBusiness interface {
 		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error)
 		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error)
 		UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)

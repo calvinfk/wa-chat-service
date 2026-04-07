@@ -10,12 +10,12 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 )
 
-func NewRouter(app *fiber.App, cfg *config.Config, routerHandlerV1 http_v1.RouterHandlerV1) {
+func NewRouter(app *fiber.App, config *config.Config, routerHandlerV1 http_v1.RouterHandlerV1) {
 	// Set up middleware
 	app.Use(
 		logger.New(),
 		middleware.Recover(),
-		middleware.Cors(&cfg.CORS),
+		middleware.Cors(&config.CORS),
 		middleware.OptionsRoute(),
 		middleware.FileSizeLimit(16*1024*1024), // 16MB
 		// middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
@@ -43,6 +43,6 @@ func NewRouter(app *fiber.App, cfg *config.Config, routerHandlerV1 http_v1.Route
 	})
 
 	apiV1 := api.Group("v1")
-	http_v1.NewApiV1Routes(apiV1, routerHandlerV1, cfg)
+	http_v1.NewApiV1Routes(apiV1, routerHandlerV1, config)
 
 }

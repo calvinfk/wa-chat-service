@@ -11,14 +11,14 @@ import (
 )
 
 type EncryptService struct {
-	cfg *config.Encrypt
+	config *config.Encrypt
 }
 
-func NewEncryptService(cfg *config.Encrypt) *EncryptService {
-	return &EncryptService{cfg: cfg}
+func NewEncryptService(config *config.Encrypt) *EncryptService {
+	return &EncryptService{config: config}
 }
 func (s *EncryptService) Encrypt(plaintext string) (string, error) {
-	block, err := aes.NewCipher(s.cfg.Key)
+	block, err := aes.NewCipher(s.config.Key)
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +47,7 @@ func (s *EncryptService) Decrypt(cipherText string) (string, error) {
 		}
 	}
 
-	block, err := aes.NewCipher(s.cfg.Key)
+	block, err := aes.NewCipher(s.config.Key)
 	if err != nil {
 		return "", err
 	}

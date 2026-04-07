@@ -9,14 +9,14 @@ import (
 	whatsapp_business_component "wa_chat_service/pkg/meta/whatsapp_business/component"
 )
 
-type WhatsappService struct {
+type WhatsappBusiness struct {
 }
 
-func NewWhatsappService() *WhatsappService {
-	return &WhatsappService{}
+func NewWhatsappService() *WhatsappBusiness {
+	return &WhatsappBusiness{}
 }
 
-func (ws *WhatsappService) SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
+func (ws *WhatsappBusiness) SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business_component.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
 	response, httpCode, err := client.SendMessage(client.PhoneNumberID, to, "individual", payload)
 	if err != nil {
 		if httpCode == http.StatusBadRequest {
@@ -37,14 +37,14 @@ func (ws *WhatsappService) SendMessage(ctx context.Context, client *whatsapp_bus
 	}
 	return response, httpCode, err
 }
-func (ws *WhatsappService) GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error) {
+func (ws *WhatsappBusiness) GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]any, int, error) {
 	response, httpCode, err := client.GetTemplateList()
 	if err != nil {
 		return nil, httpCode, err
 	}
 	return response, httpCode, nil
 }
-func (ws *WhatsappService) UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error) {
+func (ws *WhatsappBusiness) UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error) {
 	metaResponse, httpCode, err := client.UploadMedia(fileBytes, filename, mimeType)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
@@ -57,7 +57,7 @@ func (ws *WhatsappService) UploadMedia(ctx context.Context, client *whatsapp_bus
 	return metaResponse.ID, httpCode, nil
 }
 
-func (ws *WhatsappService) GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error) {
+func (ws *WhatsappBusiness) GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error) {
 	mediaURLResponse, httpCode, err := client.GetMediaURL(mediaID)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
@@ -70,7 +70,7 @@ func (ws *WhatsappService) GetMediaURL(ctx context.Context, client *whatsapp_bus
 	return mediaURLResponse.URL, httpCode, nil
 }
 
-func (ws *WhatsappService) DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaURL string) ([]byte, http.Header, int, error) {
+func (ws *WhatsappBusiness) DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaURL string) ([]byte, http.Header, int, error) {
 	mediaData, urlHeaders, httpCode, err := client.DownloadMedia(mediaURL)
 	if err != nil {
 		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][DownloadMedia] Failed to download media from URL %s: %v", mediaURL, err)
@@ -79,7 +79,7 @@ func (ws *WhatsappService) DownloadMedia(ctx context.Context, client *whatsapp_b
 	return mediaData, urlHeaders, httpCode, nil
 }
 
-func (ws *WhatsappService) DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error) {
+func (ws *WhatsappBusiness) DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error) {
 	_, httpCode, err := client.DeleteMedia(mediaID)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
