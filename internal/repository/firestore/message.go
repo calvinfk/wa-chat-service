@@ -70,7 +70,9 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		if message.StorageMediaID != nil {
 			var storageMedia model.StorageMedia
 			storageMediaDoc, err := r.db.Collection(storageMedia.TableName()).Doc(*message.StorageMediaID).Get(ctx)
-			if err == nil && storageMediaDoc.Exists() {
+			if err != nil || !storageMediaDoc.Exists() {
+				log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] No storage media found for ID:", *message.StorageMediaID, "err: ", err) // log if no storage media found
+			} else {
 				storageMediaData := storageMediaDoc.Data()
 				storageMediaData[firestore.DocumentID] = storageMediaDoc.Ref.ID
 				err := formatter.MapToStruct(storageMediaData, &storageMedia)
@@ -79,20 +81,24 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 				} else {
 					message.StorageMedia = &storageMedia
 				}
-			} else {
-				log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] No storage media found for ID:", *message.StorageMediaID, "err: ", err) // log if no storage media found
 			}
 		}
 		// sign storage media url
 		var sto *dto.StorageMediaUploadResponse
 		if message.StorageMedia != nil {
 			var storageMediaUploadResponse dto.StorageMediaUploadResponse
-			signedUrl, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*message.StorageMedia.URL, 0)
-			if err != nil {
-				log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL for storage media:", err)
-				signedUrl = ""
+			var accessURL *string
+			accessURL = message.StorageMedia.URL
+			if message.StorageMedia.IsURLFromStorage {
+				signedURL, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*message.StorageMedia.URL, 0)
+				if err != nil {
+					log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL for storage media:", err)
+					accessURL = nil
+					log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] Storage media found for ID:", *message.StorageMediaID)
+				}
+				accessURL = &signedURL
 			}
-			storageMediaUploadResponse.FromModel(*message.StorageMedia, signedUrl)
+			storageMediaUploadResponse = storageMediaUploadResponse.FromModel(*message.StorageMedia, accessURL)
 			sto = &storageMediaUploadResponse
 		}
 		var data dto.MessageGetByChatIDResponse

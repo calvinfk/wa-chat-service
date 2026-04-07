@@ -140,6 +140,8 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 					if err == nil {
 						originalFileName = params["filename"]
 					}
+				} else {
+					originalFileName = formatter.GetFileNameFromURL(*media.Link)
 				}
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
@@ -147,14 +149,20 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 					return response, true, err
 				}
 				if originalFileName == "" {
-					originalFileName = fmt.Sprintf("%s.%s", newStorageMediaID.String(), whatsapp_business.ParseMediaExtension(mimeType))
+					originalFileName = fmt.Sprintf("%s%s", newStorageMediaID.String(), whatsapp_business.ParseMediaExtension(mimeType))
 				}
 				storageMedia := model.StorageMedia{
-					DocumentID:   newStorageMediaID.String(),
-					OriginalName: originalFileName,
-					URL:          media.Link,
-					MimeType:     mimeType,
-					CreatedAt:    time.Now(),
+					DocumentID:       newStorageMediaID.String(),
+					OriginalName:     originalFileName,
+					URL:              media.Link,
+					IsURLFromStorage: false,
+					MimeType:         mimeType,
+					CreatedAt:        time.Now(),
+				}
+				_, err = u.storageMediaRepository.Insert(ctx, nil, storageMedia)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to create storage media:", err)
+					return response, true, err
 				}
 				sto = &storageMedia
 			}

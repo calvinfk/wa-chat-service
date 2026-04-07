@@ -303,3 +303,20 @@ func IsGCSSignedURLExpired(signedURL string) (bool, error) {
 
 	return false, fmt.Errorf("unrecognized or missing expiration parameters")
 }
+
+func GetFileNameFromURL(fileURL string) string {
+	u, err := url.Parse(fileURL)
+	if err != nil {
+		return ""
+	}
+	urlParts := strings.Split(u.Path, "/")
+	if len(urlParts) > 0 {
+		tempName := urlParts[len(urlParts)-1]
+		tempName = strings.Split(tempName, "?")[0] // remove query params
+		// check if the last part of the URL path has a valid filename format (e.g., has an extension)
+		if strings.Contains(tempName, ".") {
+			return tempName
+		}
+	}
+	return ""
+}

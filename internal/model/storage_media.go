@@ -5,12 +5,13 @@ import (
 )
 
 type StorageMedia struct {
-	DocumentID   string    `json:"__name__" firestore:"-"`        // generated uuid
-	MediaID      *string   `json:"media_id" firestore:"media_id"` // file ID returned by WhatsApp Business API after uploading media
-	URL          *string   `json:"url" firestore:"url"`           // url created if media is uploaded to firebase storage
-	OriginalName string    `json:"original_name" firestore:"original_name"`
-	MimeType     string    `json:"mime_type" firestore:"mime_type"`
-	CreatedAt    time.Time `json:"created_at" firestore:"created_at"`
+	DocumentID       string    `json:"__name__" firestore:"-"`        // generated uuid
+	MediaID          *string   `json:"media_id" firestore:"media_id"` // file ID returned by WhatsApp Business API after uploading media
+	URL              *string   `json:"url" firestore:"url"`           // url created if media is uploaded to firebase storage
+	OriginalName     string    `json:"original_name" firestore:"original_name"`
+	IsURLFromStorage bool      `json:"is_url_from_storage" firestore:"is_url_from_storage"`
+	MimeType         string    `json:"mime_type" firestore:"mime_type"`
+	CreatedAt        time.Time `json:"created_at" firestore:"created_at"`
 }
 
 func (m StorageMedia) TableName() string {

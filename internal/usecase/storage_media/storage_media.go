@@ -80,19 +80,20 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		return response, true, err
 	}
 	media := model.StorageMedia{
-		DocumentID:   documentID.String(),
-		MediaID:      nil,
-		URL:          &fileURL,
-		OriginalName: originalFileName,
-		MimeType:     files[0].Header.Get("Content-Type"),
-		CreatedAt:    time.Now(),
+		DocumentID:       documentID.String(),
+		MediaID:          nil,
+		URL:              &fileURL,
+		OriginalName:     originalFileName,
+		IsURLFromStorage: true,
+		MimeType:         files[0].Header.Get("Content-Type"),
+		CreatedAt:        time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to insert media data to repository:", err)
 		return response, true, err
 	}
-	response = response.FromModel(media, url)
+	response = response.FromModel(media, &url)
 	return response, false, nil
 }
 
@@ -220,11 +221,12 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 		return emptyResponse, true, err
 	}
 	media := model.StorageMedia{
-		DocumentID:   mediaDocumentID.String(),
-		OriginalName: originalFileName,
-		MediaID:      &inputData.MediaID,
-		MimeType:     mimeType,
-		CreatedAt:    time.Now(),
+		DocumentID:       mediaDocumentID.String(),
+		OriginalName:     originalFileName,
+		MediaID:          &inputData.MediaID,
+		MimeType:         mimeType,
+		IsURLFromStorage: false,
+		CreatedAt:        time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
@@ -253,14 +255,7 @@ func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, mediaURL st
 	contentDisposition := urlHeaders.Get("Content-Disposition")
 	if contentDisposition == "" {
 		// check the url path for filename if Content-Disposition header is not present
-		urlParts := strings.Split(mediaURL, "/")
-		if len(urlParts) > 0 {
-			urlParts[len(urlParts)-1] = strings.Split(urlParts[len(urlParts)-1], "?")[0] // remove query params
-			// check if the last part of the URL path has a valid filename format (e.g., has an extension)
-			if strings.Contains(urlParts[len(urlParts)-1], ".") {
-				filename = urlParts[len(urlParts)-1]
-			}
-		}
+		filename = formatter.GetFileNameFromURL(mediaURL)
 	} else {
 		// extract filename from Content-Disposition header
 		_, params, err := mime.ParseMediaType(contentDisposition)
@@ -279,11 +274,12 @@ func (u *StorageMediaUsecase) StoreMediaFromURL(ctx context.Context, mediaURL st
 		return emptyMedia, true, err
 	}
 	newMedia := model.StorageMedia{
-		DocumentID:   newMediaID.String(),
-		OriginalName: filename,
-		MimeType:     attrs.ContentType,
-		URL:          &fileURL,
-		CreatedAt:    time.Now(),
+		DocumentID:       newMediaID.String(),
+		OriginalName:     filename,
+		MimeType:         attrs.ContentType,
+		URL:              &fileURL,
+		IsURLFromStorage: true,
+		CreatedAt:        time.Now(),
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, newMedia)
 	if err != nil {

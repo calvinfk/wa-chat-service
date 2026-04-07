@@ -19,7 +19,7 @@ type (
 		OriginalName string  `json:"original_name"`
 		MimeType     string  `json:"mime_type"`
 		// URL          string `json:"url"`
-		AccessURL string `json:"access_url"`
+		AccessURL *string `json:"access_url"`
 	}
 	StorageMediaGetRequest struct {
 		ID string `query:"id" validate:"required,uuid"`
@@ -49,7 +49,7 @@ type (
 	}
 )
 
-func (r StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL string) StorageMediaUploadResponse {
+func (r StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {
 	r.ID = media.DocumentID
 	r.OriginalName = media.OriginalName
 	r.MimeType = media.MimeType
