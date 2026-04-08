@@ -7,33 +7,33 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"wa_chat_service/pkg/formatter"
 )
 
 type Client struct {
+	AppID           string
 	BaseURL         string
 	WabaID          string
 	PhoneNumberID   string
 	Version         string
 	UserAccessToken string
-	HTTPClient      *http.Client
+
+	httpClient *http.Client
+	validator  *formatter.StructValidator
 }
 
 func New(userAccessToken string, wabaID string, phoneNumberID string) *Client {
+	validator := formatter.Validator()
 	return &Client{
+		AppID:           os.Getenv("META_APP_ID"),
 		BaseURL:         "https://graph.facebook.com",
 		Version:         os.Getenv("META_GRAPH_API_VERSION"),
 		UserAccessToken: userAccessToken,
 		WabaID:          wabaID,
 		PhoneNumberID:   phoneNumberID,
-		HTTPClient:      &http.Client{},
+		httpClient:      &http.Client{},
+		validator:       validator,
 	}
-}
-
-func (wb *Client) httpClient() *http.Client {
-	if wb.HTTPClient != nil {
-		return wb.HTTPClient
-	}
-	return &http.Client{}
 }
 
 func (wb *Client) accessAPI(method string, endpoint string, payload any) ([]byte, int, error) {
@@ -47,7 +47,29 @@ func (wb *Client) accessAPI(method string, endpoint string, payload any) ([]byte
 	}
 	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := wb.httpClient().Do(req)
+	resp, err := wb.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return body, resp.StatusCode, nil
+}
+
+func (wb *Client) accessAPIWithoutAuth(method string, endpoint string, payload any) ([]byte, int, error) {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, 0, err
+	}
+	req, err := http.NewRequest(method, endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := wb.httpClient.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -83,7 +83,7 @@ func (wb *Client) DeleteTemplate(templateID string, templateName string) (Templa
 		return TemplateDeleteResponse{}, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
-	resp, err := wb.httpClient().Do(req)
+	resp, err := wb.httpClient.Do(req)
 	if err != nil {
 		return TemplateDeleteResponse{}, 0, err
 	}

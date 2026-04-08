@@ -162,11 +162,11 @@ func MapToJSONString(m map[string]any) string {
 	return string(b)
 }
 
-type structValidator struct {
+type StructValidator struct {
 	validate *validator.Validate
 }
 
-func Validator() *structValidator {
+func Validator() *StructValidator {
 	v := validator.New()
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
@@ -216,20 +216,20 @@ func Validator() *structValidator {
 	})
 	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
 	// TODO: check if from google storage, check the extension is allowed
-	return &structValidator{
+	return &StructValidator{
 		validate: v,
 	}
 }
 
 // Validator needs to implement the Validate method
-func (v *structValidator) Validate(out any) error {
+func (v *StructValidator) Validate(out any) error {
 	if out == nil {
 		return nil // Or return a specific "missing body" error
 	}
 	return v.validate.Struct(out)
 }
 
-func (v *structValidator) GetErrorMessages(err error) map[string]string {
+func (v *StructValidator) GetErrorMessages(err error) map[string]string {
 	if err == nil {
 		return nil
 	}

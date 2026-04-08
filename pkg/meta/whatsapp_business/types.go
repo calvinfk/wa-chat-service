@@ -1,6 +1,8 @@
 package whatsapp_business
 
-import "wa_chat_service/pkg/meta/whatsapp_business/message_components"
+import (
+	"wa_chat_service/pkg/meta/whatsapp_business/message_components"
+)
 
 type UploadMediaResponse struct {
 	ID string `json:"id"`
@@ -66,4 +68,25 @@ type TemplateCreateResponse struct {
 
 type TemplateDeleteResponse struct {
 	Success bool `json:"success"`
+}
+
+type StartUploadSessionRequest struct {
+	FileName    string `query:"filename" validate:"required"`
+	FileLength  int64  `query:"file_length" validate:"required"`
+	FileType    string `query:"file_type" validate:"required"`
+	AccessToken string `query:"access_token" validate:"required"`
+}
+
+type StartUploadSessionResponse struct {
+	ID         string `json:"id"`
+	FileOffset int64  `json:"file_offset"`
+}
+
+type UploadFileRequest struct {
+	UploadSessionID string `validate:"required"`
+	FileOffset      int64  `validate:"min=0"`
+	FileBytes       []byte `validate:"required"`
+}
+type UploadFileResponse struct {
+	H string `json:"h"`
 }

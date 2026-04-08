@@ -27,6 +27,14 @@ var mimeTypeExtensionMap = map[string]string{
 	"video/mp4":  ".mp4",
 }
 
+var resumableUploadMimeTypes = map[string]bool{
+	"application/pdf": true,
+	"image/jpeg":      true,
+	"image/jpg":       true,
+	"image/png":       true,
+	"video/mp4":       true,
+}
+
 var messageRegistry = map[message_components.MessageType]MessageComponent{
 	message_components.AudioMessageType:    &message_components.Audio{},
 	message_components.ContactsMessageType: &message_components.Contacts{},
