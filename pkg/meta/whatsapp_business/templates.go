@@ -3,7 +3,6 @@ package whatsapp_business
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 )
@@ -74,26 +73,36 @@ func (wb *Client) DeleteTemplate(templateID string, templateName string) (Templa
 		return TemplateDeleteResponse{}, 0, fmt.Errorf("templateID and templateName are required")
 	}
 	endpoint := fmt.Sprintf("%s/%s/%s?hsm_id=%s&name=%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate, templateID, templateName)
-	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
+	body, httpCode, err := wb.accessAPI(http.MethodDelete, endpoint, nil)
 	if err != nil {
-		return TemplateDeleteResponse{}, 0, err
+		return TemplateDeleteResponse{}, httpCode, err
 	}
-	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
-	resp, err := wb.httpClient.Do(req)
-	if err != nil {
-		return TemplateDeleteResponse{}, 0, err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return TemplateDeleteResponse{}, resp.StatusCode, err
-	}
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseMetaErrorResponse(TemplateDeleteResponse{}, body, resp.StatusCode)
+	if httpCode != http.StatusOK && httpCode != http.StatusNoContent {
+		return parseMetaErrorResponse(TemplateDeleteResponse{}, body, httpCode)
 	}
 	var response TemplateDeleteResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return TemplateDeleteResponse{Success: true}, resp.StatusCode, nil
+		// If the response body is empty (which can happen with 204 No Content), we can assume the delete was successful
+		return TemplateDeleteResponse{Success: true}, httpCode, nil
 	}
-	return response, resp.StatusCode, nil
+	return response, httpCode, nil
+}
+
+func (wb *Client) UpdateTemplate(templateID string, payload TemplateCreateRequest) (TemplateCreateResponse, int, error) {
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, templateID)
+	if templateID == "" {
+		return TemplateCreateResponse{}, 0, fmt.Errorf("templateID is required")
+	}
+	body, httpCode, err := wb.accessAPI(http.MethodPut, endpoint, payload)
+	if err != nil {
+		return TemplateCreateResponse{}, httpCode, err
+	}
+	if httpCode != http.StatusOK {
+		return parseMetaErrorResponse(TemplateCreateResponse{}, body, httpCode)
+	}
+	var response TemplateCreateResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return TemplateCreateResponse{}, httpCode, err
+	}
+	return response, httpCode, nil
 }
