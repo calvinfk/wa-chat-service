@@ -15,6 +15,7 @@ import (
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
 	message_usecase "wa_chat_service/internal/usecase/message"
+	phone_number_usecase "wa_chat_service/internal/usecase/phone_number"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	"wa_chat_service/pkg/google"
 
@@ -51,6 +52,7 @@ type Usecases struct {
 	Chat         usecase.Chat
 	Message      usecase.Message
 	StorageMedia usecase.StorageMedia
+	PhoneNumber  usecase.PhoneNumber
 }
 
 func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
@@ -118,14 +120,16 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 
 func newDefaultUsecases(repositories Repositories, services Services) Usecases {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.PhoneNumber, services.GoogleStorage, services.Encrypt, services.WhatsappBusiness)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.PhoneNumber, repositories.StorageMedia, storageMediaUsecase, services.WhatsappBusiness, services.Encrypt, services.GoogleStorage)
+	phoneNumberUsecase := phone_number_usecase.NewPhoneNumberUsecase(repositories.PhoneNumber, services.Encrypt)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, phoneNumberUsecase, services.GoogleStorage, services.WhatsappBusiness)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, phoneNumberUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Message:      messageUsecase,
 		StorageMedia: storageMediaUsecase,
 		Chat:         chatUsecase,
+		PhoneNumber:  phoneNumberUsecase,
 	}
 }
 

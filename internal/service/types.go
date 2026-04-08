@@ -69,11 +69,11 @@ type (
 	}
 
 	WhatsappBusiness interface {
-		SendMessage(ctx context.Context, client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error)
-		GetTemplateList(ctx context.Context, client *whatsapp_business.Client) ([]whatsapp_business.TemplateResponse, int, error)
-		UploadMedia(ctx context.Context, client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
-		GetMediaURL(ctx context.Context, client *whatsapp_business.Client, mediaID string) (string, int, error)
-		DownloadMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)
-		DeleteMedia(ctx context.Context, client *whatsapp_business.Client, mediaID string) (int, error)
+		SendMessage(client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error)
+		GetTemplateList(client *whatsapp_business.Client) ([]whatsapp_business.TemplateResponse, int, error)
+		UploadMedia(client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
+		GetMediaURL(client *whatsapp_business.Client, mediaID string) (string, int, error)
+		DownloadMedia(client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)
+		DeleteMedia(client *whatsapp_business.Client, mediaID string) (int, error)
 	}
 )

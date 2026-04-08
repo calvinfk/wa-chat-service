@@ -32,4 +32,8 @@ type (
 	Chat interface {
 		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], bool, error)
 	}
+
+	PhoneNumber interface {
+		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, error)
+	}
 )

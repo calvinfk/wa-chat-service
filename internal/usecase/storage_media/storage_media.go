@@ -13,6 +13,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
@@ -22,18 +23,16 @@ import (
 
 type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
-	phoneNumberRepository  repository.PhoneNumber
+	phoneNumberUsecase     usecase.PhoneNumber
 	googleStorageService   service.GoogleStorage
-	encryptService         service.Encrypt
 	whatsappService        service.WhatsappBusiness
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberRepository repository.PhoneNumber, googleStorageService service.GoogleStorage, encryptService service.Encrypt, whatsappService service.WhatsappBusiness) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, phoneNumberUsecase usecase.PhoneNumber, googleStorageService service.GoogleStorage, whatsappService service.WhatsappBusiness) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
-		phoneNumberRepository:  phoneNumberRepository,
+		phoneNumberUsecase:     phoneNumberUsecase,
 		googleStorageService:   googleStorageService,
-		encryptService:         encryptService,
 		whatsappService:        whatsappService,
 	}
 }
@@ -122,17 +121,11 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 }
 
 func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error) {
-	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	whatsappClient, err := u.phoneNumberUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to get WhatsApp client:", err)
 		return true, err
 	}
-	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
-		return true, err
-	}
-	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
 	var media *model.StorageMedia
 	if inputData.MediaID != "" {
 		mediaData, err := u.storageMediaRepository.GetByMediaID(ctx, inputData.MediaID)
@@ -157,7 +150,7 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 		return true, errs.ErrGenericNotFound
 	}
 	if media.MediaID != nil {
-		httpCode, err := u.whatsappService.DeleteMedia(ctx, whatsappClient, *media.MediaID)
+		httpCode, err := u.whatsappService.DeleteMedia(whatsappClient, *media.MediaID)
 		if err != nil {
 			log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
 			return httpCode >= http.StatusInternalServerError, err
@@ -180,18 +173,12 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 
 func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error) {
 	var emptyResponse dto.StorageMediaSaveMediaIDResponse
-	phoneNumber, err := u.phoneNumberRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	whatsappClient, err := u.phoneNumberUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get phone number:", err)
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to get WhatsApp client:", err)
 		return emptyResponse, true, err
 	}
-	decyptedAccessToken, err := u.encryptService.Decrypt(phoneNumber.AccessToken)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to decrypt access token:", err)
-		return emptyResponse, true, err
-	}
-	whatsappClient := whatsapp_business.New(decyptedAccessToken, phoneNumber.WabaID, phoneNumber.PhoneNumberID)
-	url, httpCode, err := u.whatsappService.GetMediaURL(ctx, whatsappClient, inputData.MediaID)
+	url, httpCode, err := u.whatsappService.GetMediaURL(whatsappClient, inputData.MediaID)
 	if err != nil {
 		log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to get media URL from WhatsApp Business API: %v", err)
 		return emptyResponse, httpCode >= http.StatusInternalServerError, err
