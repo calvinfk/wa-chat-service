@@ -53,11 +53,11 @@ type TemplateResponse struct {
 }
 
 type TemplateCreateRequest struct {
-	Name            string `json:"name" validate:"required"`
-	Category        string `json:"category" validate:"required,oneof=marketing utility authentication"`
-	Language        string `json:"language" validate:"required"`
-	ParameterFormat string `json:"parameter_format" validate:"required,oneof=named positional"`
-	Components      []any  `json:"components" validate:"required"`
+	Name            string           `json:"name" validate:"required"`
+	Category        string           `json:"category" validate:"required,oneof=marketing utility authentication"`
+	Language        string           `json:"language" validate:"required"`
+	ParameterFormat string           `json:"parameter_format" validate:"required,oneof=named positional"`
+	Components      []map[string]any `json:"components,omitempty" validate:"omitempty,dive"`
 }
 
 type TemplateCreateResponse struct {

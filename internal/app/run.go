@@ -24,6 +24,7 @@ func Run(config *config.Config) {
 		MessageUsecase:       usecases.Message,
 		StorageMediaUsecase:  usecases.StorageMedia,
 		ChatUsecase:          usecases.Chat,
+		TemplateUsecase:      usecases.Template,
 		AccessTokenService:   services.AccessToken,
 		EncryptService:       services.Encrypt,
 		GoogleStorageService: services.GoogleStorage,

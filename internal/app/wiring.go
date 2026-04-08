@@ -17,6 +17,7 @@ import (
 	message_usecase "wa_chat_service/internal/usecase/message"
 	phone_number_usecase "wa_chat_service/internal/usecase/phone_number"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
+	template_usecase "wa_chat_service/internal/usecase/template"
 	"wa_chat_service/pkg/google"
 
 	"cloud.google.com/go/firestore"
@@ -53,6 +54,7 @@ type Usecases struct {
 	Message      usecase.Message
 	StorageMedia usecase.StorageMedia
 	PhoneNumber  usecase.PhoneNumber
+	Template     usecase.Template
 }
 
 func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
@@ -121,11 +123,13 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 func newDefaultUsecases(repositories Repositories, services Services) Usecases {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
 	phoneNumberUsecase := phone_number_usecase.NewPhoneNumberUsecase(repositories.PhoneNumber, services.Encrypt)
+	templateUsecase := template_usecase.NewTemplateUsecase(phoneNumberUsecase, services.WhatsappBusiness)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, phoneNumberUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, phoneNumberUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
+		Template:     templateUsecase,
 		Message:      messageUsecase,
 		StorageMedia: storageMediaUsecase,
 		Chat:         chatUsecase,

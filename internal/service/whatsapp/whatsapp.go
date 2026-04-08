@@ -2,8 +2,8 @@ package whatsapp_service
 
 import (
 	"log"
-	"mime/multipart"
 	"net/http"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 )
@@ -98,8 +98,8 @@ func (ws *WhatsappBusiness) DeleteMedia(client *whatsapp_business.Client, mediaI
 	return httpCode, nil
 }
 
-func (ws *WhatsappBusiness) ResumableUpload(client *whatsapp_business.Client, fileHeader *multipart.FileHeader) (string, int, error) {
-	uploadURL, httpCode, err := client.ResumableUpload(fileHeader)
+func (ws *WhatsappBusiness) ResumableUpload(client *whatsapp_business.Client, inputData dto.ResumableUploadRequest) (string, int, error) {
+	uploadURL, httpCode, err := client.ResumableUpload(inputData.FileHeader)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
 			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ResumableUpload] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
@@ -111,7 +111,13 @@ func (ws *WhatsappBusiness) ResumableUpload(client *whatsapp_business.Client, fi
 	return uploadURL, httpCode, nil
 }
 
-func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, template whatsapp_business.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error) {
+func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error) {
+	template := whatsapp_business.TemplateCreateRequest{
+		Name:       inputData.Name,
+		Category:   inputData.Category,
+		Language:   inputData.Language,
+		Components: inputData.Components,
+	}
 	response, httpCode, err := client.CreateTemplate(template)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {

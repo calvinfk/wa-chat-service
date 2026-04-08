@@ -20,6 +20,10 @@ type (
 		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error)
 	}
 
+	Template interface {
+		CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error)
+	}
+
 	StorageMedia interface {
 		UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error)
 		// the caller is responsible to close the reader after use

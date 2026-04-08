@@ -47,6 +47,11 @@ type (
 	StorageMediaSaveMediaIDResponse struct {
 		ID string `json:"id"`
 	}
+
+	ResumableUploadRequest struct {
+		FileHeader    *multipart.FileHeader `form:"file" validate:"required"`
+		PhoneNumberID string                `form:"phone_number_id" validate:"required"`
+	}
 )
 
 func (r StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {

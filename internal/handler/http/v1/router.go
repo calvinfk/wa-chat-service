@@ -13,6 +13,7 @@ type RouterHandlerV1 struct {
 	MessageUsecase       usecase.Message
 	StorageMediaUsecase  usecase.StorageMedia
 	ChatUsecase          usecase.Chat
+	TemplateUsecase      usecase.Template
 	AccessTokenService   service.AccessToken
 	EncryptService       service.Encrypt
 	GoogleStorageService service.GoogleStorage
@@ -27,4 +28,6 @@ func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *con
 	chatHandler.RegisterRoute(api)
 	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase)
 	storageMediaHandler.RegisterRoutes(api)
+	templateHandler := NewTemplateHandler(routerHandler.TemplateUsecase)
+	templateHandler.RegisterRoute(api)
 }

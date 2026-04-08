@@ -52,12 +52,8 @@ func (wb *Client) GetTemplateByID(templateID string, query ...string) (TemplateR
 	return response, httpCode, nil
 }
 
-func (wb *Client) CreateTemplate(req []byte) (TemplateCreateResponse, int, error) {
+func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateResponse, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
-	var payload TemplateCreateRequest
-	if err := json.Unmarshal(req, &payload); err != nil {
-		return TemplateCreateResponse{}, 0, err
-	}
 	// TODO: validate payload before sending request
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
 	if err != nil {
