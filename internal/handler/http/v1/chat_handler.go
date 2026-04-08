@@ -26,15 +26,15 @@ func NewChatHandler(messageUsecase usecase.Message, chatUsecase usecase.Chat) Ha
 func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	chatGroup := api.Group("/chat")
 	{
-		chatGroup.Post("/send", h.SendMessage)
-		chatGroup.Get("/template-list", h.GetTemplateList)
-		chatGroup.Get("/by-phone-number-id", h.GetChatByPhoneNumberID)
-		chatGroup.Get("/messages", h.GetMessagesByChatID)
+		chatGroup.Post("/send", h.sendMessage)
+		chatGroup.Get("/template-list", h.getTemplateList)
+		chatGroup.Get("/by-phone-number-id", h.getChatByPhoneNumberID)
+		chatGroup.Get("/messages", h.getMessagesByChatID)
 	}
 
 }
 
-func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
+func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	var requestData dto.MessageSendRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -60,7 +60,7 @@ func (h *ChatHandler) SendMessage(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *ChatHandler) GetTemplateList(ctx fiber.Ctx) error {
+func (h *ChatHandler) getTemplateList(ctx fiber.Ctx) error {
 	var requestData dto.TemplateListRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -71,7 +71,7 @@ func (h *ChatHandler) GetTemplateList(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *ChatHandler) GetChatByPhoneNumberID(ctx fiber.Ctx) error {
+func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -86,7 +86,7 @@ func (h *ChatHandler) GetChatByPhoneNumberID(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *ChatHandler) GetMessagesByChatID(ctx fiber.Ctx) error {
+func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)

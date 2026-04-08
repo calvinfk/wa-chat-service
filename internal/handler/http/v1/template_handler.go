@@ -21,11 +21,11 @@ func NewTemplateHandler(templateUsecase usecase.Template) *TemplateHandler {
 func (h *TemplateHandler) RegisterRoute(router fiber.Router) {
 	templateRoutes := router.Group("/template")
 	{
-		templateRoutes.Post("/create", h.CreateTemplate)
+		templateRoutes.Post("/create", h.createTemplate)
 	}
 }
 
-func (h *TemplateHandler) CreateTemplate(ctx fiber.Ctx) error {
+func (h *TemplateHandler) createTemplate(ctx fiber.Ctx) error {
 	var inputData dto.TemplateCreateRequest
 	if err := ctx.Bind().Body(&inputData); err != nil {
 		httpCode, apiResponse := api_response.NewApiResponse(false, err, "Failed to parse request body", nil)

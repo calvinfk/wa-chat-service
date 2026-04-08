@@ -24,14 +24,14 @@ func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia) *StorageMe
 func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 	storageMediaRouter := router.Group("/storage-media")
 	{
-		storageMediaRouter.Post("/upload", h.UploadMedia)
-		storageMediaRouter.Get("/get", h.GetMedia)
-		storageMediaRouter.Delete("/delete", h.DeleteMedia)
-		storageMediaRouter.Post("/save-media-id", h.SaveMediaID)
+		storageMediaRouter.Post("/upload", h.uploadMedia)
+		storageMediaRouter.Get("/get", h.getMedia)
+		storageMediaRouter.Delete("/delete", h.deleteMedia)
+		storageMediaRouter.Post("/save-media-id", h.saveMediaID)
 	}
 }
 
-func (h *StorageMediaHandler) UploadMedia(ctx fiber.Ctx) error {
+func (h *StorageMediaHandler) uploadMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaUploadRequest
 	if err := ctx.Bind().Form(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -46,7 +46,7 @@ func (h *StorageMediaHandler) UploadMedia(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *StorageMediaHandler) GetMedia(ctx fiber.Ctx) error {
+func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaGetRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -67,13 +67,13 @@ func (h *StorageMediaHandler) GetMedia(ctx fiber.Ctx) error {
 	ctx.Set("Content-Length", fmt.Sprintf("%d", mediaResponse.Size))
 
 	if _, err := io.Copy(ctx.Response().BodyWriter(), mediaResponse.Reader); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][GetMedia] Failed to stream file to response:", err)
+		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][getMedia] Failed to stream file to response:", err)
 		return err
 	}
 	return nil
 }
 
-func (h *StorageMediaHandler) DeleteMedia(ctx fiber.Ctx) error {
+func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaDeleteRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
@@ -84,10 +84,10 @@ func (h *StorageMediaHandler) DeleteMedia(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *StorageMediaHandler) SaveMediaID(ctx fiber.Ctx) error {
+func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaSaveMediaIDRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][SaveMediaID] Failed to bind request data:", err)
+		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][saveMediaID] Failed to bind request data:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
