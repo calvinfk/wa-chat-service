@@ -312,3 +312,67 @@ func (u *StorageMediaUsecase) downloadMedia(ctx context.Context, whatsappClient 
 	}
 	return nil, 0, fmt.Errorf("media not found or inaccessible")
 }
+
+func (u *StorageMediaUsecase) UploadMediaMeta(ctx context.Context, inputData dto.StorageMediaUploadMetaRequest) (dto.StorageMediaUploadMetaResponse, bool, error) {
+	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to get WhatsApp client:", err)
+		return dto.StorageMediaUploadMetaResponse{}, true, err
+	}
+	media, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to get media data from repository:", err)
+		return dto.StorageMediaUploadMetaResponse{}, true, err
+	}
+	if media.MediaID != nil {
+		// check if its still exists in WhatsApp Business API
+		_, httpCode, err := u.whatsappService.GetMediaURL(whatsappClient, *media.MediaID)
+		if err == nil {
+			return dto.StorageMediaUploadMetaResponse{MediaID: *media.MediaID}, false, nil
+		} else if httpCode >= http.StatusInternalServerError {
+			log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to get media URL from WhatsApp Business API: %v", err)
+			return dto.StorageMediaUploadMetaResponse{}, true, err
+		} else {
+			// if the media is not found in WhatsApp Business API, we will upload it again
+			fileBytes, _, err := u.downloadMedia(ctx, whatsappClient, media)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to download media for re-uploading:", err)
+				return dto.StorageMediaUploadMetaResponse{}, true, err
+			}
+			mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileBytes, media.OriginalName, media.MimeType)
+			if err != nil {
+				log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to upload media to WhatsApp Business API: %v", err)
+				return dto.StorageMediaUploadMetaResponse{}, httpCode >= http.StatusInternalServerError, err
+			}
+			// Update media record in repository with new MediaID
+			media.MediaID = &mediaID
+			err = u.storageMediaRepository.Update(ctx, nil, media)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to update media record in repository with new MediaID:", err)
+				return dto.StorageMediaUploadMetaResponse{}, true, err
+			}
+			return dto.StorageMediaUploadMetaResponse{MediaID: mediaID}, false, nil
+		}
+	} else if media.URL != nil {
+		// upload to WhatsApp Business API
+		fileBytes, _, err := u.downloadMedia(ctx, whatsappClient, media)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to download media for uploading:", err)
+			return dto.StorageMediaUploadMetaResponse{}, true, err
+		}
+		mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileBytes, media.OriginalName, media.MimeType)
+		if err != nil {
+			log.Printf("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to upload media to WhatsApp Business API: %v", err)
+			return dto.StorageMediaUploadMetaResponse{}, httpCode >= http.StatusInternalServerError, err
+		}
+		// Update media record in repository with new MediaID
+		media.MediaID = &mediaID
+		err = u.storageMediaRepository.Update(ctx, nil, media)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaMeta] Failed to update media record in repository with new MediaID:", err)
+			return dto.StorageMediaUploadMetaResponse{}, true, err
+		}
+		return dto.StorageMediaUploadMetaResponse{MediaID: mediaID}, false, nil
+	}
+	return dto.StorageMediaUploadMetaResponse{}, true, fmt.Errorf("media not found or inaccessible")
+}

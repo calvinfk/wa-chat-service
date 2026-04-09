@@ -34,6 +34,7 @@ type (
 		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
 		SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error)
 		UploadResumableMedia(ctx context.Context, inputData dto.StorageMediaResumableUploadRequest) (dto.StorageMediaResumableUploadResponse, bool, error)
+		UploadMediaMeta(ctx context.Context, inputData dto.StorageMediaUploadMetaRequest) (dto.StorageMediaUploadMetaResponse, bool, error)
 	}
 
 	Chat interface {

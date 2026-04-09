@@ -54,6 +54,15 @@ type (
 	StorageMediaResumableUploadResponse struct {
 		H string `json:"h"`
 	}
+
+	StorageMediaUploadMetaRequest struct {
+		PhoneNumberID string `json:"phone_number_id" validate:"required"`
+		ID            string `json:"id" validate:"required,uuid"`
+	}
+
+	StorageMediaUploadMetaResponse struct {
+		MediaID string `json:"media_id"`
+	}
 )
 
 func (StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {
