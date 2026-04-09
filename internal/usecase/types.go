@@ -45,7 +45,8 @@ type (
 		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error)
 	}
 
-	GoogleTask interface {
-		CreatePingTask() (bool, error)
+	Broadcast interface {
+		ScheduleBroadcast() (bool, error)
+		SendBroadcast() (bool, error)
 	}
 )

@@ -51,7 +51,6 @@ func Jwt(encryptService service.Encrypt, jwtService service.JWT) fiber.Handler {
 				"errors":  nil,
 			})
 		}
-		log.Printf("[INFO][internal/handler/http/middleware/Jwt] JWT parsed successfully, sub: %s", sub)
 		ctx.Locals("jwt_sub", sub)
 		return ctx.Next()
 	}

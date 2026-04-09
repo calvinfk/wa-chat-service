@@ -43,7 +43,7 @@ func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtServic
 // }
 
 func (s *GoogleTaskService) CreatePingTask() error {
-	token, err := s.jwtService.GenerateJWT("ping-task", time.Now().Add(time.Second*5).Unix())
+	token, err := s.jwtService.GenerateJWT("ping-task", time.Now().Add(time.Second*20).Unix())
 	if err != nil {
 		return err
 	}

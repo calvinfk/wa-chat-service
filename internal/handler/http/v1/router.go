@@ -14,7 +14,7 @@ type RouterHandlerV1 struct {
 	StorageMediaUsecase usecase.StorageMedia
 	ChatUsecase         usecase.Chat
 	TemplateUsecase     usecase.Template
-	GoogleTaskUsecase   usecase.GoogleTask
+	BroadcastUsecase    usecase.Broadcast
 	EncryptService      service.Encrypt
 	JWTService          service.JWT
 }
@@ -30,8 +30,6 @@ func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *con
 	storageMediaHandler.RegisterRoutes(api)
 	templateHandler := NewTemplateHandler(routerHandler.TemplateUsecase)
 	templateHandler.RegisterRoute(api)
-	googleTaskHandler := NewGoogleTaskHandler(routerHandler.GoogleTaskUsecase)
-	googleTaskHandler.RegisterRoute(api)
-	broadcastHandler := NewBroadcastHandler(routerHandler.EncryptService, routerHandler.JWTService)
+	broadcastHandler := NewBroadcastHandler(routerHandler.BroadcastUsecase, routerHandler.EncryptService, routerHandler.JWTService)
 	broadcastHandler.RegisterRoute(api)
 }

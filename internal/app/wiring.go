@@ -14,8 +14,8 @@ import (
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	"wa_chat_service/internal/usecase"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
+	broadcast_usecase "wa_chat_service/internal/usecase/broadcast"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
-	google_task_usecase "wa_chat_service/internal/usecase/google_task"
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
@@ -63,7 +63,7 @@ type Usecases struct {
 	StorageMedia usecase.StorageMedia
 	Tenant       usecase.Tenant
 	Template     usecase.Template
-	GoogleTask   usecase.GoogleTask
+	Broadcast    usecase.Broadcast
 }
 
 func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
@@ -159,7 +159,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
-	googleTaskUsecase := google_task_usecase.NewGoogleTaskUsecase(services.GoogleTask)
+	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(services.GoogleTask)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,
@@ -167,7 +167,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 		StorageMedia: storageMediaUsecase,
 		Chat:         chatUsecase,
 		Tenant:       tenantUsecase,
-		GoogleTask:   googleTaskUsecase,
+		Broadcast:    broadcastUsecase,
 	}
 }
 

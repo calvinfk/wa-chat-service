@@ -25,7 +25,7 @@ func Run(config *config.Config) {
 		StorageMediaUsecase: usecases.StorageMedia,
 		ChatUsecase:         usecases.Chat,
 		TemplateUsecase:     usecases.Template,
-		GoogleTaskUsecase:   usecases.GoogleTask,
+		BroadcastUsecase:    usecases.Broadcast,
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
 	}
