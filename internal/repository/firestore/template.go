@@ -5,7 +5,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
@@ -40,7 +40,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 		var template model.Template
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err := formatter.MapToStruct(docData, &template)
+		err := utils.MapToStruct(docData, &template)
 		if err != nil {
 			return response, err
 		}
@@ -62,7 +62,7 @@ func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]mod
 		var template model.Template
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err := formatter.MapToStruct(docData, &template)
+		err := utils.MapToStruct(docData, &template)
 		if err != nil {
 			return templates, err
 		}
@@ -84,7 +84,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 	}
 	docData := doc.Data()
 	docData[firestore.DocumentID] = doc.Ref.ID
-	err = formatter.MapToStruct(docData, &template)
+	err = utils.MapToStruct(docData, &template)
 	if err != nil {
 		return template, err
 	}

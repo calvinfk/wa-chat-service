@@ -6,7 +6,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
@@ -31,7 +31,7 @@ func (r *ActivityLogRepository) Insert(ctx context.Context, tx *firestore.Transa
 	}
 	data.ID = logID.String()
 	data.CreatedAt = time.Now()
-	dataMap, err := formatter.StructToMap(data, true)
+	dataMap, err := utils.StructToMap(data, true)
 	if err != nil {
 		return r.model, err
 	}

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/google/uuid"
 )
@@ -61,7 +61,7 @@ func (e QueryFilterEmail) IsEmpty() bool {
 	return e == ""
 }
 func (e QueryFilterEmail) IsValid() bool {
-	return formatter.ValidateEmail(QueryFilterString(e).GetValue())
+	return utils.ValidateEmail(QueryFilterString(e).GetValue())
 }
 func (e QueryFilterEmail) GetEmail() string {
 	return QueryFilterString(e).GetValue()

@@ -14,8 +14,8 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/google/uuid"
 )
@@ -130,7 +130,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 						originalFileName = params["filename"]
 					}
 				} else {
-					originalFileName = formatter.GetFileNameFromURL(*media.Link)
+					originalFileName = utils.GetFileNameFromURL(*media.Link)
 				}
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
@@ -162,7 +162,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
 		return response, httpCode >= http.StatusInternalServerError, err
 	}
-	payloadData, err := formatter.AnyToJsonString(component.GetPayload())
+	payloadData, err := utils.AnyToJsonString(component.GetPayload())
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to convert payload to JSON")
 	}

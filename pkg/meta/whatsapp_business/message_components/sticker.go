@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Sticker struct {
@@ -13,7 +13,7 @@ func (c Sticker) GetType() MessageType {
 }
 
 func (c Sticker) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -23,13 +23,13 @@ func (c Sticker) GetPayload() map[string]any {
 }
 
 func (c Sticker) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Sticker Sticker `json:"sticker" validate:"required"`
 	}{
 		Sticker: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Sticker) GetMessage() string {

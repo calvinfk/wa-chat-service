@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 	"wa_chat_service/internal/dto"
-	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/utils"
 )
 
 type WhatsappBusiness struct {
@@ -21,7 +21,7 @@ func (ws *WhatsappBusiness) SendMessage(client *whatsapp_business.Client, to str
 		if httpCode == http.StatusBadRequest {
 			waError, ok := err.(whatsapp_business.WhatsAppBusinessError)
 			if ok {
-				payloadData, err := formatter.AnyToJsonString(payload.GetPayload())
+				payloadData, err := utils.AnyToJsonString(payload.GetPayload())
 				log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] WhatsApp Business API error: %s (code: %d, subcode: %d)", waError.ErrorData.Message, waError.ErrorData.Code, waError.ErrorData.ErrorSubcode)
 				if err != nil {
 					log.Println("[ERROR][internal/service/whatsapp/whatsapp.go][SendMessage] Failed to convert payload to JSON")

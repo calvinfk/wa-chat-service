@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Image struct {
@@ -14,7 +14,7 @@ func (c Image) GetType() MessageType {
 }
 
 func (c Image) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +24,13 @@ func (c Image) GetPayload() map[string]any {
 }
 
 func (c Image) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Image Image `json:"image" validate:"required"`
 	}{
 		Image: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Image) GetMessage() string {

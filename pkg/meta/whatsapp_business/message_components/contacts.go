@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Contacts []Contact
@@ -65,7 +65,7 @@ func (c Contacts) GetPayload() map[string]any {
 	var contactPayloads []map[string]any
 	for _, contact := range c {
 		// Convert each contact to a map[string]any if needed
-		contactPayload, err := formatter.StructToMap(contact, true)
+		contactPayload, err := utils.StructToMap(contact, true)
 		if err != nil {
 			panic(err)
 		}
@@ -77,13 +77,13 @@ func (c Contacts) GetPayload() map[string]any {
 }
 
 func (c Contacts) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	validatePayload := struct {
 		Contacts Contacts `json:"contacts" validate:"dive"`
 	}{
 		Contacts: c,
 	}
-	return validator.Validate(validatePayload)
+	return validator.Struct(validatePayload)
 }
 
 func (c Contacts) GetMessage() string {

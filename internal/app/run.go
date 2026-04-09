@@ -8,7 +8,7 @@ import (
 	"wa_chat_service/config"
 	http_internal "wa_chat_service/internal/handler/http"
 	http_v1 "wa_chat_service/internal/handler/http/v1"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -33,7 +33,7 @@ func Run(config *config.Config) {
 	app := fiber.New(fiber.Config{
 		AppName:         config.App.Name,
 		BodyLimit:       16 * 1024 * 1024, // 16MB
-		StructValidator: formatter.Validator(),
+		StructValidator: utils.NewStructValidator(),
 	})
 
 	http_internal.NewRouter(app, config, routerHandlerV1)

@@ -1,6 +1,6 @@
 package message_components
 
-import "wa_chat_service/pkg/formatter"
+import "wa_chat_service/pkg/utils"
 
 type Template struct {
 	Name       string       `json:"name" validate:"required"`
@@ -32,7 +32,7 @@ func (t *Template) GetType() MessageType {
 	return TemplateMessageType
 }
 func (c Template) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -42,13 +42,13 @@ func (c Template) GetPayload() map[string]any {
 }
 
 func (c Template) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Template Template `json:"template" validate:"required"`
 	}{
 		Template: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Template) GetMessage() string {

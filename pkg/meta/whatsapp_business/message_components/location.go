@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Location struct {
@@ -16,7 +16,7 @@ func (c Location) GetType() MessageType {
 }
 
 func (c Location) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -26,13 +26,13 @@ func (c Location) GetPayload() map[string]any {
 }
 
 func (c Location) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Location Location `json:"location" validate:"required"`
 	}{
 		Location: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Location) GetMessage() string {

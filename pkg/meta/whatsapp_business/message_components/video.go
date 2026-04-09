@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Video struct {
@@ -14,7 +14,7 @@ func (c Video) GetType() MessageType {
 }
 
 func (c Video) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +24,13 @@ func (c Video) GetPayload() map[string]any {
 }
 
 func (c Video) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Video Video `json:"video" validate:"required"`
 	}{
 		Video: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 func (c Video) GetMessage() string {
 	if c.Caption != nil {

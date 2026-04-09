@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type (
@@ -21,10 +21,10 @@ type (
 )
 
 func (r ChatGetByPhoneNumberIDRequest) Validate() map[string]string {
-	validator := formatter.Validator()
-	err := validator.Validate(r)
+	validator := utils.NewValidator()
+	err := validator.Struct(r)
 	if err != nil {
-		return validator.GetErrorMessages(err)
+		return utils.GetValidatorErrorMessages(err)
 	}
 	return nil
 }

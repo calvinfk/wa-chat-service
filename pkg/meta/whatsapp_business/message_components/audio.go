@@ -1,8 +1,6 @@
 package message_components
 
-import (
-	"wa_chat_service/pkg/formatter"
-)
+import "wa_chat_service/pkg/utils"
 
 type Audio struct {
 	Media
@@ -14,7 +12,7 @@ func (c Audio) GetType() MessageType {
 }
 
 func (c Audio) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +22,13 @@ func (c Audio) GetPayload() map[string]any {
 }
 
 func (c Audio) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Audio Audio `json:"audio" validate:"required"`
 	}{
 		Audio: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Audio) GetMessage() string {

@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
+
+	"github.com/go-playground/validator/v10"
 )
 
 type Client struct {
@@ -20,11 +22,11 @@ type Client struct {
 	UserAccessToken string
 
 	httpClient *http.Client
-	validator  *formatter.StructValidator
+	validator  *validator.Validate
 }
 
 func New(userAccessToken string, wabaID string, phoneNumberID string) *Client {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	appID := os.Getenv("META_APP_ID")
 	if appID == "" {
 		log.Printf("[WARNING][pkg/meta/whatsapp_business/client.go][New] META_APP_ID is not set in environment variables")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/errs"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
@@ -48,7 +48,7 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 	var media model.StorageMedia
 	docData := doc.Data()
 	docData[firestore.DocumentID] = doc.Ref.ID
-	err = formatter.MapToStruct(docData, &media)
+	err = utils.MapToStruct(docData, &media)
 	if err != nil {
 		return r.storageMedia, err
 	}
@@ -67,7 +67,7 @@ func (r *StorageMediaRepository) GetByURL(ctx context.Context, url string) (mode
 	for _, doc := range docs {
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err = formatter.MapToStruct(docData, &media)
+		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
 		}
@@ -87,7 +87,7 @@ func (r *StorageMediaRepository) GetByAccessURL(ctx context.Context, accessURL s
 	for _, doc := range docs {
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err = formatter.MapToStruct(docData, &media)
+		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
 		}
@@ -107,7 +107,7 @@ func (r *StorageMediaRepository) GetByMediaID(ctx context.Context, mediaID strin
 	for _, doc := range docs {
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err = formatter.MapToStruct(docData, &media)
+		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
 		}

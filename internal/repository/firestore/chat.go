@@ -5,7 +5,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/grpc/codes"
@@ -76,7 +76,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 		var chat model.Chat
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
-		err := formatter.MapToStruct(docData, &chat)
+		err := utils.MapToStruct(docData, &chat)
 		if err != nil {
 			return response, err
 		}

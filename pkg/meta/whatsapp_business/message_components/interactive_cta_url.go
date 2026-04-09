@@ -2,7 +2,7 @@ package message_components
 
 import (
 	"log"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type InteractiveCTAUrl struct {
@@ -36,7 +36,7 @@ func (c InteractiveCTAUrl) GetType() MessageType {
 }
 
 func (c InteractiveCTAUrl) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -47,13 +47,13 @@ func (c InteractiveCTAUrl) GetPayload() map[string]any {
 
 func (c InteractiveCTAUrl) Validate() error {
 	log.Println("[DEBUG][pkg/meta/whatsapp_business/component/interactive_cta_url.go][Validate] Validating InteractiveCTAUrl component")
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Interactive InteractiveCTAUrl `json:"interactive" validate:"required"`
 	}{
 		Interactive: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c InteractiveCTAUrl) GetMessage() string {

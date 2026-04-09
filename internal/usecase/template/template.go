@@ -13,9 +13,9 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/transaction"
+	"wa_chat_service/pkg/utils"
 )
 
 type TemplateUsecase struct {
@@ -46,7 +46,7 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to create template:", err)
 		return nil, httpCode >= http.StatusInternalServerError, err
 	}
-	componentsString, err := formatter.AnyToJsonString(inputData.Components)
+	componentsString, err := utils.AnyToJsonString(inputData.Components)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to marshal template components:", err)
 		return nil, true, err
@@ -125,7 +125,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			if exists {
 				template = currentTemplate
 			} else {
-				componentString, err := formatter.AnyToJsonString(templateMeta.Components)
+				componentString, err := utils.AnyToJsonString(templateMeta.Components)
 				if err != nil {
 					log.Printf("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to marshal template components for template ID %s: %v", templateMeta.ID, err)
 					continue
@@ -210,7 +210,7 @@ func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.Temp
 		log.Printf("[ERROR][internal/usecase/template/template.go][UpdateTemplate] cannot update template with status %s", currentTemplate.Status)
 		return false, fmt.Errorf("cannot update template with status %s", currentTemplate.Status)
 	}
-	componentsString, err := formatter.AnyToJsonString(inputData.Components)
+	componentsString, err := utils.AnyToJsonString(inputData.Components)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to marshal template components:", err)
 		return false, err

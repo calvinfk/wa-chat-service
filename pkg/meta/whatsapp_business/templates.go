@@ -88,7 +88,7 @@ func (wb *Client) GetTemplateByID(templateID string, query ...string) (TemplateR
 }
 
 func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateResponse, int, error) {
-	if err := wb.validator.Validate(payload); err != nil {
+	if err := wb.validator.Struct(payload); err != nil {
 		return TemplateCreateResponse{}, 0, err
 	}
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
@@ -112,7 +112,7 @@ func (wb *Client) DeleteTemplate(templateID string, templateName string) (Templa
 	var requestData TemplateDeleteRequest
 	requestData.ID = templateID
 	requestData.Name = templateName
-	if err := wb.validator.Validate(requestData); err != nil {
+	if err := wb.validator.Struct(requestData); err != nil {
 		return TemplateDeleteResponse{}, 0, err
 	}
 	var queries []string

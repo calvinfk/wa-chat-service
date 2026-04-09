@@ -144,7 +144,7 @@ func (wb *Client) StartResumableUploadSession(fileName string, fileLength int64,
 		FileType:    fileType,
 		AccessToken: wb.UserAccessToken,
 	}
-	if err := wb.validator.Validate(payload); err != nil {
+	if err := wb.validator.Struct(payload); err != nil {
 		return StartUploadSessionResponse{}, 0, fmt.Errorf("validation error: %w", err)
 	}
 	endpoint := fmt.Sprintf("%s/%s/uploads?file_name=%s&file_length=%d&file_type=%s&access_token=%s", wb.GetBaseURLVersion(), wb.AppID, payload.FileName, payload.FileLength, payload.FileType, payload.AccessToken)
@@ -169,7 +169,7 @@ func (wb *Client) StartResumableUpload(uploadSessionID string, fileOffset int64,
 		FileOffset:      fileOffset,
 		FileBytes:       file,
 	}
-	err := wb.validator.Validate(payload)
+	err := wb.validator.Struct(payload)
 	if err != nil {
 		return UploadFileResponse{}, 0, err
 	}

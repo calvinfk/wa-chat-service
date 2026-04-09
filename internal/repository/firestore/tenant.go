@@ -3,7 +3,7 @@ package repository_firestore
 import (
 	"context"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 )
@@ -25,7 +25,7 @@ func (r *TenantRepository) GetByPhoneNumberID(ctx context.Context, phoneNumberID
 	var tenant model.Tenant
 	docData := doc.Data()
 	docData[firestore.DocumentID] = doc.Ref.ID
-	err = formatter.MapToStruct(docData, &tenant)
+	err = utils.MapToStruct(docData, &tenant)
 	if err != nil {
 		return model.Tenant{}, err
 	}

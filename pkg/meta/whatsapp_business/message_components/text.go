@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type Text struct {
@@ -14,7 +14,7 @@ func (c Text) GetType() MessageType {
 }
 
 func (c Text) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +24,13 @@ func (c Text) GetPayload() map[string]any {
 }
 
 func (c Text) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Text Text `json:"text" validate:"required"`
 	}{
 		Text: c,
 	}
-	return validator.Validate(data)
+	return validator.Struct(data)
 }
 
 func (c Text) GetMessage() string {

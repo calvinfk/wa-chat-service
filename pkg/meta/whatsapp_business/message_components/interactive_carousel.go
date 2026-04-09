@@ -1,7 +1,7 @@
 package message_components
 
 import (
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type InteractiveCarousel struct {
@@ -42,7 +42,7 @@ func (c InteractiveCarousel) GetType() MessageType {
 }
 
 func (c InteractiveCarousel) GetPayload() map[string]any {
-	jsonData, err := formatter.StructToMap(c, true)
+	jsonData, err := utils.StructToMap(c, true)
 	if err != nil {
 		panic(err)
 	}
@@ -52,13 +52,13 @@ func (c InteractiveCarousel) GetPayload() map[string]any {
 }
 
 func (c InteractiveCarousel) Validate() error {
-	validator := formatter.Validator()
+	validator := utils.NewValidator()
 	data := struct {
 		Interactive InteractiveCarousel `json:"interactive" validate:"required"`
 	}{
 		Interactive: c,
 	}
-	err := validator.Validate(data)
+	err := validator.Struct(data)
 	if err != nil {
 		return err
 	}

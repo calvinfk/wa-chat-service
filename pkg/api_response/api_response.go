@@ -3,8 +3,8 @@ package api_response
 import (
 	"net/http"
 	"wa_chat_service/pkg/errs"
-	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -29,7 +29,7 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 	}
 	if err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			errors := formatter.FormatErrors(validationErrors, data)
+			errors := utils.FormatErrors(validationErrors, data)
 			response.Code = http.StatusBadRequest
 			response.Data = nil
 			response.Errors = errors
@@ -58,7 +58,7 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 				response.Data = nil
 				response.Errors = nil
 			}
-			response.Message = formatter.CapitalizeFirstLetter(errors.Error())
+			response.Message = utils.CapitalizeFirstLetter(errors.Error())
 		} else {
 			response.Code = http.StatusBadRequest
 			response.Data = nil

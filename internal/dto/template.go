@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 )
 
 type (
@@ -53,9 +53,9 @@ type (
 )
 
 func (r TemplateGetByPhoneNumberID) Validate() map[string]string {
-	validator := formatter.Validator()
-	err := validator.Validate(r)
-	return validator.GetErrorMessages(err)
+	validator := utils.NewValidator()
+	err := validator.Struct(r)
+	return utils.GetValidatorErrorMessages(err)
 }
 
 func (TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) TemplateGetByPhoneNumberIDResponse {

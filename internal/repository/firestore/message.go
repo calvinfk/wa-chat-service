@@ -7,7 +7,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 )
@@ -62,7 +62,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
 		docData["chat_id"] = doc.Ref.Parent.Parent.ID
-		err := formatter.MapToStruct(docData, &message)
+		err := utils.MapToStruct(docData, &message)
 		if err != nil {
 			return response, err
 		}
@@ -75,7 +75,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			} else {
 				storageMediaData := storageMediaDoc.Data()
 				storageMediaData[firestore.DocumentID] = storageMediaDoc.Ref.ID
-				err := formatter.MapToStruct(storageMediaData, &storageMedia)
+				err := utils.MapToStruct(storageMediaData, &storageMedia)
 				if err != nil {
 					log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to map storage media data:", err)
 				} else {
