@@ -50,7 +50,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 	return response, nil
 }
 
-func (r *TemplateRepository) GetByTenantID(ctx context.Context, tenantID string) ([]model.Template, error) {
+func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]model.Template, error) {
 	var templates []model.Template
 	collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
 	query := collection.Query
@@ -69,6 +69,26 @@ func (r *TemplateRepository) GetByTenantID(ctx context.Context, tenantID string)
 		templates = append(templates, template)
 	}
 	return templates, nil
+}
+
+func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, documentID string) (model.Template, error) {
+	var template model.Template
+	docRef := r.db.
+		Collection("tenants").
+		Doc(tenantID).
+		Collection(r.template.TableName()).
+		Doc(documentID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		return template, err
+	}
+	docData := doc.Data()
+	docData[firestore.DocumentID] = doc.Ref.ID
+	err = formatter.MapToStruct(docData, &template)
+	if err != nil {
+		return template, err
+	}
+	return template, nil
 }
 
 func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transaction, tenantID string, inputData model.Template) (model.Template, error) {

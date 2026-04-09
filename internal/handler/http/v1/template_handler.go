@@ -26,6 +26,7 @@ func (h *TemplateHandler) RegisterRoute(router fiber.Router) {
 		templateRoutes.Post("/create", h.createTemplate)
 		templateRoutes.Post("/sync", h.syncTemplate)
 		templateRoutes.Delete("/delete", h.deleteTemplate)
+		templateRoutes.Put("/update", h.updateTemplate)
 	}
 }
 
@@ -75,4 +76,16 @@ func (h *TemplateHandler) deleteTemplate(ctx fiber.Ctx) error {
 	serverError, err := h.templateUsecase.DeleteTemplate(ctx, inputData)
 	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully delete template", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
+}
+
+func (h *TemplateHandler) updateTemplate(ctx fiber.Ctx) error {
+	var inputData dto.TemplateUpdateRequest
+	if err := ctx.Bind().All(&inputData); err != nil {
+		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	serverError, err := h.templateUsecase.UpdateTemplate(ctx, inputData)
+	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully update template", nil)
+	return ctx.Status(httpCode).JSON(apiResponse)
+
 }

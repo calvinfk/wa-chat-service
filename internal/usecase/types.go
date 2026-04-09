@@ -24,6 +24,7 @@ type (
 		GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error)
 		SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error)
 		DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error)
+		UpdateTemplate(ctx context.Context, inputData dto.TemplateUpdateRequest) (bool, error)
 	}
 
 	StorageMedia interface {

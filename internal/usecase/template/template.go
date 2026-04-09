@@ -2,8 +2,10 @@ package template_usecase
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -91,7 +93,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get whatsapp client:", err)
 		return false, err
 	}
-	currentTemplates, err := u.templateRepository.GetByTenantID(ctx, tenantID)
+	currentTemplates, err := u.templateRepository.GetAll(ctx, tenantID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get current templates from repository:", err)
 		return false, err
@@ -189,6 +191,53 @@ func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.Temp
 			log.Println("[ERROR][internal/usecase/template/template.go][DeleteTemplate] failed to delete template from repository:", err)
 			return true, err
 		}
+	}
+	return false, nil
+}
+
+func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.TemplateUpdateRequest) (bool, error) {
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to get whatsapp client:", err)
+		return false, err
+	}
+	currentTemplate, err := u.templateRepository.GetByID(ctx, tenantID, inputData.ID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to get current template from repository:", err)
+		return false, err
+	}
+	if strings.ToUpper(currentTemplate.Status) != "REJECTED" {
+		log.Printf("[ERROR][internal/usecase/template/template.go][UpdateTemplate] cannot update template with status %s", currentTemplate.Status)
+		return false, fmt.Errorf("cannot update template with status %s", currentTemplate.Status)
+	}
+	componentsString, err := formatter.AnyToJsonString(inputData.Components)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to marshal template components:", err)
+		return false, err
+	}
+	payload := whatsapp_business.TemplateCreateRequest{
+		Name:            inputData.Name,
+		Language:        inputData.Language,
+		Category:        inputData.Category,
+		ParameterFormat: inputData.ParameterFormat,
+		Components:      inputData.Components,
+	}
+	response, httpCode, err := whatsappClient.UpdateTemplate(inputData.ID, payload)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to update template:", err)
+		return httpCode >= http.StatusInternalServerError, err
+	}
+	currentTemplate.Category = response.Category
+	currentTemplate.Status = response.Status
+	currentTemplate.Name = payload.Name
+	currentTemplate.Language = payload.Language
+	currentTemplate.ParameterFormat = payload.ParameterFormat
+	currentTemplate.Components = componentsString
+	currentTemplate.UpdatedAt = time.Now()
+	_, err = u.templateRepository.Upsert(ctx, nil, tenantID, currentTemplate)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to upsert template:", err)
+		return false, err
 	}
 	return false, nil
 }

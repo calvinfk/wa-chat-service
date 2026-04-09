@@ -142,11 +142,11 @@ func (wb *Client) DeleteTemplate(templateID string, templateName string) (Templa
 }
 
 func (wb *Client) UpdateTemplate(templateID string, payload TemplateCreateRequest) (TemplateCreateResponse, int, error) {
-	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, templateID)
+	endpoint := fmt.Sprintf("%s/%s", wb.GetBaseURLVersion(), templateID)
 	if templateID == "" {
 		return TemplateCreateResponse{}, 0, fmt.Errorf("templateID is required")
 	}
-	body, httpCode, err := wb.accessAPI(http.MethodPut, endpoint, payload)
+	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
 	if err != nil {
 		return TemplateCreateResponse{}, httpCode, err
 	}

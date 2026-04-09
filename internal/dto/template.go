@@ -16,8 +16,8 @@ type (
 		Components      []map[string]any `json:"components" validate:"required"`
 	}
 	TemplateGetByPhoneNumberID struct {
-		PhoneNumberID string `query:"phone_number_id" validate:"required"`
-		Fields        string `query:"fields"`
+		PhoneNumberID string `json:"-" query:"phone_number_id" validate:"required"`
+		Name          string `json:"name" query:"name" validate:"omitempty,min=1"`
 	}
 	TemplateGetByPhoneNumberIDResponse struct {
 		ID                          string    `json:"id"`
@@ -39,6 +39,16 @@ type (
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
 		ID            string `query:"id" validate:"required_without=Name"`
 		Name          string `query:"name" validate:"required_without=ID"`
+	}
+
+	TemplateUpdateRequest struct {
+		PhoneNumberID   string           `json:"phone_number_id" validate:"required"`
+		ID              string           `json:"id" query:"id" validate:"required"`
+		Name            string           `json:"name" validate:"required"`
+		Language        string           `json:"language" validate:"required"`
+		Category        string           `json:"category" validate:"required"`
+		ParameterFormat *string          `json:"parameter_format,omitempty"`
+		Components      []map[string]any `json:"components" validate:"required"`
 	}
 )
 
