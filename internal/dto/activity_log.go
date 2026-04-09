@@ -59,10 +59,12 @@ func (r ActivityLogFilterRequest) Validate() map[string]string {
 	return errors
 }
 
-func (r *ActivityLogResponse) FromModel(data model.ActivityLog) {
-	r.ID = data.ID
-	r.UserID = data.UserID
-	r.Type = data.Type
-	r.Description = data.Description
-	r.CreatedAt = data.CreatedAt
+func (ActivityLogResponse) FromModel(data model.ActivityLog) ActivityLogResponse {
+	return ActivityLogResponse{
+		ID:          data.ID,
+		UserID:      data.UserID,
+		Type:        data.Type,
+		Description: data.Description,
+		CreatedAt:   data.CreatedAt,
+	}
 }

@@ -56,15 +56,17 @@ type (
 	}
 )
 
-func (r StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {
-	r.ID = media.DocumentID
-	r.OriginalName = media.OriginalName
-	r.MimeType = media.MimeType
-	r.AccessURL = accessURL
-	return r
+func (StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {
+	return StorageMediaUploadResponse{
+		ID:           media.DocumentID,
+		OriginalName: media.OriginalName,
+		MimeType:     media.MimeType,
+		AccessURL:    accessURL,
+	}
 }
 
-func (r StorageMediaSaveMediaIDResponse) FromModel(media model.StorageMedia) StorageMediaSaveMediaIDResponse {
-	r.ID = media.DocumentID
-	return r
+func (StorageMediaSaveMediaIDResponse) FromModel(media model.StorageMedia) StorageMediaSaveMediaIDResponse {
+	return StorageMediaSaveMediaIDResponse{
+		ID: media.DocumentID,
+	}
 }

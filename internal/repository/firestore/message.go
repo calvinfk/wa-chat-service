@@ -86,7 +86,6 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 		// sign storage media url
 		var sto *dto.StorageMediaUploadResponse
 		if message.StorageMedia != nil {
-			var storageMediaUploadResponse dto.StorageMediaUploadResponse
 			var accessURL *string
 			accessURL = message.StorageMedia.URL
 			if message.StorageMedia.IsURLFromStorage {
@@ -98,12 +97,10 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 				}
 				accessURL = &signedURL
 			}
-			storageMediaUploadResponse = storageMediaUploadResponse.FromModel(*message.StorageMedia, accessURL)
+			storageMediaUploadResponse := dto.StorageMediaUploadResponse{}.FromModel(*message.StorageMedia, accessURL)
 			sto = &storageMediaUploadResponse
 		}
-		var data dto.MessageGetByChatIDResponse
-		data.FromModel(message, sto)
-		result = append(result, data)
+		result = append(result, dto.MessageGetByChatIDResponse{}.FromModel(message, sto))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

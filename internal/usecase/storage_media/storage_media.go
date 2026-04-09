@@ -220,7 +220,7 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMediaUsingMediaID] Failed to create media record in repository:", err)
 		return emptyResponse, true, err
 	}
-	return emptyResponse.FromModel(media), false, nil
+	return dto.StorageMediaSaveMediaIDResponse{}.FromModel(media), false, nil
 }
 
 func (u *StorageMediaUsecase) UploadResumableMedia(ctx context.Context, inputData dto.StorageMediaResumableUploadRequest) (dto.StorageMediaResumableUploadResponse, bool, error) {

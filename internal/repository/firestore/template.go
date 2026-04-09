@@ -44,9 +44,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 		if err != nil {
 			return response, err
 		}
-		var data dto.TemplateGetByPhoneNumberIDResponse
-		data.FromModel(template)
-		result = append(result, data)
+		result = append(result, dto.TemplateGetByPhoneNumberIDResponse{}.FromModel(template))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

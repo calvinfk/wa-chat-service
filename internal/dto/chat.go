@@ -29,11 +29,13 @@ func (r ChatGetByPhoneNumberIDRequest) Validate() map[string]string {
 	return nil
 }
 
-func (r *ChatGetByPhoneNumberIDResponse) FromModel(data model.Chat) {
-	r.ID = data.DocumentID
-	r.ChatType = data.ChatType
-	r.DisplayName = data.DisplayName
-	r.LastMessage = data.LastMessage
-	r.CreatedAt = data.CreatedAt
-	r.UpdatedAt = data.UpdatedAt
+func (ChatGetByPhoneNumberIDResponse) FromModel(data model.Chat) ChatGetByPhoneNumberIDResponse {
+	return ChatGetByPhoneNumberIDResponse{
+		ID:          data.DocumentID,
+		ChatType:    data.ChatType,
+		DisplayName: data.DisplayName,
+		LastMessage: data.LastMessage,
+		CreatedAt:   data.CreatedAt,
+		UpdatedAt:   data.UpdatedAt,
+	}
 }

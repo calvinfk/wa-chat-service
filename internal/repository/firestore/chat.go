@@ -80,9 +80,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 		if err != nil {
 			return response, err
 		}
-		var data dto.ChatGetByPhoneNumberIDResponse
-		data.FromModel(chat)
-		result = append(result, data)
+		result = append(result, dto.ChatGetByPhoneNumberIDResponse{}.FromModel(chat))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

@@ -29,7 +29,6 @@ type (
 		Status                      string    `json:"status"`
 		Components                  string    `json:"components"`
 		CreatedAt                   time.Time `json:"created_at"`
-		UpdatedAt                   time.Time `json:"updated_at"`
 	}
 	TemplateSyncRequest struct {
 		PhoneNumberID string `json:"phone_number_id" validate:"required"`
@@ -48,7 +47,7 @@ func (r TemplateGetByPhoneNumberID) Validate() map[string]string {
 	return validator.GetErrorMessages(err)
 }
 
-func (r TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) TemplateGetByPhoneNumberIDResponse {
+func (TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) TemplateGetByPhoneNumberIDResponse {
 	return TemplateGetByPhoneNumberIDResponse{
 		ID:                          data.DocumentID,
 		Category:                    data.Category,
@@ -59,5 +58,6 @@ func (r TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) Templ
 		Name:                        data.Name,
 		ParameterFormat:             data.ParameterFormat,
 		Status:                      data.Status,
+		CreatedAt:                   data.CreatedAt,
 	}
 }

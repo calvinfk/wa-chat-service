@@ -70,8 +70,7 @@ func (r *ActivityLogRepository) GetFiltered(ctx context.Context, filter filter_r
 		if err != nil {
 			return response, err
 		}
-		var responseData dto.ActivityLogResponse
-		responseData.FromModel(data)
+		responseData := dto.ActivityLogResponse{}.FromModel(data)
 		result = append(result, responseData)
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)

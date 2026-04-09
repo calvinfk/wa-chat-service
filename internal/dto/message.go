@@ -49,19 +49,21 @@ func (r MessageGetByChatIDRequest) Validate() map[string]string {
 	return nil
 }
 
-func (r *MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaUploadResponse) {
-	r.ID = data.DocumentID
-	r.ChatID = data.ChatID
-	r.StorageMediaID = data.StorageMediaID
-	r.StorageMedia = storageMedia
-	r.MessageType = data.MessageType
-	r.MessageCategory = data.MessageCategory
-	r.SenderName = data.SenderName
-	r.Payload = data.Payload
-	r.Status = data.Status
-	r.CreatedAt = data.CreatedAt
-	r.SentAt = data.SentAt
-	r.DeliveredAt = data.DeliveredAt
-	r.ReadAt = data.ReadAt
-	r.Error = data.Error
+func (MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaUploadResponse) MessageGetByChatIDResponse {
+	return MessageGetByChatIDResponse{
+		ID:              data.DocumentID,
+		ChatID:          data.ChatID,
+		StorageMediaID:  data.StorageMediaID,
+		StorageMedia:    storageMedia,
+		MessageType:     data.MessageType,
+		MessageCategory: data.MessageCategory,
+		SenderName:      data.SenderName,
+		Payload:         data.Payload,
+		Status:          data.Status,
+		CreatedAt:       data.CreatedAt,
+		SentAt:          data.SentAt,
+		DeliveredAt:     data.DeliveredAt,
+		ReadAt:          data.ReadAt,
+		Error:           data.Error,
+	}
 }
