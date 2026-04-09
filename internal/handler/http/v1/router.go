@@ -9,14 +9,14 @@ import (
 )
 
 type RouterHandlerV1 struct {
-	ActivityLogUsecase   usecase.ActivityLog
-	MessageUsecase       usecase.Message
-	StorageMediaUsecase  usecase.StorageMedia
-	ChatUsecase          usecase.Chat
-	TemplateUsecase      usecase.Template
-	AccessTokenService   service.AccessToken
-	EncryptService       service.Encrypt
-	GoogleStorageService service.GoogleStorage
+	ActivityLogUsecase  usecase.ActivityLog
+	MessageUsecase      usecase.Message
+	StorageMediaUsecase usecase.StorageMedia
+	ChatUsecase         usecase.Chat
+	TemplateUsecase     usecase.Template
+	GoogleTaskUsecase   usecase.GoogleTask
+	EncryptService      service.Encrypt
+	JWTService          service.JWT
 }
 
 type HandlerV1 interface {
@@ -30,4 +30,8 @@ func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *con
 	storageMediaHandler.RegisterRoutes(api)
 	templateHandler := NewTemplateHandler(routerHandler.TemplateUsecase)
 	templateHandler.RegisterRoute(api)
+	googleTaskHandler := NewGoogleTaskHandler(routerHandler.GoogleTaskUsecase)
+	googleTaskHandler.RegisterRoute(api)
+	broadcastHandler := NewBroadcastHandler(routerHandler.EncryptService, routerHandler.JWTService)
+	broadcastHandler.RegisterRoute(api)
 }

@@ -20,14 +20,14 @@ func Run(config *config.Config) {
 
 	// Router Handler
 	routerHandlerV1 := http_v1.RouterHandlerV1{
-		ActivityLogUsecase:   usecases.ActivityLog,
-		MessageUsecase:       usecases.Message,
-		StorageMediaUsecase:  usecases.StorageMedia,
-		ChatUsecase:          usecases.Chat,
-		TemplateUsecase:      usecases.Template,
-		AccessTokenService:   services.AccessToken,
-		EncryptService:       services.Encrypt,
-		GoogleStorageService: services.GoogleStorage,
+		ActivityLogUsecase:  usecases.ActivityLog,
+		MessageUsecase:      usecases.Message,
+		StorageMediaUsecase: usecases.StorageMedia,
+		ChatUsecase:         usecases.Chat,
+		TemplateUsecase:     usecases.Template,
+		GoogleTaskUsecase:   usecases.GoogleTask,
+		EncryptService:      services.Encrypt,
+		JWTService:          services.JWT,
 	}
 
 	app := fiber.New(fiber.Config{

@@ -10,20 +10,22 @@ import (
 	access_token_service "wa_chat_service/internal/service/access_token"
 	encrypt_service "wa_chat_service/internal/service/encrypt"
 	google_service "wa_chat_service/internal/service/google"
+	jose_service "wa_chat_service/internal/service/jose"
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	"wa_chat_service/internal/usecase"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
+	google_task_usecase "wa_chat_service/internal/usecase/google_task"
 	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
-	"wa_chat_service/pkg/google"
 	"wa_chat_service/pkg/transaction"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
 	firebase "firebase.google.com/go/v4"
+	"google.golang.org/api/cloudtasks/v2"
 )
 
 type Clients struct {
@@ -32,6 +34,7 @@ type Clients struct {
 	firestoreClient  *firestore.Client
 	gcpStorageClient *storage.Client
 	txManager        *transaction.TxManager
+	gcpTaskClient    *cloudtasks.Service
 }
 
 type Services struct {
@@ -40,6 +43,8 @@ type Services struct {
 	GoogleStorage service.GoogleStorage
 	// GoogleFirebase *service.GoogleFirebase
 	WhatsappBusiness service.WhatsappBusiness
+	GoogleTask       service.GoogleTask
+	JWT              service.JWT
 }
 
 type Repositories struct {
@@ -58,6 +63,7 @@ type Usecases struct {
 	StorageMedia usecase.StorageMedia
 	Tenant       usecase.Tenant
 	Template     usecase.Template
+	GoogleTask   usecase.GoogleTask
 }
 
 func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
@@ -69,9 +75,20 @@ func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, U
 }
 
 func newDefaultClients(config *config.Config) Clients {
-	// dbPostgres := database.OpenPostgresConnection(config.Database.URL)
-	firebaseClient := google.OpenFirebaseConnection(config.GCP.ProjectID)
-	gcpStorageClient := google.OpenGCPStorageConnection()
+	ctx := context.Background()
+	// dbPostgres, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{})
+	// if err != nil {
+	// 	panic("failed to open database: " + err.Error())
+	// }
+	conf := &firebase.Config{ProjectID: config.GCP.ProjectID, StorageBucket: config.GCP.ProjectID + ".firebasestorage.app"}
+	firebaseClient, err := firebase.NewApp(ctx, conf)
+	if err != nil {
+		panic("Failed to create Firebase app: " + err.Error())
+	}
+	gcpStorageClient, err := storage.NewClient(ctx)
+	if err != nil {
+		panic("Failed to create Google Storage client: " + err.Error())
+	}
 	firestoreClient, err := firebaseClient.Firestore(context.Background())
 	if err != nil {
 		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firestore client: %v", err)
@@ -85,12 +102,17 @@ func newDefaultClients(config *config.Config) Clients {
 	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
 	// }
 	txManager := transaction.NewTxManager(nil, firestoreClient)
+	gcpTaskClient, err := cloudtasks.NewService(context.Background())
+	if err != nil {
+		panic("Failed to create Cloud Tasks client: " + err.Error())
+	}
 	return Clients{
 		// DbPostgres: dbPostgres,
 		firebaseClient:   firebaseClient,
 		firestoreClient:  firestoreClient,
 		gcpStorageClient: gcpStorageClient,
 		txManager:        txManager,
+		gcpTaskClient:    gcpTaskClient,
 	}
 }
 
@@ -100,12 +122,16 @@ func newDefaultServices(config *config.Config, clients Clients) Services {
 	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &config.GCP)
 	// googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, clients.firebaseMessagingClient, clients.firebaseStorageClient)
 	whatsappService := whatsapp_service.NewWhatsappService()
+	jwtService := jose_service.NewJWTService(&config.JOSE)
+	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &config.GCP, jwtService, encryptService)
 	return Services{
 		AccessToken:   accessTokenService,
 		Encrypt:       encryptService,
 		GoogleStorage: googleStorageService,
 		// GoogleFirebase: googleFirebaseService,
 		WhatsappBusiness: whatsappService,
+		GoogleTask:       googleTaskService,
+		JWT:              jwtService,
 	}
 }
 
@@ -133,6 +159,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
+	googleTaskUsecase := google_task_usecase.NewGoogleTaskUsecase(services.GoogleTask)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,
@@ -140,6 +167,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 		StorageMedia: storageMediaUsecase,
 		Chat:         chatUsecase,
 		Tenant:       tenantUsecase,
+		GoogleTask:   googleTaskUsecase,
 	}
 }
 

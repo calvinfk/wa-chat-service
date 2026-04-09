@@ -77,4 +77,13 @@ type (
 		DeleteMedia(client *whatsapp_business.Client, mediaID string) (int, error)
 		CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error)
 	}
+
+	GoogleTask interface {
+		CreatePingTask() error
+	}
+
+	JWT interface {
+		GenerateJWT(sub any, expiredAt int64) (string, error)
+		ParseJWT(tokenString string) (any, error)
+	}
 )

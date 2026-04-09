@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"strconv"
@@ -15,6 +18,7 @@ type (
 		Database Database
 		Encrypt  Encrypt
 		GCP      GCP
+		JOSE     JOSE
 	}
 
 	// Application metadata and server configuration, such as name, version, environment, port, and URL.
@@ -49,7 +53,12 @@ type (
 
 	GCP struct {
 		ProjectID     string `env:"GCP_PROJECT_ID,required"`
+		AppBaseURL    string `env:"GCP_APP_BASE_URL,required"`
 		DefaultBucket string // default bucket for general use
+	}
+
+	JOSE struct {
+		RSAPrivateKey *rsa.PrivateKey
 	}
 )
 
@@ -86,6 +95,12 @@ func New() (*Config, error) {
 		return nil, err
 	}
 	config.GCP = gcp
+
+	jose, err := joseEnv()
+	if err != nil {
+		return nil, err
+	}
+	config.JOSE = jose
 
 	return config, nil
 }
@@ -212,15 +227,74 @@ func encryptEnv() (Encrypt, error) {
 
 func gcpEnv() (GCP, error) {
 	config := GCP{
-		ProjectID: os.Getenv("GCP_PROJECT_ID"),
+		ProjectID:  os.Getenv("GCP_PROJECT_ID"),
+		AppBaseURL: os.Getenv("GCP_APP_BASE_URL"),
 	}
 	errors := []string{}
 	if config.ProjectID == "" {
 		errors = append(errors, "GCP_PROJECT_ID is required")
+	}
+	if config.AppBaseURL == "" {
+		errors = append(errors, "GCP_APP_BASE_URL is required")
 	}
 	config.DefaultBucket = config.ProjectID + ".firebasestorage.app"
 	if len(errors) > 0 {
 		return GCP{}, fmt.Errorf("missing required GCP environment variables: %s", strings.Join(errors, ", "))
 	}
 	return config, nil
+}
+func joseEnv() (JOSE, error) {
+	var errors []string
+	cfg := JOSE{}
+	if encodedKey := os.Getenv("JOSE_RSA_PRIVATE_KEY"); encodedKey != "" {
+		var err error
+		cfg.RSAPrivateKey, err = loadPrivateKey(encodedKey)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to load RSA private key: %v", err))
+		}
+	} else {
+		errors = append(errors, "JOSE_RSA_PRIVATE_KEY is required")
+	}
+	if len(errors) > 0 {
+		return JOSE{}, fmt.Errorf("missing required JOSE environment variables: %s", strings.Join(errors, ", "))
+	}
+	return cfg, nil
+}
+
+func loadPrivateKey(keyPath string) (*rsa.PrivateKey, error) {
+	file, err := os.OpenFile(keyPath, os.O_RDONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open private key file: %w", err)
+	}
+	defer file.Close()
+	data := make([]byte, 2048) // Read up to 2KB, adjust if needed
+	_, err = file.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+
+	var privateKey *rsa.PrivateKey
+	block, _ := pem.Decode(data)
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		// PKCS#1
+		privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS1 private key: %w", err)
+		}
+	case "PRIVATE KEY":
+		// PKCS#8
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
+		}
+		var ok bool
+		privateKey, ok = key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("not RSA private key")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported key type %q", block.Type)
+	}
+	return privateKey, nil
 }

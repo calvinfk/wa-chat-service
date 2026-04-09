@@ -21,6 +21,9 @@ encrypt:
 decrypt:
 	go run ./cmd/encrypt/encrypt.go decrypt=$(ARGS)
 
+encode:
+	go run ./cmd/encode/encode.go
+
 # 4. Build the final Windows Binary
 build:
 	go build -o $(APP_NAME).exe $(MAIN_PATH)

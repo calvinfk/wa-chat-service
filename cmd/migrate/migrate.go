@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 	"wa_chat_service/config"
-	"wa_chat_service/pkg/database"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +33,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error initializing config: %v", err)
 	}
-	db := database.OpenPostgresConnection(config.Database.URL)
+	dbPostgres, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{})
+	if err != nil {
+		panic("failed to open database: " + err.Error())
+	}
+
 	models := []any{}
 
 	args := os.Args
@@ -44,11 +48,11 @@ func main() {
 	for arg := range strings.SplitSeq(args[1], ",") {
 		switch arg {
 		case "migrate":
-			autoMigrate(db, models)
+			autoMigrate(dbPostgres, models)
 		case "drop":
-			dropTables(db, models)
+			dropTables(dbPostgres, models)
 		case "seed":
-			seedData(db)
+			seedData(dbPostgres)
 		default:
 			log.Printf("[INFO][cmd/migrate/migrate.go][main] command '%s' not recognized", args[1])
 		}
