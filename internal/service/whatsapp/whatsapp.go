@@ -37,7 +37,7 @@ func (ws *WhatsappBusiness) SendMessage(client *whatsapp_business.Client, to str
 	return response, httpCode, err
 }
 
-func (ws *WhatsappBusiness) GetTemplateList(client *whatsapp_business.Client) ([]whatsapp_business.TemplateResponse, int, error) {
+func (ws *WhatsappBusiness) GetTemplateList(client *whatsapp_business.Client) ([]any, int, error) {
 	response, httpCode, err := client.GetTemplateList()
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {

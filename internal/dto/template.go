@@ -17,6 +17,7 @@ type (
 	}
 	TemplateGetByPhoneNumberID struct {
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
+		Fields        string `query:"fields"`
 	}
 	TemplateGetByPhoneNumberIDResponse struct {
 		ID                          string    `json:"id"`

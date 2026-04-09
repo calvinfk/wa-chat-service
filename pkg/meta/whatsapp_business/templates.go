@@ -12,20 +12,29 @@ const (
 	endpointTemplate = "message_templates"
 )
 
-func (wb *Client) GetTemplateList(query ...string) ([]TemplateResponse, int, error) {
+func (wb *Client) GetTemplateList(query ...string) ([]any, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
 	if len(query) > 0 {
-		endpoint += "?" + strings.Join(query, "&")
+		var queries []string
+		for _, q := range query {
+			if q != "" {
+				queries = append(queries, q)
+			}
+		}
+		if len(queries) > 0 {
+			endpoint += "?" + strings.Join(queries, "&")
+		}
 	}
+	fmt.Println("endpoint get template list:", endpoint)
 	body, httpCode, err := wb.accessAPI(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		return parseMetaErrorResponse([]TemplateResponse{}, body, httpCode)
+		return parseMetaErrorResponse([]any{}, body, httpCode)
 	}
 	var response struct {
-		Data []TemplateResponse `json:"data"`
+		Data []any `json:"data"`
 	}
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, httpCode, err
@@ -36,7 +45,15 @@ func (wb *Client) GetTemplateList(query ...string) ([]TemplateResponse, int, err
 func (wb *Client) GetTemplateByID(templateID string, query ...string) (TemplateResponse, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, templateID)
 	if len(query) > 0 {
-		endpoint += "?" + strings.Join(query, "&")
+		var queries []string
+		for _, q := range query {
+			if q != "" {
+				queries = append(queries, q)
+			}
+		}
+		if len(queries) > 0 {
+			endpoint += "?" + strings.Join(queries, "&")
+		}
 	}
 	body, httpCode, err := wb.accessAPI(http.MethodGet, endpoint, nil)
 	if err != nil {

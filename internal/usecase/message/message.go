@@ -190,20 +190,6 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 	return response, false, nil
 }
 
-func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]whatsapp_business.TemplateResponse, bool, error) {
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get WhatsApp client:", err)
-		return nil, true, err
-	}
-	templateList, httpCode, err := u.whatsappService.GetTemplateList(whatsappClient)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get template list:", err)
-		return nil, httpCode >= http.StatusInternalServerError, err
-	}
-	return templateList, false, nil
-}
-
 func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error) {
 	var response filter_request.FilterResponse[dto.MessageGetByChatIDResponse]
 	messages, err := u.messageRepository.GetMessageByChatID(ctx, requestData)

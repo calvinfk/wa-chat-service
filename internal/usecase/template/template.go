@@ -12,6 +12,7 @@ import (
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
+	"wa_chat_service/pkg/meta/whatsapp_business"
 )
 
 type TemplateUsecase struct {
@@ -92,7 +93,8 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get template list:", err)
 		return httpCode >= http.StatusInternalServerError, err
 	}
-	for _, template := range response {
+	for _, responseData := range response {
+		template := responseData.(whatsapp_business.TemplateResponse)
 		componentsString, err := formatter.AnyToJsonString(template.Components)
 		if err != nil {
 			log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to marshal template components:", err)
@@ -124,7 +126,11 @@ func (u *TemplateUsecase) GetTemplatesMeta(ctx context.Context, inputData dto.Te
 		log.Println("[ERROR][internal/usecase/template/template.go][GetTemplatesMeta] failed to get whatsapp client:", err)
 		return nil, true, err
 	}
-	metaResponse, httpCode, err := whatsappClient.GetTemplateList()
+	var queryParams string
+	if inputData.Fields != "" {
+		queryParams = "fields=" + inputData.Fields
+	}
+	metaResponse, httpCode, err := whatsappClient.GetTemplateList(queryParams)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][GetTemplatesMeta] failed to get templates meta:", err)
 		return nil, httpCode >= http.StatusInternalServerError, err

@@ -16,7 +16,6 @@ type (
 
 	Message interface {
 		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
-		GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]whatsapp_business.TemplateResponse, bool, error)
 		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error)
 	}
 
