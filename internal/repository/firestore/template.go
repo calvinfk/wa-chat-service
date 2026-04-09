@@ -31,7 +31,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 	}
 	collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
 	query := collection.Query
-	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return response, err
 	}

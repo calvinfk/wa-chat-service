@@ -42,6 +42,7 @@ type (
 		// Deletes media entry by document ID.
 		Delete(ctx context.Context, tx *firestore.Transaction, documentID string) error
 		Update(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) error
+		GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], error)
 	}
 
 	Tenant interface {

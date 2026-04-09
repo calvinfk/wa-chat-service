@@ -6,6 +6,7 @@ import (
 
 type StorageMedia struct {
 	DocumentID       string    `json:"__name__" firestore:"-"`                // generated uuid
+	TenantID         string    `json:"tenant_id" firestore:"tenant_id"`       // owner of the media
 	MediaID          *string   `json:"media_id" firestore:"media_id"`         // file ID returned by WhatsApp Business API after uploading media
 	URL              *string   `json:"url" firestore:"url"`                   // url created if media is uploaded to firebase storage
 	AssetHandle      *string   `json:"asset_handle" firestore:"asset_handle"` // handle id by resumable api

@@ -139,7 +139,7 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 	activityLogRepository := repository_firestore.NewActivityLogRepository(clients.firestoreClient)
 	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
 	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
-	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient)
+	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient, services.GoogleStorage)
 	tenantRepository := repository_firestore.NewTenantRepository(clients.firestoreClient)
 	templateRepository := repository_firestore.NewTemplateRepository(clients.firestoreClient)
 	return Repositories{
@@ -156,7 +156,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, tenantUsecase, services.WhatsappBusiness, clients.txManager)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.Tenant, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(services.GoogleTask)

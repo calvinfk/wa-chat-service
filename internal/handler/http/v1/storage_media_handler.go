@@ -7,6 +7,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
+	"wa_chat_service/pkg/filter_request"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -30,6 +31,7 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 		storageMediaRouter.Post("/save-media-id", h.saveMediaID)
 		storageMediaRouter.Post("/resumable", h.uploadResumableMedia)
 		storageMediaRouter.Post("/upload-meta", h.uploadMediaMeta)
+		storageMediaRouter.Get("/list", h.getMediaList)
 	}
 }
 
@@ -120,4 +122,20 @@ func (h *StorageMediaHandler) uploadMediaMeta(ctx fiber.Ctx) error {
 	response, serverError, err := h.storageMediaUsecase.UploadMediaMeta(ctx.Context(), requestData)
 	code, apiResponse := api_response.NewApiResponse(serverError, err, "Media metadata uploaded successfully", response)
 	return ctx.Status(code).JSON(apiResponse)
+}
+
+func (h *StorageMediaHandler) getMediaList(ctx fiber.Ctx) error {
+	var requestData filter_request.FilterRequest[dto.StorageMediaGetListRequest]
+	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	if err := ctx.Bind().Query(&requestData); err != nil {
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	response, serverError, err := h.storageMediaUsecase.GetFiltered(ctx.Context(), requestData)
+	code, apiResponse := api_response.NewApiResponse(serverError, err, "Media list retrieved successfully", response)
+	return ctx.Status(code).JSON(apiResponse)
+
 }

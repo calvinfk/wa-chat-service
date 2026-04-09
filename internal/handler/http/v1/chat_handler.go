@@ -48,10 +48,14 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 
 	messageData, ok := additionalData[requestData.Type]
 	if !ok {
-		code, response := api_response.NewApiResponse(false, fmt.Errorf("invalid message type: %s", requestData.Type), "", nil)
+		code, response := api_response.NewApiResponse(false, fmt.Errorf("%s is required", requestData.Type), "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	requestData.Payload = messageData.(map[string]any)
+	if messageData == nil {
+		code, response := api_response.NewApiResponse(false, fmt.Errorf("%s is required", requestData.Type), "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	requestData.Payload = messageData
 
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)

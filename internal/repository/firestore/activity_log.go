@@ -59,7 +59,7 @@ func (r *ActivityLogRepository) GetFiltered(ctx context.Context, filter filter_r
 	}
 	collection := r.firestoreClient.Collection(r.model.TableName())
 	query := collection.Query
-	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return response, err
 	}

@@ -52,7 +52,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 	}
 	collection := r.db.Collection("chats").Doc(requestData.SpecificFilter.ChatID).Collection(r.message.TableName())
 	query := collection.Query
-	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return response, err
 	}
@@ -84,7 +84,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			}
 		}
 		// sign storage media url
-		var sto *dto.StorageMediaUploadResponse
+		var sto *dto.StorageMediaResponse
 		if message.StorageMedia != nil {
 			var accessURL *string
 			accessURL = message.StorageMedia.URL
@@ -97,8 +97,8 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 				}
 				accessURL = &signedURL
 			}
-			storageMediaUploadResponse := dto.StorageMediaUploadResponse{}.FromModel(*message.StorageMedia, accessURL)
-			sto = &storageMediaUploadResponse
+			storageMediaResponse := dto.StorageMediaResponse{}.FromModel(*message.StorageMedia, accessURL)
+			sto = &storageMediaResponse
 		}
 		result = append(result, dto.MessageGetByChatIDResponse{}.FromModel(message, sto))
 	}

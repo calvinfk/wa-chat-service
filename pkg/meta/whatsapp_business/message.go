@@ -9,12 +9,13 @@ import (
 	"wa_chat_service/pkg/meta/whatsapp_business/message_components"
 )
 
-func NewComponent(componentType string, component map[string]any) (MessageComponent, error) {
+func NewComponent(componentType string, component any) (MessageComponent, error) {
 	var messageStruct MessageComponent
 	var ok bool
 	messageType := message_components.MessageType(componentType)
 	if messageType == message_components.InteractiveMessageType {
-		messageStruct, ok = interactiveMessageRegistry[component["type"].(string)]
+		interactiveType := component.(map[string]any)["type"].(string)
+		messageStruct, ok = interactiveMessageRegistry[interactiveType]
 	} else {
 		messageStruct, ok = messageRegistry[message_components.MessageType(messageType)]
 	}

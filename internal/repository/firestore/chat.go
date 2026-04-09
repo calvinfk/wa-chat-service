@@ -67,7 +67,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 	}
 	collection := r.db.Collection(r.chat.TableName())
 	query := collection.Query
-	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, paginate, sort)
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return response, err
 	}

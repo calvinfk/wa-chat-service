@@ -2,8 +2,11 @@ package repository_firestore
 
 import (
 	"context"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/errs"
+	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
@@ -12,13 +15,15 @@ import (
 )
 
 type StorageMediaRepository struct {
-	storageMedia model.StorageMedia
-	db           *firestore.Client
+	storageMedia         model.StorageMedia
+	db                   *firestore.Client
+	googleStorageService service.GoogleStorage
 }
 
-func NewStorageMediaRepository(db *firestore.Client) *StorageMediaRepository {
+func NewStorageMediaRepository(db *firestore.Client, googleStorageService service.GoogleStorage) *StorageMediaRepository {
 	return &StorageMediaRepository{
-		db: db,
+		db:                   db,
+		googleStorageService: googleStorageService,
 	}
 }
 
@@ -148,4 +153,41 @@ func (r *StorageMediaRepository) Update(ctx context.Context, tx *firestore.Trans
 		return execDB(ctx, tx)
 	}
 	return r.db.RunTransaction(ctx, execDB)
+}
+
+func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], error) {
+	var response filter_request.FilterResponse[dto.StorageMediaResponse]
+	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.storageMedia.AllowedFilterFields(), r.storageMedia.AllowedSortFields())
+	if err != nil {
+		return response, err
+	}
+	collection := r.db.Collection(r.storageMedia.TableName())
+	query := collection.Query
+	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
+	if err != nil {
+		return response, err
+	}
+	var result []dto.StorageMediaResponse
+	for _, doc := range docs {
+		var media model.StorageMedia
+		docData := doc.Data()
+		docData[firestore.DocumentID] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &media)
+		if err != nil {
+			return response, err
+		}
+		var accessURL *string
+		if media.IsURLFromStorage && media.URL != nil {
+			signedUrl, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*media.URL, 0)
+			if err != nil {
+				return response, err
+			}
+			accessURL = &signedUrl
+		} else if media.URL != nil {
+			accessURL = media.URL
+		}
+		result = append(result, dto.StorageMediaResponse{}.FromModel(media, accessURL))
+	}
+	response = filter_request.NewFilterResponse(result, paginate, totalData)
+	return response, nil
 }

@@ -53,7 +53,7 @@ func NewMessageUsecase(
 func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error) {
 	var err error
 	var response model.Message
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get WhatsApp client:", err)
 		return response, true, err
@@ -112,7 +112,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 				resp, err := http.Head(*media.Link)
 				if err != nil || resp.StatusCode != http.StatusOK {
 					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Media link is not accessible:", err)
-					return response, true, fmt.Errorf("media link is not accessible")
+					return response, false, fmt.Errorf("media link is not accessible")
 				}
 				urlHeaders := resp.Header
 				mimeType := urlHeaders.Get("Content-Type")
@@ -142,6 +142,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 				}
 				storageMedia := model.StorageMedia{
 					DocumentID:       newStorageMediaID.String(),
+					TenantID:         tenantID,
 					OriginalName:     originalFileName,
 					URL:              media.Link,
 					IsURLFromStorage: false,

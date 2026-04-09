@@ -16,6 +16,7 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/errs"
+	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"github.com/google/uuid"
@@ -23,22 +24,29 @@ import (
 
 type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
+	tenantRepository       repository.Tenant
 	tenantUsecase          usecase.Tenant
 	googleStorageService   service.GoogleStorage
 	whatsappService        service.WhatsappBusiness
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, tenantUsecase usecase.Tenant, googleStorageService service.GoogleStorage, whatsappService service.WhatsappBusiness) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, tenantRepository repository.Tenant, tenantUsecase usecase.Tenant, googleStorageService service.GoogleStorage, whatsappService service.WhatsappBusiness) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
+		tenantRepository:       tenantRepository,
 		tenantUsecase:          tenantUsecase,
 		googleStorageService:   googleStorageService,
 		whatsappService:        whatsappService,
 	}
 }
 
-func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaUploadResponse, bool, error) {
-	var response dto.StorageMediaUploadResponse
+func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaResponse, bool, error) {
+	var response dto.StorageMediaResponse
+	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to get tenant data from repository:", err)
+		return response, true, err
+	}
 	documentID, err := uuid.NewV7()
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][UploadMedia] Failed to generate UUID:", err)
@@ -80,7 +88,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	}
 	media := model.StorageMedia{
 		DocumentID:       documentID.String(),
-		MediaID:          nil,
+		TenantID:         tenant.DocumentID,
 		URL:              &fileURL,
 		OriginalName:     originalFileName,
 		IsURLFromStorage: true,
@@ -156,7 +164,7 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 			return httpCode >= http.StatusInternalServerError, err
 		}
 	}
-	if media.URL != nil {
+	if media.IsURLFromStorage && media.URL != nil {
 		err = u.googleStorageService.DeleteFile(ctx, *media.URL)
 		if err != nil {
 			log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][DeleteMedia] Failed to delete file from Google Cloud Storage:", err)
@@ -375,4 +383,13 @@ func (u *StorageMediaUsecase) UploadMediaMeta(ctx context.Context, inputData dto
 		return dto.StorageMediaUploadMetaResponse{MediaID: mediaID}, false, nil
 	}
 	return dto.StorageMediaUploadMetaResponse{}, true, fmt.Errorf("media not found or inaccessible")
+}
+
+func (u *StorageMediaUsecase) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], bool, error) {
+	response, err := u.storageMediaRepository.GetFiltered(ctx, inputData)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetFiltered] Failed to get filtered media data from repository:", err)
+		return filter_request.FilterResponse[dto.StorageMediaResponse]{}, true, err
+	}
+	return response, false, nil
 }

@@ -147,7 +147,7 @@ func ApplyFilterGorm[T any](query *gorm.DB, data *[]T, filters []Filter, paginat
 	return totalData, nil
 }
 
-func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []Filter, paginate Paginate, sort Sort) ([]*firestore.DocumentSnapshot, int64, error) {
+func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []Filter, sort Sort, paginate Paginate) ([]*firestore.DocumentSnapshot, int64, error) {
 	for _, filter := range filters {
 		query = query.Where(filter.Field, parseOperatorToFirestoreCondition(filter.Operator), filter.Value)
 	}

@@ -13,7 +13,7 @@ type (
 		RecipientName string `json:"recipient_name" validate:"required"`
 		SenderName    string `json:"sender_name" validate:"required"`
 		Type          string `json:"type" validate:"required"` // text, image, video, etc
-		Payload       map[string]any
+		Payload       any
 	}
 	TemplateListRequest struct {
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
@@ -23,20 +23,20 @@ type (
 		ChatID string `query:"chat_id" validate:"required"`
 	}
 	MessageGetByChatIDResponse struct {
-		ID              string                      `json:"id"`               // id from whatsapp
-		ChatID          string                      `json:"chat_id"`          // reference to chat document
-		StorageMediaID  *string                     `json:"storage_media_id"` // reference to media document if message has media
-		StorageMedia    *StorageMediaUploadResponse `json:"storage_media"`
-		MessageType     string                      `json:"message_type"`     // text, image, video, etc
-		MessageCategory string                      `json:"message_category"` // marketing, authentication, utility, service
-		SenderName      string                      `json:"sender_name"`      // sender name for individual chat, group name for group chat
-		Payload         string                      `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
-		Status          string                      `json:"status"`           // -, sent, delivered, read
-		CreatedAt       time.Time                   `json:"created_at"`
-		SentAt          *time.Time                  `json:"sent_at,omitempty"`
-		DeliveredAt     *time.Time                  `json:"delivered_at,omitempty"`
-		ReadAt          *time.Time                  `json:"read_at,omitempty"`
-		Error           *string                     `json:"error,omitempty"` // error message if failed to send, json stringified from whatsapp error response
+		ID              string                `json:"id"`               // id from whatsapp
+		ChatID          string                `json:"chat_id"`          // reference to chat document
+		StorageMediaID  *string               `json:"storage_media_id"` // reference to media document if message has media
+		StorageMedia    *StorageMediaResponse `json:"storage_media"`
+		MessageType     string                `json:"message_type"`     // text, image, video, etc
+		MessageCategory string                `json:"message_category"` // marketing, authentication, utility, service
+		SenderName      string                `json:"sender_name"`      // sender name for individual chat, group name for group chat
+		Payload         string                `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
+		Status          string                `json:"status"`           // -, sent, delivered, read
+		CreatedAt       time.Time             `json:"created_at"`
+		SentAt          *time.Time            `json:"sent_at,omitempty"`
+		DeliveredAt     *time.Time            `json:"delivered_at,omitempty"`
+		ReadAt          *time.Time            `json:"read_at,omitempty"`
+		Error           *string               `json:"error,omitempty"` // error message if failed to send, json stringified from whatsapp error response
 	}
 )
 
@@ -49,7 +49,7 @@ func (r MessageGetByChatIDRequest) Validate() map[string]string {
 	return nil
 }
 
-func (MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaUploadResponse) MessageGetByChatIDResponse {
+func (MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaResponse) MessageGetByChatIDResponse {
 	return MessageGetByChatIDResponse{
 		ID:              data.DocumentID,
 		ChatID:          data.ChatID,

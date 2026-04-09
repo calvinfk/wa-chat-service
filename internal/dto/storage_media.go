@@ -3,8 +3,10 @@ package dto
 import (
 	"mime/multipart"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/storage"
+	"github.com/go-playground/validator/v10"
 )
 
 type (
@@ -13,7 +15,7 @@ type (
 		PhoneNumberID string                  `form:"phone_number_id" validate:"required"`
 	}
 
-	StorageMediaUploadResponse struct {
+	StorageMediaResponse struct {
 		ID           string  `json:"id"`
 		OriginalName string  `json:"original_name"`
 		MimeType     string  `json:"mime_type"`
@@ -63,10 +65,14 @@ type (
 	StorageMediaUploadMetaResponse struct {
 		MediaID string `json:"media_id"`
 	}
+
+	StorageMediaGetListRequest struct {
+		PhoneNumberID string `query:"phone_number_id" validate:"required"`
+	}
 )
 
-func (StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaUploadResponse {
-	return StorageMediaUploadResponse{
+func (StorageMediaResponse) FromModel(media model.StorageMedia, accessURL *string) StorageMediaResponse {
+	return StorageMediaResponse{
 		ID:           media.DocumentID,
 		OriginalName: media.OriginalName,
 		MimeType:     media.MimeType,
@@ -78,4 +84,12 @@ func (StorageMediaSaveMediaIDResponse) FromModel(media model.StorageMedia) Stora
 	return StorageMediaSaveMediaIDResponse{
 		ID: media.DocumentID,
 	}
+}
+
+func (r StorageMediaGetListRequest) Validate() map[string]string {
+	validator := validator.New()
+	if err := validator.Struct(r); err != nil {
+		return utils.GetValidatorErrorMessages(err)
+	}
+	return nil
 }
