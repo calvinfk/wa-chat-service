@@ -19,6 +19,7 @@ import (
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
 	"wa_chat_service/pkg/google"
+	"wa_chat_service/pkg/transaction"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -30,6 +31,7 @@ type Clients struct {
 	firebaseClient   *firebase.App
 	firestoreClient  *firestore.Client
 	gcpStorageClient *storage.Client
+	txManager        *transaction.TxManager
 }
 
 type Services struct {
@@ -62,7 +64,7 @@ func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, U
 	clients := newDefaultClients(config)
 	services := newDefaultServices(config, clients)
 	repositories := newDefaultRepositories(clients, services)
-	usecases := newDefaultUsecases(repositories, services)
+	usecases := newDefaultUsecases(clients, repositories, services)
 	return clients, services, repositories, usecases
 }
 
@@ -82,12 +84,13 @@ func newDefaultClients(config *config.Config) Clients {
 	// if err != nil {
 	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
 	// }
-	// _ = transaction.NewTxManager(dbPostgres, firestoreClient)
+	txManager := transaction.NewTxManager(nil, firestoreClient)
 	return Clients{
 		// DbPostgres: dbPostgres,
 		firebaseClient:   firebaseClient,
 		firestoreClient:  firestoreClient,
 		gcpStorageClient: gcpStorageClient,
+		txManager:        txManager,
 	}
 }
 
@@ -123,10 +126,10 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 	}
 }
 
-func newDefaultUsecases(repositories Repositories, services Services) Usecases {
+func newDefaultUsecases(clients Clients, repositories Repositories, services Services) Usecases {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt)
-	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, tenantUsecase, services.WhatsappBusiness)
+	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, tenantUsecase, services.WhatsappBusiness, clients.txManager)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)

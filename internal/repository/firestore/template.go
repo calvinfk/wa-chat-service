@@ -50,10 +50,10 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 	return response, nil
 }
 
-func (r *TemplateRepository) GetByPhoneNumberID(ctx context.Context, tenantID string, phoneNumberID string) ([]model.Template, error) {
+func (r *TemplateRepository) GetByTenantID(ctx context.Context, tenantID string) ([]model.Template, error) {
 	var templates []model.Template
 	collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
-	query := collection.Where("phone_number_id", "==", phoneNumberID)
+	query := collection.Query
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
 		return templates, err

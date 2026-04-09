@@ -40,9 +40,9 @@ func RandString(length int) string {
 	return string(b)
 }
 
-// HashString takes a string input and returns its SHA-256 hash as a hexadecimal string. It uses the crypto/sha256 package to compute the hash and fmt.Sprintf to format the output as a hexadecimal string.
-func HashString(s string) string {
-	hash := sha256.Sum256([]byte(s))
+// HashData takes an input and returns its SHA-256 hash as a hexadecimal string. It uses the crypto/sha256 package to compute the hash and fmt.Sprintf to format the output as a hexadecimal string.
+func HashData(s any) string {
+	hash := sha256.Sum256(fmt.Appendf(nil, "%v", s))
 	return fmt.Sprintf("%x", hash)
 }
 
@@ -319,4 +319,10 @@ func GetFileNameFromURL(fileURL string) string {
 		}
 	}
 	return ""
+}
+
+func JsonStringToMap(jsonString string) (any, error) {
+	var result any
+	err := json.Unmarshal([]byte(jsonString), &result)
+	return result, err
 }

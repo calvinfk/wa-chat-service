@@ -71,7 +71,6 @@ type (
 
 	WhatsappBusiness interface {
 		SendMessage(client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error)
-		GetTemplateList(client *whatsapp_business.Client) ([]any, int, error)
 		UploadMedia(client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
 		GetMediaURL(client *whatsapp_business.Client, mediaID string) (string, int, error)
 		DownloadMedia(client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)

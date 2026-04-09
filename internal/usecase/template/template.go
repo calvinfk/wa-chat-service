@@ -13,19 +13,22 @@ import (
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/formatter"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/transaction"
 )
 
 type TemplateUsecase struct {
 	templateRepository repository.Template
 	tenantUsecase      usecase.Tenant
 	whatsappService    service.WhatsappBusiness
+	txManager          *transaction.TxManager
 }
 
-func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness) *TemplateUsecase {
+func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *transaction.TxManager) *TemplateUsecase {
 	return &TemplateUsecase{
 		templateRepository: templateRepository,
 		tenantUsecase:      tenantUsecase,
 		whatsappService:    whatsappService,
+		txManager:          txManager,
 	}
 }
 
@@ -88,54 +91,79 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get whatsapp client:", err)
 		return false, err
 	}
-	response, httpCode, err := whatsappClient.GetTemplateList()
+	currentTemplates, err := u.templateRepository.GetByTenantID(ctx, tenantID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get template list:", err)
-		return httpCode >= http.StatusInternalServerError, err
+		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get current templates from repository:", err)
+		return false, err
 	}
-	for _, responseData := range response {
-		template := responseData.(whatsapp_business.TemplateResponse)
-		componentsString, err := formatter.AnyToJsonString(template.Components)
+	currentTemplateMap := make(map[string]model.Template)
+	for _, template := range currentTemplates {
+		currentTemplateMap[template.DocumentID] = template
+	}
+	var savedTemplateIDs = make(map[string]bool)
+	var nextCursor string
+	for {
+		var queryParams string
+		if nextCursor != "" {
+			queryParams = "after=" + nextCursor
+		}
+		response, paging, httpCode, err := whatsappClient.GetTemplateList("limit=100", queryParams)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to marshal template components:", err)
-			continue
+			log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get template list:", err)
+			return httpCode >= http.StatusInternalServerError, err
 		}
-		newTemplate := model.Template{
-			DocumentID:                  template.ID,
-			Name:                        template.Name,
-			Category:                    template.Category,
-			IsPrimaryDeviceDeliveryOnly: template.IsPrimaryDeviceDeliveryOnly,
-			Language:                    template.Language,
-			MessageSendTTLSeconds:       template.MessageSendTTLSeconds,
-			ParameterFormat:             template.ParameterFormat,
-			Status:                      template.Status,
-			Components:                  componentsString,
-			CreatedAt:                   time.Now(),
+		if len(response) == 0 {
+			break
 		}
-		if _, err := u.templateRepository.Upsert(ctx, nil, tenantID, newTemplate); err != nil {
-			log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to upsert template:", err)
-			continue
+		for _, responseData := range response {
+			templateMeta := responseData.(whatsapp_business.TemplateResponse)
+			savedTemplateIDs[templateMeta.ID] = true
+			var template model.Template
+			currentTemplate, exists := currentTemplateMap[templateMeta.ID]
+			if exists {
+				template = currentTemplate
+			} else {
+				componentString, err := formatter.AnyToJsonString(templateMeta.Components)
+				if err != nil {
+					log.Printf("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to marshal template components for template ID %s: %v", templateMeta.ID, err)
+					continue
+				}
+				template = model.Template{
+					DocumentID:                  templateMeta.ID,
+					Name:                        templateMeta.Name,
+					Category:                    templateMeta.Category,
+					IsPrimaryDeviceDeliveryOnly: templateMeta.IsPrimaryDeviceDeliveryOnly,
+					Language:                    templateMeta.Language,
+					MessageSendTTLSeconds:       templateMeta.MessageSendTTLSeconds,
+					ParameterFormat:             templateMeta.ParameterFormat,
+					Status:                      templateMeta.Status,
+					Components:                  componentString,
+					CreatedAt:                   time.Now(),
+					UpdatedAt:                   time.Now(),
+				}
+			}
+			template.Status = templateMeta.Status
+			template.Category = templateMeta.Category
+			template.UpdatedAt = time.Now()
+			if _, err := u.templateRepository.Upsert(ctx, nil, tenantID, template); err != nil {
+				log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to upsert template:", err)
+			}
+		}
+		if paging.Next == "" {
+			break
+		} else {
+			nextCursor = paging.Cursors.After
+		}
+	}
+	for templateID := range currentTemplateMap {
+		if _, exists := savedTemplateIDs[templateID]; !exists {
+			err := u.templateRepository.DeleteByID(ctx, nil, tenantID, templateID)
+			if err != nil {
+				log.Printf("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to delete template with ID %s: %v", templateID, err)
+			}
 		}
 	}
 	return false, nil
-}
-
-func (u *TemplateUsecase) GetTemplatesMeta(ctx context.Context, inputData dto.TemplateGetByPhoneNumberID) (any, bool, error) {
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][GetTemplatesMeta] failed to get whatsapp client:", err)
-		return nil, true, err
-	}
-	var queryParams string
-	if inputData.Fields != "" {
-		queryParams = "fields=" + inputData.Fields
-	}
-	metaResponse, httpCode, err := whatsappClient.GetTemplateList(queryParams)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][GetTemplatesMeta] failed to get templates meta:", err)
-		return nil, httpCode >= http.StatusInternalServerError, err
-	}
-	return metaResponse, false, nil
 }
 
 func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error) {

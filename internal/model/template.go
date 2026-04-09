@@ -13,6 +13,7 @@ type Template struct {
 	Status                      string    `json:"status" firestore:"status"`         // approved, rejected, etc
 	Components                  string    `json:"components" firestore:"components"` // json string of components array from whatsapp
 	CreatedAt                   time.Time `json:"created_at" firestore:"created_at"`
+	UpdatedAt                   time.Time `json:"updated_at" firestore:"updated_at"`
 }
 
 func (t Template) TableName() string {

@@ -50,7 +50,7 @@ type (
 
 	Template interface {
 		GetFilteredByPhoneNumberID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], error)
-		GetByPhoneNumberID(ctx context.Context, tenantID string, phoneNumberID string) ([]model.Template, error)
+		GetByTenantID(ctx context.Context, tenantID string) ([]model.Template, error)
 		Upsert(ctx context.Context, tx *firestore.Transaction, tenantID string, data model.Template) (model.Template, error)
 		DeleteByID(ctx context.Context, tx *firestore.Transaction, tenantID string, documentID string) error
 		DeleteByName(ctx context.Context, tx *firestore.Transaction, tenantID string, name string) error

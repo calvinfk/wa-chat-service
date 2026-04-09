@@ -37,19 +37,6 @@ func (ws *WhatsappBusiness) SendMessage(client *whatsapp_business.Client, to str
 	return response, httpCode, err
 }
 
-func (ws *WhatsappBusiness) GetTemplateList(client *whatsapp_business.Client) ([]any, int, error) {
-	response, httpCode, err := client.GetTemplateList()
-	if err != nil {
-		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
-			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][GetTemplateList] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
-		} else {
-			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][GetTemplateList] Failed to get template list: %v", err)
-		}
-		return nil, httpCode, err
-	}
-	return response, httpCode, nil
-}
-
 func (ws *WhatsappBusiness) UploadMedia(client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error) {
 	metaResponse, httpCode, err := client.UploadMedia(fileBytes, filename, mimeType)
 	if err != nil {

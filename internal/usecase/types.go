@@ -23,7 +23,6 @@ type (
 		CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error)
 		GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error)
 		SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error)
-		GetTemplatesMeta(ctx context.Context, inputData dto.TemplateGetByPhoneNumberID) (any, bool, error)
 		DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error)
 	}
 

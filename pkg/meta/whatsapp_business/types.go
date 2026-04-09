@@ -40,6 +40,14 @@ type MessageResponse struct {
 	} `json:"messages"`
 }
 
+type Paging struct {
+	Cursors struct {
+		Before string `json:"before,omitempty"`
+		After  string `json:"after,omitempty"`
+	} `json:"cursors"`
+	Next     string `json:"next,omitempty"`
+	Previous string `json:"previous,omitempty"`
+}
 type TemplateResponse struct {
 	Category                    string  `json:"category" validate:"required"`   // MARKETING, UTILITY, etc
 	Components                  []any   `json:"components" validate:"required"` // header, body, button, etc

@@ -12,7 +12,7 @@ const (
 	endpointTemplate = "message_templates"
 )
 
-func (wb *Client) GetTemplateList(query ...string) ([]any, int, error) {
+func (wb *Client) GetTemplateList(query ...string) ([]any, Paging, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
 	var queries []string
 	if len(query) > 0 {
@@ -27,32 +27,35 @@ func (wb *Client) GetTemplateList(query ...string) ([]any, int, error) {
 	}
 	body, httpCode, err := wb.accessAPI(http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, httpCode, err
+		return nil, Paging{}, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		return parseMetaErrorResponse([]any{}, body, httpCode)
+		data, httpCode, err := parseMetaErrorResponse([]any{}, body, httpCode)
+		return data, Paging{}, httpCode, err
 	}
-	if len(queries) > 0 {
+	if len(queries) > 0 && strings.Contains(strings.Join(queries, "&"), "fields=") {
 		var response struct {
-			Data []any `json:"data"`
+			Data   []any  `json:"data"`
+			Paging Paging `json:"paging"`
 		}
 		if err := json.Unmarshal(body, &response); err != nil {
-			return nil, httpCode, err
+			return nil, Paging{}, httpCode, err
 		} else {
-			return response.Data, httpCode, nil
+			return response.Data, response.Paging, httpCode, nil
 		}
 	} else {
 		var response struct {
-			Data []TemplateResponse `json:"data"`
+			Data   []TemplateResponse `json:"data"`
+			Paging Paging             `json:"paging"`
 		}
 		if err := json.Unmarshal(body, &response); err != nil {
-			return nil, httpCode, err
+			return nil, Paging{}, httpCode, err
 		} else {
 			data := make([]any, len(response.Data))
 			for i, v := range response.Data {
 				data[i] = v
 			}
-			return data, httpCode, nil
+			return data, response.Paging, httpCode, nil
 		}
 	}
 }

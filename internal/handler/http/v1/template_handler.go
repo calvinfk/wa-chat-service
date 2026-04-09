@@ -23,7 +23,6 @@ func (h *TemplateHandler) RegisterRoute(router fiber.Router) {
 	templateRoutes := router.Group("/template")
 	{
 		templateRoutes.Get("/get", h.getTemplates)
-		templateRoutes.Get("/get-meta", h.getTemplatesMeta)
 		templateRoutes.Post("/create", h.createTemplate)
 		templateRoutes.Post("/sync", h.syncTemplate)
 		templateRoutes.Delete("/delete", h.deleteTemplate)
@@ -64,17 +63,6 @@ func (h *TemplateHandler) syncTemplate(ctx fiber.Ctx) error {
 	}
 	serverError, err := h.templateUsecase.SyncTemplate(ctx, inputData)
 	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully sync template", nil)
-	return ctx.Status(httpCode).JSON(apiResponse)
-}
-
-func (h *TemplateHandler) getTemplatesMeta(ctx fiber.Ctx) error {
-	var inputData dto.TemplateGetByPhoneNumberID
-	if err := ctx.Bind().Query(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(httpCode).JSON(apiResponse)
-	}
-	data, serverError, err := h.templateUsecase.GetTemplatesMeta(ctx, inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get templates meta", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
