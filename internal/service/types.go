@@ -76,7 +76,6 @@ type (
 		GetMediaURL(client *whatsapp_business.Client, mediaID string) (string, int, error)
 		DownloadMedia(client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)
 		DeleteMedia(client *whatsapp_business.Client, mediaID string) (int, error)
-		ResumableUpload(client *whatsapp_business.Client, inputData dto.ResumableUploadRequest) (string, int, error)
 		CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error)
 	}
 )

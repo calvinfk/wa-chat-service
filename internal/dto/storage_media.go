@@ -15,11 +15,9 @@ type (
 
 	StorageMediaUploadResponse struct {
 		ID           string  `json:"id"`
-		MediaID      *string `json:"media_id"`
 		OriginalName string  `json:"original_name"`
 		MimeType     string  `json:"mime_type"`
-		// URL          string `json:"url"`
-		AccessURL *string `json:"access_url"`
+		AccessURL    *string `json:"access_url"`
 	}
 	StorageMediaGetRequest struct {
 		ID string `query:"id" validate:"required,uuid"`
@@ -48,9 +46,13 @@ type (
 		ID string `json:"id"`
 	}
 
-	ResumableUploadRequest struct {
-		FileHeader    *multipart.FileHeader `form:"file" validate:"required"`
-		PhoneNumberID string                `form:"phone_number_id" validate:"required"`
+	StorageMediaResumableUploadRequest struct {
+		StorageMediaID string `json:"storage_media_id" validate:"required,uuid"`
+		PhoneNumberID  string `json:"phone_number_id" validate:"required"`
+	}
+
+	StorageMediaResumableUploadResponse struct {
+		H string `json:"h"`
 	}
 )
 
@@ -58,8 +60,6 @@ func (r StorageMediaUploadResponse) FromModel(media model.StorageMedia, accessUR
 	r.ID = media.DocumentID
 	r.OriginalName = media.OriginalName
 	r.MimeType = media.MimeType
-	r.MediaID = media.MediaID
-	// r.URL = media.URL
 	r.AccessURL = accessURL
 	return r
 }

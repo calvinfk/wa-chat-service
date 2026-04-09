@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -24,8 +25,12 @@ type Client struct {
 
 func New(userAccessToken string, wabaID string, phoneNumberID string) *Client {
 	validator := formatter.Validator()
+	appID := os.Getenv("META_APP_ID")
+	if appID == "" {
+		log.Printf("[WARNING][pkg/meta/whatsapp_business/client.go][New] META_APP_ID is not set in environment variables")
+	}
 	return &Client{
-		AppID:           os.Getenv("META_APP_ID"),
+		AppID:           appID,
 		BaseURL:         "https://graph.facebook.com",
 		Version:         os.Getenv("META_GRAPH_API_VERSION"),
 		UserAccessToken: userAccessToken,

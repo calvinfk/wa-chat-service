@@ -131,18 +131,29 @@ func (wb *Client) GetHeaders(url string) (http.Header, error) {
 	return resp.Header, nil
 }
 
-func (wb *Client) startResumableUploadSession(payload StartUploadSessionRequest) (StartUploadSessionResponse, int, error) {
-	endpoint := fmt.Sprintf("%s/%s/uploads", wb.GetBaseURLVersion(), wb.AppID)
-	err := wb.validator.Validate(payload)
-	if err != nil {
-		return StartUploadSessionResponse{}, 0, err
+func (wb *Client) StartResumableUploadSession(fileName string, fileLength int64, fileType string) (StartUploadSessionResponse, int, error) {
+	if fileName == "" || fileLength <= 0 || fileType == "" {
+		return StartUploadSessionResponse{}, 0, fmt.Errorf("fileName, fileLength, and fileType are required and must be valid")
 	}
-	body, httpCode, err := wb.accessAPIWithoutAuth(http.MethodPost, endpoint, payload)
+	if !resumableUploadMimeTypes[fileType] {
+		return StartUploadSessionResponse{}, 0, fmt.Errorf("unsupported file type: %s", fileType)
+	}
+	payload := StartUploadSessionRequest{
+		FileName:    fileName,
+		FileLength:  fileLength,
+		FileType:    fileType,
+		AccessToken: wb.UserAccessToken,
+	}
+	if err := wb.validator.Validate(payload); err != nil {
+		return StartUploadSessionResponse{}, 0, fmt.Errorf("validation error: %w", err)
+	}
+	endpoint := fmt.Sprintf("%s/%s/uploads?file_name=%s&file_length=%d&file_type=%s&access_token=%s", wb.GetBaseURLVersion(), wb.AppID, payload.FileName, payload.FileLength, payload.FileType, payload.AccessToken)
+	body, httpCode, err := wb.accessAPIWithoutAuth(http.MethodPost, endpoint, nil)
 	if err != nil {
 		return StartUploadSessionResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		return StartUploadSessionResponse{}, httpCode, fmt.Errorf("failed to start upload session, status code: %d", httpCode)
+		return parseMetaErrorResponse(StartUploadSessionResponse{}, body, httpCode)
 	}
 	var response StartUploadSessionResponse
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -151,66 +162,27 @@ func (wb *Client) startResumableUploadSession(payload StartUploadSessionRequest)
 	return response, httpCode, nil
 }
 
-func (wb *Client) uploadFile(payload UploadFileRequest) (UploadFileResponse, int, error) {
-	endpoint := fmt.Sprintf("%s/%s", wb.GetBaseURLVersion(), payload.UploadSessionID)
+func (wb *Client) StartResumableUpload(uploadSessionID string, fileOffset int64, file []byte) (UploadFileResponse, int, error) {
+	endpoint := fmt.Sprintf("%s/%s", wb.GetBaseURLVersion(), uploadSessionID)
+	payload := UploadFileRequest{
+		UploadSessionID: uploadSessionID,
+		FileOffset:      fileOffset,
+		FileBytes:       file,
+	}
 	err := wb.validator.Validate(payload)
 	if err != nil {
 		return UploadFileResponse{}, 0, err
 	}
-	body, httpCode, err := wb.accessAPI(http.MethodPut, endpoint, payload)
+	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
 	if err != nil {
 		return UploadFileResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK {
-		return UploadFileResponse{}, httpCode, fmt.Errorf("failed to upload file, status code: %d", httpCode)
+		return parseMetaErrorResponse(UploadFileResponse{}, body, httpCode)
 	}
 	var response UploadFileResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return UploadFileResponse{}, httpCode, err
 	}
 	return response, httpCode, nil
-}
-
-func (wb *Client) ResumableUpload(fileHeader *multipart.FileHeader) (string, int, error) {
-	if fileHeader == nil {
-		return "", 0, fmt.Errorf("file is nil")
-	}
-	if fileHeader.Size == 0 {
-		return "", 0, fmt.Errorf("file is empty")
-	}
-	contentType := fileHeader.Header.Get("Content-Type")
-	if contentType == "" {
-		return "", 0, fmt.Errorf("content type is required")
-	}
-	if !resumableUploadMimeTypes[contentType] {
-		return "", 0, fmt.Errorf("unsupported content type: %s", contentType)
-	}
-	startResponse, _, err := wb.startResumableUploadSession(StartUploadSessionRequest{
-		FileName:    fileHeader.Filename,
-		FileLength:  fileHeader.Size,
-		FileType:    contentType,
-		AccessToken: wb.UserAccessToken,
-	})
-	if err != nil {
-		return "", 0, fmt.Errorf("start upload session: %w", err)
-	}
-	file, err := fileHeader.Open()
-	if err != nil {
-		return "", 0, fmt.Errorf("open file: %w", err)
-	}
-	defer file.Close()
-	// TODO: For large files, we should read and upload in chunks instead of reading the entire file into memory.
-	fileBytes, err := io.ReadAll(file)
-	if err != nil {
-		return "", 0, fmt.Errorf("read file: %w", err)
-	}
-	uploadResponse, httpCode, err := wb.uploadFile(UploadFileRequest{
-		UploadSessionID: startResponse.ID,
-		FileOffset:      startResponse.FileOffset,
-		FileBytes:       fileBytes,
-	})
-	if err != nil {
-		return "", httpCode, fmt.Errorf("upload file: %w", err)
-	}
-	return uploadResponse.H, httpCode, nil
 }

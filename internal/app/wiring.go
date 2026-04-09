@@ -15,9 +15,9 @@ import (
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
 	message_usecase "wa_chat_service/internal/usecase/message"
-	phone_number_usecase "wa_chat_service/internal/usecase/phone_number"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
+	tenant_usecase "wa_chat_service/internal/usecase/tenant"
 	"wa_chat_service/pkg/google"
 
 	"cloud.google.com/go/firestore"
@@ -45,7 +45,8 @@ type Repositories struct {
 	Chat         repository.Chat
 	Message      repository.Message
 	StorageMedia repository.StorageMedia
-	PhoneNumber  repository.PhoneNumber
+	Tenant       repository.Tenant
+	Template     repository.Template
 }
 
 type Usecases struct {
@@ -53,7 +54,7 @@ type Usecases struct {
 	Chat         usecase.Chat
 	Message      usecase.Message
 	StorageMedia usecase.StorageMedia
-	PhoneNumber  usecase.PhoneNumber
+	Tenant       usecase.Tenant
 	Template     usecase.Template
 }
 
@@ -110,22 +111,24 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
 	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient)
-	phoneNumberRepository := repository_firestore.NewPhoneNumberRepository(clients.firestoreClient)
+	tenantRepository := repository_firestore.NewTenantRepository(clients.firestoreClient)
+	templateRepository := repository_firestore.NewTemplateRepository(clients.firestoreClient)
 	return Repositories{
 		ActivityLog:  activityLogRepository,
 		Chat:         chatRepository,
 		Message:      messageRepository,
 		StorageMedia: storageMediaRepository,
-		PhoneNumber:  phoneNumberRepository,
+		Template:     templateRepository,
+		Tenant:       tenantRepository,
 	}
 }
 
 func newDefaultUsecases(repositories Repositories, services Services) Usecases {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog)
-	phoneNumberUsecase := phone_number_usecase.NewPhoneNumberUsecase(repositories.PhoneNumber, services.Encrypt)
-	templateUsecase := template_usecase.NewTemplateUsecase(phoneNumberUsecase, services.WhatsappBusiness)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, phoneNumberUsecase, services.GoogleStorage, services.WhatsappBusiness)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, phoneNumberUsecase, services.WhatsappBusiness, services.GoogleStorage)
+	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt)
+	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, tenantUsecase, services.WhatsappBusiness)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
@@ -133,7 +136,7 @@ func newDefaultUsecases(repositories Repositories, services Services) Usecases {
 		Message:      messageUsecase,
 		StorageMedia: storageMediaUsecase,
 		Chat:         chatUsecase,
-		PhoneNumber:  phoneNumberUsecase,
+		Tenant:       tenantUsecase,
 	}
 }
 

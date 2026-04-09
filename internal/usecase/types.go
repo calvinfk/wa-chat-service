@@ -22,6 +22,10 @@ type (
 
 	Template interface {
 		CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error)
+		GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error)
+		SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error)
+		GetTemplatesMeta(ctx context.Context, inputData dto.TemplateGetByPhoneNumberID) (any, bool, error)
+		DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error)
 	}
 
 	StorageMedia interface {
@@ -30,14 +34,14 @@ type (
 		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (dto.StorageMediaGetMediaResponse, bool, error)
 		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
 		SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error)
-		StoreMediaFromURL(ctx context.Context, mediaURL string) (model.StorageMedia, bool, error)
+		UploadResumableMedia(ctx context.Context, inputData dto.StorageMediaResumableUploadRequest) (dto.StorageMediaResumableUploadResponse, bool, error)
 	}
 
 	Chat interface {
 		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], bool, error)
 	}
 
-	PhoneNumber interface {
-		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, error)
+	Tenant interface {
+		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error)
 	}
 )

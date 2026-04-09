@@ -28,6 +28,7 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 		storageMediaRouter.Get("/get", h.getMedia)
 		storageMediaRouter.Delete("/delete", h.deleteMedia)
 		storageMediaRouter.Post("/save-media-id", h.saveMediaID)
+		storageMediaRouter.Post("/resumable", h.uploadResumableMedia)
 	}
 }
 
@@ -94,4 +95,16 @@ func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", data)
 	return ctx.Status(code).JSON(response)
+}
+
+func (h *StorageMediaHandler) uploadResumableMedia(ctx fiber.Ctx) error {
+	var requestData dto.StorageMediaResumableUploadRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][uploadResumableMedia] Failed to bind request data:", err)
+		code, response := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(code).JSON(response)
+	}
+	response, serverError, err := h.storageMediaUsecase.UploadResumableMedia(ctx.Context(), requestData)
+	code, apiResponse := api_response.NewApiResponse(serverError, err, "Resumable media upload initiated successfully", response)
+	return ctx.Status(code).JSON(apiResponse)
 }

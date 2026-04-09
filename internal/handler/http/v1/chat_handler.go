@@ -27,11 +27,9 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	chatGroup := api.Group("/chat")
 	{
 		chatGroup.Post("/send", h.sendMessage)
-		chatGroup.Get("/template-list", h.getTemplateList)
 		chatGroup.Get("/by-phone-number-id", h.getChatByPhoneNumberID)
 		chatGroup.Get("/messages", h.getMessagesByChatID)
 	}
-
 }
 
 func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
@@ -57,17 +55,6 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
-	return ctx.Status(code).JSON(response)
-}
-
-func (h *ChatHandler) getTemplateList(ctx fiber.Ctx) error {
-	var requestData dto.TemplateListRequest
-	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(code).JSON(response)
-	}
-	templates, serverError, err := h.messageUsecase.GetTemplateList(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved template list", templates)
 	return ctx.Status(code).JSON(response)
 }
 

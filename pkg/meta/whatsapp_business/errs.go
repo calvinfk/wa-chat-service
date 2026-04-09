@@ -3,6 +3,7 @@ package whatsapp_business
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 )
 
 type WhatsappErrorCode int
@@ -106,21 +107,26 @@ const (
 //
 // https://developers.facebook.com/documentation/business-messaging/whatsapp/support/error-codes#other-errors
 const (
-	ERR_UNKNOWN_API                         WhatsappErrorCode = 1
-	ERR_API_DOWN                            WhatsappErrorCode = 2
-	ERR_BUSINESS_PHONE_NUMBER_DELETED       WhatsappErrorCode = 33
-	ERR_UNSUPPORTED_OR_MISSPELLED_PARAMETER WhatsappErrorCode = 100
-	ERR_USER_IN_EXPERIMENT                  WhatsappErrorCode = 130472
-	ERR_MESSAGE_NOT_SENT                    WhatsappErrorCode = 131000 // Message failed to send due to an unknown error.
-	ERR_ACCESS_DENIED                       WhatsappErrorCode = 131005
-	ERR_REQUIRED_PARAMETER_MISSING          WhatsappErrorCode = 131008
-	ERR_PARAMETER_NOT_VALID                 WhatsappErrorCode = 131009
-	ERR_SERVICE_UNAVAILABLE                 WhatsappErrorCode = 131016
-	ERR_SAME_SENDER_RECEIVER                WhatsappErrorCode = 131021
-	ERR_MESSAGE_UNDELIVERABLE               WhatsappErrorCode = 131026
-	ERR_DISPLAY_NAME_NEED_APPROVAL          WhatsappErrorCode = 131037
-	ERR_PAYMENT_METHOD_ERROR                WhatsappErrorCode = 131042
-	ERR_PHONE_NUMBER_REGISTRATION_ERROR     WhatsappErrorCode = 131045
+	ERR_UNKNOWN_API                          WhatsappErrorCode = 1
+	ERR_API_DOWN                             WhatsappErrorCode = 2
+	ERR_BUSINESS_PHONE_NUMBER_DELETED        WhatsappErrorCode = 33
+	ERR_UNSUPPORTED_OR_MISSPELLED_PARAMETER  WhatsappErrorCode = 100
+	ERR_USER_IN_EXPERIMENT                   WhatsappErrorCode = 130472
+	ERR_MESSAGE_NOT_SENT                     WhatsappErrorCode = 131000 // Message failed to send due to an unknown error.
+	ERR_ACCESS_DENIED                        WhatsappErrorCode = 131005
+	ERR_REQUIRED_PARAMETER_MISSING           WhatsappErrorCode = 131008
+	ERR_PARAMETER_NOT_VALID                  WhatsappErrorCode = 131009
+	ERR_SERVICE_UNAVAILABLE                  WhatsappErrorCode = 131016
+	ERR_SAME_SENDER_RECEIVER                 WhatsappErrorCode = 131021
+	ERR_MESSAGE_UNDELIVERABLE                WhatsappErrorCode = 131026
+	ERR_DISPLAY_NAME_NEED_APPROVAL           WhatsappErrorCode = 131037
+	ERR_PAYMENT_METHOD_ERROR                 WhatsappErrorCode = 131042
+	ERR_PHONE_NUMBER_REGISTRATION_ERROR      WhatsappErrorCode = 131045
+	ERR_REENGAGEMENT_MESSAGE                 WhatsappErrorCode = 131047
+	ERR_NOT_DELIVERED                        WhatsappErrorCode = 131049
+	ERR_RECIPIENT_DECLINED_MARKETING_MESSAGE WhatsappErrorCode = 131050
+	ERR_UNSUPPORTED_MESSAGE_TYPE             WhatsappErrorCode = 131051
+	ERR_MEDIA_DOWNLOAD_ERROR                 WhatsappErrorCode = 131052
 	// ...
 )
 
@@ -136,12 +142,14 @@ type WhatsAppBusinessError struct {
 		Message   string            `json:"message"`
 		Type      string            `json:"type"`
 		Code      WhatsappErrorCode `json:"code"`
-		ErrorData struct {
+		ErrorData *struct {
 			MessagingProduct string `json:"messaging_product"`
 			Details          string `json:"details"`
-		} `json:"error_data"`
-		ErrorSubcode int    `json:"error_subcode"`
-		FbtraceID    string `json:"fbtrace_id"`
+		} `json:"error_data,omitempty"`
+		ErrorUserTitle *string `json:"error_user_title,omitempty"`
+		ErrorUserMsg   *string `json:"error_user_msg,omitempty"`
+		ErrorSubcode   int     `json:"error_subcode"`
+		FbtraceID      string  `json:"fbtrace_id"`
 	} `json:"error"`
 }
 
@@ -152,6 +160,7 @@ func (v WhatsAppBusinessError) Error() string {
 func parseMetaErrorResponse[T any](emptyResponse T, body []byte, httpCode int) (T, int, error) {
 	var responseError WhatsAppBusinessError
 	if err := json.Unmarshal(body, &responseError); err != nil {
+		log.Printf("[ERROR][pkg/meta/whatsapp_business/errs.go][parseMetaErrorResponse] Failed to unmarshal error response: %v, body: %s", err, string(body))
 		return emptyResponse, httpCode, fmt.Errorf("unexpected http code: %d", httpCode)
 	}
 	return emptyResponse, httpCode, responseError

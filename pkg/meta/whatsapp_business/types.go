@@ -41,15 +41,15 @@ type MessageResponse struct {
 }
 
 type TemplateResponse struct {
-	Category                    string `json:"category" validate:"required"`   // MARKETING, UTILITY, etc
-	Components                  []any  `json:"components" validate:"required"` // header, body, button, etc
-	ID                          string `json:"id" validate:"required"`
-	IsPrimaryDeviceDeliveryOnly bool   `json:"is_primary_device_delivery_only"`
-	Language                    string `json:"language" validate:"required"`
-	MessageSendTTLSeconds       int    `json:"message_send_ttl_seconds"`
-	Name                        string `json:"name" validate:"required"`
-	ParameterFormat             string `json:"parameter_format" validate:"required"`
-	Status                      string `json:"status" validate:"required"` // approved, rejected, etc
+	Category                    string  `json:"category" validate:"required"`   // MARKETING, UTILITY, etc
+	Components                  []any   `json:"components" validate:"required"` // header, body, button, etc
+	ID                          string  `json:"id" validate:"required"`
+	IsPrimaryDeviceDeliveryOnly bool    `json:"is_primary_device_delivery_only"`
+	Language                    string  `json:"language" validate:"required"`
+	MessageSendTTLSeconds       int     `json:"message_send_ttl_seconds"`
+	Name                        string  `json:"name" validate:"required"`
+	ParameterFormat             *string `json:"parameter_format,omitempty"`
+	Status                      string  `json:"status" validate:"required"` // approved, rejected, etc
 }
 
 type TemplateCreateRequest struct {
@@ -64,6 +64,11 @@ type TemplateCreateResponse struct {
 	ID       string `json:"id"`
 	Status   string `json:"status"`
 	Category string `json:"category"`
+}
+
+type TemplateDeleteRequest struct {
+	ID   string `json:"id" validate:"required_without=Name"`
+	Name string `json:"name" validate:"required_without=ID"`
 }
 
 type TemplateDeleteResponse struct {

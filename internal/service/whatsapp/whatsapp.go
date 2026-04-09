@@ -98,31 +98,19 @@ func (ws *WhatsappBusiness) DeleteMedia(client *whatsapp_business.Client, mediaI
 	return httpCode, nil
 }
 
-func (ws *WhatsappBusiness) ResumableUpload(client *whatsapp_business.Client, inputData dto.ResumableUploadRequest) (string, int, error) {
-	uploadURL, httpCode, err := client.ResumableUpload(inputData.FileHeader)
-	if err != nil {
-		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
-			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ResumableUpload] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
-			return "", httpCode, err
-		}
-		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ResumableUpload] Failed to start resumable upload: %v", err)
-		return "", httpCode, err
-	}
-	return uploadURL, httpCode, nil
-}
-
 func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error) {
 	template := whatsapp_business.TemplateCreateRequest{
-		Name:       inputData.Name,
-		Category:   inputData.Category,
-		Language:   inputData.Language,
-		Components: inputData.Components,
+		Name:            inputData.Name,
+		Category:        inputData.Category,
+		Language:        inputData.Language,
+		ParameterFormat: inputData.ParameterFormat,
+		Components:      inputData.Components,
 	}
 	response, httpCode, err := client.CreateTemplate(template)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
 			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][CreateTemplate] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
-			return whatsapp_business.TemplateCreateResponse{}, httpCode, err
+			return whatsapp_business.TemplateCreateResponse{}, httpCode, waErr
 		}
 		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][CreateTemplate] Failed to create template: %v", err)
 		return whatsapp_business.TemplateCreateResponse{}, httpCode, err

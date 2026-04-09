@@ -25,7 +25,7 @@ type MessageUsecase struct {
 	chatRepository         repository.Chat
 	storageMediaRepository repository.StorageMedia
 	storageMediaUsecase    usecase.StorageMedia
-	phoneNumberUsecase     usecase.PhoneNumber
+	tenantUsecase          usecase.Tenant
 	whatsappService        service.WhatsappBusiness
 	googleStorageService   service.GoogleStorage
 }
@@ -35,7 +35,7 @@ func NewMessageUsecase(
 	chatRepository repository.Chat,
 	storageMediaRepository repository.StorageMedia,
 	storageMediaUsecase usecase.StorageMedia,
-	phoneNumberUsecase usecase.PhoneNumber,
+	tenantUsecase usecase.Tenant,
 	whatsappService service.WhatsappBusiness,
 	googleStorageService service.GoogleStorage,
 ) *MessageUsecase {
@@ -44,7 +44,7 @@ func NewMessageUsecase(
 		chatRepository:         chatRepository,
 		storageMediaRepository: storageMediaRepository,
 		storageMediaUsecase:    storageMediaUsecase,
-		phoneNumberUsecase:     phoneNumberUsecase,
+		tenantUsecase:          tenantUsecase,
 		whatsappService:        whatsappService,
 		googleStorageService:   googleStorageService,
 	}
@@ -53,7 +53,7 @@ func NewMessageUsecase(
 func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error) {
 	var err error
 	var response model.Message
-	whatsappClient, err := u.phoneNumberUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get WhatsApp client:", err)
 		return response, true, err
@@ -191,7 +191,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageS
 }
 
 func (u *MessageUsecase) GetTemplateList(ctx context.Context, inputData dto.TemplateListRequest) ([]whatsapp_business.TemplateResponse, bool, error) {
-	whatsappClient, err := u.phoneNumberUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/message/message.go][GetTemplateList] Failed to get WhatsApp client:", err)
 		return nil, true, err

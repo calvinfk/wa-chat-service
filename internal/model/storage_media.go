@@ -5,9 +5,10 @@ import (
 )
 
 type StorageMedia struct {
-	DocumentID       string    `json:"__name__" firestore:"-"`        // generated uuid
-	MediaID          *string   `json:"media_id" firestore:"media_id"` // file ID returned by WhatsApp Business API after uploading media
-	URL              *string   `json:"url" firestore:"url"`           // url created if media is uploaded to firebase storage
+	DocumentID       string    `json:"__name__" firestore:"-"`                // generated uuid
+	MediaID          *string   `json:"media_id" firestore:"media_id"`         // file ID returned by WhatsApp Business API after uploading media
+	URL              *string   `json:"url" firestore:"url"`                   // url created if media is uploaded to firebase storage
+	AssetHandle      *string   `json:"asset_handle" firestore:"asset_handle"` // handle id by resumable api
 	OriginalName     string    `json:"original_name" firestore:"original_name"`
 	IsURLFromStorage bool      `json:"is_url_from_storage" firestore:"is_url_from_storage"`
 	MimeType         string    `json:"mime_type" firestore:"mime_type"`

@@ -40,21 +40,17 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 		return nil, fmt.Errorf("failed to get bucket: %w", err)
 	}
 	obj := bucket.Object(filePath).If(storage.Conditions{DoesNotExist: true})
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get object attributes: %w", err)
-	}
 	writer := obj.NewWriter(ctx)
 	// writer.ContentType = contentType
-	_, err = writer.Write(fileData)
-	if err != nil {
+
+	if _, err := writer.Write(fileData); err != nil {
 		return nil, err
 	}
-	err = writer.Close()
-	if err != nil {
+
+	if err := writer.Close(); err != nil {
 		return nil, err
 	}
-	return attrs, nil
+	return writer.Attrs(), nil
 }
 
 func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error) {

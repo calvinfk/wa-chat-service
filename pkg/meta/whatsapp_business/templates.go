@@ -3,6 +3,7 @@ package whatsapp_business
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -52,6 +53,9 @@ func (wb *Client) GetTemplateByID(templateID string, query ...string) (TemplateR
 }
 
 func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateResponse, int, error) {
+	if err := wb.validator.Validate(payload); err != nil {
+		return TemplateCreateResponse{}, 0, err
+	}
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
 	// TODO: validate payload before sending request
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
@@ -59,6 +63,7 @@ func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateR
 		return TemplateCreateResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK && httpCode != http.StatusCreated {
+		log.Println("[ERROR][pkg/meta/whatsapp_business/templates.go][CreateTemplate] failed to create template, response body:", string(body))
 		return parseMetaErrorResponse(TemplateCreateResponse{}, body, httpCode)
 	}
 	var response TemplateCreateResponse
@@ -69,10 +74,23 @@ func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateR
 }
 
 func (wb *Client) DeleteTemplate(templateID string, templateName string) (TemplateDeleteResponse, int, error) {
-	if templateID == "" || templateName == "" {
-		return TemplateDeleteResponse{}, 0, fmt.Errorf("templateID and templateName are required")
+	var requestData TemplateDeleteRequest
+	requestData.ID = templateID
+	requestData.Name = templateName
+	if err := wb.validator.Validate(requestData); err != nil {
+		return TemplateDeleteResponse{}, 0, err
 	}
-	endpoint := fmt.Sprintf("%s/%s/%s?hsm_id=%s&name=%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate, templateID, templateName)
+	var queries []string
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
+	if templateID != "" {
+		queries = append(queries, "id="+templateID)
+	}
+	if templateName != "" {
+		queries = append(queries, "name="+templateName)
+	}
+	if len(queries) > 0 {
+		endpoint += "?" + strings.Join(queries, "&")
+	}
 	body, httpCode, err := wb.accessAPI(http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return TemplateDeleteResponse{}, httpCode, err
