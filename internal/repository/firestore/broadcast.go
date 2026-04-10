@@ -31,9 +31,9 @@ func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (
 		return model.Broadcast{}, err
 	}
 	var broadcast model.Broadcast
-	doc := docRef.Data()
-	doc[firestore.DocumentID] = docRef.Ref.ID
-	err = utils.MapToStruct(doc, &broadcast)
+	docData := docRef.Data()
+	docData[firestore.DocumentID] = docRef.Ref.ID
+	err = utils.MapToStruct(docData, &broadcast)
 	if err != nil {
 		return model.Broadcast{}, err
 	}
@@ -58,7 +58,7 @@ func (r *BroadcastRepository) InsertRecipient(ctx context.Context, broadcastReci
 	return err
 }
 
-func (r *BroadcastRepository) GetRecipietsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error) {
+func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error) {
 	query := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Collection(r.broadcastRecipient.TableName())
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
@@ -67,10 +67,10 @@ func (r *BroadcastRepository) GetRecipietsByBroadcastID(ctx context.Context, bro
 	var recipients []model.BroadcastRecipient
 	for _, docRef := range docs {
 		var recipient model.BroadcastRecipient
-		doc := docRef.Data()
-		doc[firestore.DocumentID] = docRef.Ref.ID
-		doc["broadcast_id"] = broadcastID
-		err = utils.MapToStruct(doc, &recipient)
+		docData := docRef.Data()
+		docData[firestore.DocumentID] = docRef.Ref.ID
+		docData["broadcast_id"] = broadcastID
+		err = utils.MapToStruct(docData, &recipient)
 		if err != nil {
 			return nil, err
 		}

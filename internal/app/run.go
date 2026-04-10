@@ -26,6 +26,7 @@ func Run(config *config.Config) {
 		ChatUsecase:         usecases.Chat,
 		TemplateUsecase:     usecases.Template,
 		BroadcastUsecase:    usecases.Broadcast,
+		TenantUsecase:       usecases.Tenant,
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
 	}

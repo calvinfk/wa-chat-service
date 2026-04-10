@@ -46,7 +46,13 @@ type (
 	}
 
 	Tenant interface {
+		GetByID(ctx context.Context, tenantID string) (model.Tenant, error)
 		GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (model.Tenant, error)
+		InsertContact(ctx context.Context, contact model.Contact) error
+		GetContactsFiltered(ctx context.Context, tenantID string, filterRequest filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], error)
+		GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]model.Contact, error)
+		GetContactByID(ctx context.Context, tenantID string, contactID string) (model.Contact, error)
+		UpdateContact(ctx context.Context, contact model.Contact) error
 	}
 
 	Template interface {
@@ -64,7 +70,7 @@ type (
 		Update(ctx context.Context, broadcast model.Broadcast) error
 		Delete(ctx context.Context, broadcastID string) error
 		InsertRecipient(ctx context.Context, broadcastRecipient model.BroadcastRecipient) error
-		GetRecipietsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error)
+		GetRecipientsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error)
 		UpdateRecipientStatus(ctx context.Context, data model.BroadcastRecipient) error
 	}
 )

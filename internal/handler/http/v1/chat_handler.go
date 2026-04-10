@@ -57,7 +57,7 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	}
 	requestData.Payload = messageData
 
-	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), requestData)
+	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), nil, "", requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
 	return ctx.Status(code).JSON(response)
 }

@@ -15,7 +15,7 @@ type (
 	}
 
 	Message interface {
-		SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error)
+		SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error)
 		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], bool, error)
 	}
 
@@ -44,6 +44,9 @@ type (
 
 	Tenant interface {
 		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error)
+		CreateContact(ctx context.Context, inputData dto.ContactCreateRequest) (bool, error)
+		GetContactsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], bool, error)
+		UpdateContact(ctx context.Context, inputData dto.ContactUpdateRequest) (bool, error)
 	}
 
 	Broadcast interface {

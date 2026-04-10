@@ -50,13 +50,15 @@ func NewMessageUsecase(
 	}
 }
 
-func (u *MessageUsecase) SendMessage(ctx context.Context, inputData dto.MessageSendRequest) (model.Message, bool, error) {
+func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error) {
 	var err error
 	var response model.Message
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get WhatsApp client:", err)
-		return response, true, err
+	if whatsappClient == nil {
+		whatsappClient, tenantID, err = u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get WhatsApp client:", err)
+			return response, true, err
+		}
 	}
 	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {

@@ -3,7 +3,6 @@ package broadcast_usecase
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	"wa_chat_service/pkg/meta/whatsapp_business/message_components"
 
 	"github.com/google/uuid"
 )
@@ -21,14 +19,18 @@ import (
 type BroadcastUsecase struct {
 	templateRepository  repository.Template
 	broadcastRepository repository.Broadcast
+	tenantRepository    repository.Tenant
+	messageUsecase      usecase.Message
 	tenantUsecase       usecase.Tenant
 	googleTaskService   service.GoogleTask
 }
 
-func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask) *BroadcastUsecase {
+func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask) *BroadcastUsecase {
 	return &BroadcastUsecase{
 		templateRepository:  templateRepository,
 		broadcastRepository: broadcastRepository,
+		tenantRepository:    tenantRepository,
+		messageUsecase:      messageUsecase,
 		tenantUsecase:       tenantUsecase,
 		googleTaskService:   googleTaskService,
 	}
@@ -45,14 +47,20 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
 		return true, err
 	}
+	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, inputData.Recipients)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
+		return true, err
+	}
+	log.Println("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] found ", len(phoneNumbers), " contacts for recipients, ", phoneNumbers)
 	// TODO: validate components before creating template component
 	// var sendTemplate map[string]any
 	payload := make(map[string]any)
 	payload["template"] = map[string]any{
-		"name":     template.Name,
-		"language": map[string]any{"code": template.Language},
+		"name":       template.Name,
+		"language":   map[string]any{"code": template.Language},
+		"components": inputData.Components,
 	}
-	payload["template"].(map[string]any)["components"] = inputData.Components
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
@@ -96,10 +104,18 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		return true, err
 	}
 	for _, recipient := range inputData.Recipients {
+		var recipientName string
+		contact, exists := phoneNumbers[recipient]
+		if exists {
+			recipientName = contact.Name
+		} else {
+			recipientName = recipient
+		}
 		broadcastRecipient := model.BroadcastRecipient{
 			DocumentID:    uuid.NewString(),
 			BroadcastID:   broadcast.DocumentID,
 			RecipientID:   recipient,
+			RecipientName: recipientName,
 			RecipientType: "individual", // TODO: support group recipient type
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
@@ -120,12 +136,12 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get broadcast by ID: ", err)
 		return true, err
 	}
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, broadcast.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, broadcast.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get whatsapp client: ", err)
 		return true, err
 	}
-	broadcastRecipients, err := u.broadcastRepository.GetRecipietsByBroadcastID(ctx, broadcastID)
+	broadcastRecipients, err := u.broadcastRepository.GetRecipientsByBroadcastID(ctx, broadcastID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to list broadcast recipients: ", err)
 		return true, err
@@ -164,13 +180,36 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	for i := 0; i < cap(workers); i++ {
 		wg.Go(func() {
 			for req := range workers {
-				err := u.sendMessageToRecipient(whatsappClient, req.Broadcast, req.Recipient)
+				payloadMap := make(map[string]any)
+				err := json.Unmarshal([]byte(req.Broadcast.Payload), &payloadMap)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast payload: ", err)
+					continue
+				}
+				inputData := dto.MessageSendRequest{
+					PhoneNumberID: req.Broadcast.PhoneNumberID,
+					RecipientID:   req.Recipient.RecipientID,
+					RecipientName: req.Recipient.RecipientName,
+					SenderName:    "Broadcast: " + req.Broadcast.Name,
+					Type:          "template",
+					Payload:       payloadMap["template"],
+				}
+				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, tenantID, inputData)
 				if err != nil {
 					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to send message to recipient: ", err)
+					errStr := err.Error()
+					req.Recipient.Status = string(dto.BroadcastScheduleFailed)
+					req.Recipient.Errors = &errStr
 				} else {
+					req.Recipient.Status = string(dto.BroadcastScheduleSuccess)
 					mu.Lock()
 					successCount++
 					mu.Unlock()
+				}
+				req.Recipient.UpdatedAt = time.Now()
+				err = u.broadcastRepository.UpdateRecipientStatus(ctx, req.Recipient)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast recipient status: ", err)
 				}
 				time.Sleep(time.Second * 1) // add delay between sending messages to avoid hitting rate limits
 			}
@@ -198,41 +237,4 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		return true, err
 	}
 	return false, nil
-}
-
-func (u *BroadcastUsecase) sendMessageToRecipient(client *whatsapp_business.Client, broadcast model.Broadcast, recipient model.BroadcastRecipient) error {
-	var recipientStatus string
-	var template message_components.Template
-	var err error
-	defer func() {
-		if recipientStatus == "" {
-			recipientStatus = "delivered"
-		}
-		var errors *string
-		if err != nil {
-			errStr := err.Error()
-			errors = &errStr
-		}
-		recipient.Status = recipientStatus
-		recipient.Errors = errors
-		recipient.UpdatedAt = time.Now()
-		if err := u.broadcastRepository.UpdateRecipientStatus(context.Background(), recipient); err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][sendMessageToRecipient] failed to update broadcast recipient status: ", err)
-		}
-	}()
-	log.Println("[INFO][internal/usecase/broadcast/broadcast.go][sendMessageToRecipient] sending payload: ", broadcast.Payload)
-	template, err = whatsapp_business.NewTemplateComponent([]byte(broadcast.Payload))
-	if err != nil {
-		recipientStatus = "failed"
-		err = fmt.Errorf("failed to create template component: %v", err)
-		return err
-	}
-	_, _, err = client.SendMessage(recipient.RecipientID, recipient.RecipientType, template)
-	if err != nil {
-		recipientStatus = "failed"
-		err = fmt.Errorf("failed to send message to recipient: %v", err)
-		return err
-	}
-	recipientStatus = "delivered"
-	return nil
 }

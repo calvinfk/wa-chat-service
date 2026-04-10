@@ -162,7 +162,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.Tenant, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
-	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, tenantUsecase, services.GoogleTask)
+	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,
