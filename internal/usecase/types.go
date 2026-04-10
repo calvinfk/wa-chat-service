@@ -47,7 +47,7 @@ type (
 	}
 
 	Broadcast interface {
-		ScheduleBroadcast() (bool, error)
-		SendBroadcast() (bool, error)
+		ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error)
+		SendBroadcast(ctx context.Context) (bool, error)
 	}
 )

@@ -32,6 +32,7 @@ type (
 		Status                      string    `json:"status"`
 		Components                  string    `json:"components"`
 		CreatedAt                   time.Time `json:"created_at"`
+		UpdatedAt                   time.Time `json:"updated_at"`
 	}
 	TemplateSyncRequest struct {
 		PhoneNumberID string `json:"phone_number_id" validate:"required"`
@@ -72,5 +73,6 @@ func (TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) Templat
 		ParameterFormat:             data.ParameterFormat,
 		Status:                      data.Status,
 		CreatedAt:                   data.CreatedAt,
+		UpdatedAt:                   data.UpdatedAt,
 	}
 }

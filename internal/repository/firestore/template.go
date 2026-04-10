@@ -119,6 +119,7 @@ func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transacti
 			{Path: "parameter_format", Value: inputData.ParameterFormat},
 			{Path: "status", Value: inputData.Status},
 			{Path: "components", Value: inputData.Components},
+			{Path: "updated_at", Value: inputData.UpdatedAt},
 		})
 		if updateErr != nil {
 			return updateErr

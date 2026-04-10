@@ -61,6 +61,7 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 		Status:                response.Status,
 		Components:            componentsString,
 		CreatedAt:             time.Now(),
+		UpdatedAt:             time.Now(),
 	}
 
 	if _, err := u.templateRepository.Upsert(ctx, nil, tenantID, newTemplate); err != nil {
