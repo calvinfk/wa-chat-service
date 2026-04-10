@@ -52,7 +52,30 @@ func GetMedia(component MessageComponent) *message_components.Media {
 	}
 }
 
-func (wb *Client) SendMessage(phoneNumberID, to, recipientType string, payload MessageComponent) (MessageResponse, int, error) {
+func NewTemplateComponent(payloadBytes []byte) (message_components.Template, error) {
+	var payloadMap map[string]any
+	if err := json.Unmarshal(payloadBytes, &payloadMap); err != nil {
+		return message_components.Template{}, fmt.Errorf("failed to unmarshal template payload: %v", err)
+	}
+	if payloadMap["template"] == nil {
+		return message_components.Template{}, fmt.Errorf("invalid template payload: missing 'template' field")
+	}
+	templateBytes, err := json.Marshal(payloadMap["template"])
+	if err != nil {
+		return message_components.Template{}, fmt.Errorf("failed to marshal template component: %v", err)
+	}
+	var templateStruct message_components.Template
+	if err := json.Unmarshal(templateBytes, &templateStruct); err != nil {
+		return templateStruct, err
+	}
+	if err := templateStruct.Validate(); err != nil {
+		return templateStruct, err
+	}
+	return templateStruct, nil
+
+}
+
+func (wb *Client) SendMessage(to, recipientType string, payload MessageComponent) (MessageResponse, int, error) {
 	payloadData := map[string]any{
 		"messaging_product": "whatsapp",
 		"recipient_type":    recipientType,
@@ -60,7 +83,7 @@ func (wb *Client) SendMessage(phoneNumberID, to, recipientType string, payload M
 		"type":              payload.GetType(),
 	}
 	maps.Copy(payloadData, payload.GetPayload())
-	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), phoneNumberID)
+	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), wb.PhoneNumberID)
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payloadData)
 	if err != nil {
 		return MessageResponse{}, httpCode, err

@@ -16,7 +16,7 @@ func NewWhatsappService() *WhatsappBusiness {
 }
 
 func (ws *WhatsappBusiness) SendMessage(client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error) {
-	response, httpCode, err := client.SendMessage(client.PhoneNumberID, to, "individual", payload)
+	response, httpCode, err := client.SendMessage(to, "individual", payload)
 	if err != nil {
 		if httpCode == http.StatusBadRequest {
 			waError, ok := err.(whatsapp_business.WhatsAppBusinessError)

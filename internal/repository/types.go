@@ -57,4 +57,14 @@ type (
 		DeleteByID(ctx context.Context, tx *firestore.Transaction, tenantID string, documentID string) error
 		DeleteByName(ctx context.Context, tx *firestore.Transaction, tenantID string, name string) error
 	}
+
+	Broadcast interface {
+		Insert(ctx context.Context, broadcast model.Broadcast) error
+		GetByID(ctx context.Context, broadcastID string) (model.Broadcast, error)
+		Update(ctx context.Context, broadcast model.Broadcast) error
+		Delete(ctx context.Context, broadcastID string) error
+		InsertRecipient(ctx context.Context, broadcastRecipient model.BroadcastRecipient) error
+		GetRecipietsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error)
+		UpdateRecipientStatus(ctx context.Context, data model.BroadcastRecipient) error
+	}
 )

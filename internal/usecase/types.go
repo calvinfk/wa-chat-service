@@ -48,6 +48,6 @@ type (
 
 	Broadcast interface {
 		ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error)
-		SendBroadcast(ctx context.Context) (bool, error)
+		SendBroadcast(ctx context.Context, broadcastID string) (bool, error)
 	}
 )

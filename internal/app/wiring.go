@@ -54,6 +54,7 @@ type Repositories struct {
 	StorageMedia repository.StorageMedia
 	Tenant       repository.Tenant
 	Template     repository.Template
+	Broadcast    repository.Broadcast
 }
 
 type Usecases struct {
@@ -142,6 +143,7 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient, services.GoogleStorage)
 	tenantRepository := repository_firestore.NewTenantRepository(clients.firestoreClient)
 	templateRepository := repository_firestore.NewTemplateRepository(clients.firestoreClient)
+	broadcastRepository := repository_firestore.NewBroadcastRepository(clients.firestoreClient)
 	return Repositories{
 		ActivityLog:  activityLogRepository,
 		Chat:         chatRepository,
@@ -149,6 +151,7 @@ func newDefaultRepositories(clients Clients, services Services) Repositories {
 		StorageMedia: storageMediaRepository,
 		Template:     templateRepository,
 		Tenant:       tenantRepository,
+		Broadcast:    broadcastRepository,
 	}
 }
 
@@ -159,7 +162,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.Tenant, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
-	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(services.GoogleTask)
+	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, tenantUsecase, services.GoogleTask)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,

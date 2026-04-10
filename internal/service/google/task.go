@@ -63,9 +63,43 @@ func (s *GoogleTaskService) CreatePingTask() error {
 			ScheduleTime: time.Now().Add(15 * time.Second).Format(time.RFC3339), // Schedule task to run after 15 seconds
 		},
 	}
-	_, err = s.client.Projects.Locations.Queues.Tasks.Create("projects/"+s.cfg.ProjectID+"/locations/asia-southeast2/queues/broadcast-message", req).Do()
+	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.BroadcastTaskParent, req).Do()
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error {
+	token, err := s.jwtService.GenerateJWT("broadcast_"+broadcastID, scheduleTime.Add(time.Second*20).Unix())
+	if err != nil {
+		return err
+	}
+	encryptedToken, err := s.encryptService.Encrypt(token)
+	if err != nil {
+		return err
+	}
+	req := &cloudtasks.CreateTaskRequest{
+		Task: &cloudtasks.Task{
+			Name:         s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID,
+			ScheduleTime: scheduleTime.Format(time.RFC3339), // Schedule task to run at specified time
+			HttpRequest: &cloudtasks.HttpRequest{
+				Url:        s.cfg.AppBaseURL + "/api/v1/broadcast/send",
+				HttpMethod: http.MethodPost,
+				Headers: map[string]string{
+					"Authorization": "Bearer " + encryptedToken,
+				},
+			},
+		},
+	}
+	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.BroadcastTaskParent, req).Do()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GoogleTaskService) DeleteBroadcastTask(broadcastID string) error {
+	_, err := s.client.Projects.Locations.Queues.Tasks.Delete(s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID).Do()
+	return err
 }
