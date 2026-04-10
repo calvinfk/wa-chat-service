@@ -22,18 +22,28 @@ func NewTxManager(db *gorm.DB, firestoreClient *firestore.Client) *TxManager {
 func (txm *TxManager) Do(ctx context.Context, fn func(ctx context.Context, txGorm *gorm.DB, txFirestore *firestore.Transaction) (bool, error)) (bool, error) {
 	var serverError bool
 	var err error
-	err = txm.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) error {
-		txGorm := txm.DB.WithContext(ctx).Begin()
-		serverError, err = fn(ctx, txGorm, txFirestore)
-		if err != nil {
+	var txGorm *gorm.DB
+	if txm.DB != nil {
+		txGorm = txm.DB.WithContext(ctx).Begin()
+	}
+	if txm.firestoreClient != nil {
+		err = txm.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) error {
+			serverError, err = fn(ctx, txGorm, txFirestore)
+			return nil
+		})
+	} else {
+		serverError, err = fn(ctx, txGorm, nil)
+	}
+	if err != nil {
+		if txGorm != nil {
 			txGorm.Rollback()
-			return err
 		}
+		return serverError, err
+	} else if txGorm != nil {
 		if err := txGorm.Commit().Error; err != nil {
 			serverError = true
-			return err
+			return serverError, err
 		}
-		return nil
-	})
+	}
 	return serverError, err
 }
