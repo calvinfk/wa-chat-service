@@ -52,7 +52,6 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
 		return true, err
 	}
-	log.Println("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] found ", len(phoneNumbers), " contacts for recipients, ", phoneNumbers)
 	// TODO: validate components before creating template component
 	// var sendTemplate map[string]any
 	payload := make(map[string]any)

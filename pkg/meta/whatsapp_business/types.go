@@ -62,9 +62,9 @@ type TemplateResponse struct {
 
 type TemplateCreateRequest struct {
 	Name            string           `json:"name" validate:"required"`
-	Category        string           `json:"category" validate:"required,oneof=marketing utility authentication"`
+	Category        string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
 	Language        string           `json:"language" validate:"required"`
-	ParameterFormat *string          `json:"parameter_format,omitempty" validate:"omitempty,oneof=named positional"`
+	ParameterFormat *string          `json:"parameter_format,omitempty" validate:"omitempty,oneof=NAMED POSITIONAL"`
 	Components      []map[string]any `json:"components" validate:"required,dive"`
 }
 

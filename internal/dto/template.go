@@ -11,7 +11,7 @@ type (
 		PhoneNumberID   string           `json:"phone_number_id" validate:"required"`
 		Name            string           `json:"name" validate:"required"`
 		Language        string           `json:"language" validate:"required"`
-		Category        string           `json:"category" validate:"required"`
+		Category        string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
 		ParameterFormat *string          `json:"parameter_format,omitempty"`
 		Components      []map[string]any `json:"components" validate:"required"`
 	}
@@ -49,7 +49,7 @@ type (
 		ID              string           `json:"id" query:"id" validate:"required"`
 		Name            string           `json:"name" validate:"required"`
 		Language        string           `json:"language" validate:"required"`
-		Category        string           `json:"category" validate:"required"`
+		Category        string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
 		ParameterFormat *string          `json:"parameter_format,omitempty"`
 		Components      []map[string]any `json:"components" validate:"required"`
 	}

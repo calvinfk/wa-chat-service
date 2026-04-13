@@ -75,6 +75,20 @@ func NewTemplateComponent(payloadBytes []byte) (message_components.Template, err
 
 }
 
+func IsMediaMessageType(messageTypeStr string) bool {
+	messageType := message_components.MessageType(messageTypeStr)
+	switch messageType {
+	case message_components.AudioMessageType,
+		message_components.DocumentMessageType,
+		message_components.ImageMessageType,
+		message_components.StickerMessageType,
+		message_components.VideoMessageType:
+		return true
+	default:
+		return false
+	}
+}
+
 func (wb *Client) SendMessage(to, recipientType string, payload MessageComponent) (MessageResponse, int, error) {
 	payloadData := map[string]any{
 		"messaging_product": "whatsapp",
