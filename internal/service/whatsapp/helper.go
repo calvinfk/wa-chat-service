@@ -5,9 +5,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
+	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 )
+
+var templateParameterRegex = regexp.MustCompile(`{{\s*([^{}\s]+)\s*}}`)
+
+type templateValidationInput struct {
+	dbComponents    []map[string]any
+	sendComponents  []map[string]any
+	parameterFormat *string
+}
 
 func normalizeComponentType(component map[string]any) (string, error) {
 	componentType, ok := component["type"].(string)
@@ -61,6 +71,31 @@ func parseTemplateComponentsJSON(raw string) ([]map[string]any, error) {
 	return components, nil
 }
 
+func parseTemplateValidationInput(templateDB model.Template, templateSend whatsapp_business.MessageComponent) (*templateValidationInput, error) {
+	if templateDB.Status != "APPROVED" {
+		return nil, fmt.Errorf("template is not approved, current status: %s", templateDB.Status)
+	}
+	if templateSend.GetType() != "template" {
+		return nil, fmt.Errorf("invalid type: expected 'template', got '%s'", templateSend.GetType())
+	}
+
+	templateDBComponents, err := parseTemplateComponentsJSON(templateDB.Components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal template components: %v", err)
+	}
+
+	sendComponents, err := extractSendTemplateComponents(templateSend.GetPayload())
+	if err != nil {
+		return nil, err
+	}
+
+	return &templateValidationInput{
+		dbComponents:    templateDBComponents,
+		sendComponents:  sendComponents,
+		parameterFormat: templateDB.ParameterFormat,
+	}, nil
+}
+
 func parseDBTemplateComponents(components []map[string]any) (map[string]map[string]any, error) {
 	parsedParameter := map[string]map[string]any{
 		"HEADER":  {},
@@ -73,16 +108,29 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 		if err != nil {
 			return nil, err
 		}
-
 		switch componentType {
-		case "HEADER", "BODY", "FOOTER":
-			componentTextAny, exists := component["text"]
-			if !exists || componentTextAny == nil {
-				continue
+		case "HEADER":
+			componentFormat, err := extractStringField(component, "format")
+			if err != nil {
+				return nil, err
 			}
-			componentText, ok := componentTextAny.(string)
-			if !ok {
-				return nil, fmt.Errorf("text field is invalid in %s component, expected string", componentType)
+			componentFormat = strings.ToLower(componentFormat)
+			if componentFormat == "text" {
+				componentText, err := extractStringField(component, "text")
+				if err != nil {
+					return nil, err
+				}
+				matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
+				for _, match := range matches {
+					parsedParameter[componentType][match[1]] = ""
+				}
+			} else if whatsapp_business.IsMediaMessageType(componentFormat) {
+				parsedParameter[componentType]["mediatype_db_"+componentFormat] = ""
+			}
+		case "BODY", "FOOTER":
+			componentText, err := extractStringField(component, "text")
+			if err != nil {
+				return nil, err
 			}
 			matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
 			for _, match := range matches {
@@ -141,7 +189,7 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 
 		switch componentType {
 		case "HEADER":
-			for _, p := range componentParameters {
+			for i, p := range componentParameters {
 				componentParameterType, err := extractStringField(p, "type")
 				if err != nil {
 					return fillableParameterCount, fmt.Errorf("type field is required for parameters in %s but missing or not a string", componentType)
@@ -171,10 +219,11 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					if !ok {
 						return fillableParameterCount, fmt.Errorf("media id is required for media component in %s but missing or not a string", componentType)
 					}
-					httpCode, err := validateMediaID(whatsappClient, mediaID)
-					if err != nil || httpCode != http.StatusOK {
-						return fillableParameterCount, fmt.Errorf("failed to validate media ID '%s' in %s: %v (HTTP code: %d)", mediaID, componentType, err, httpCode)
+					err := validateMediaID(whatsappClient, mediaID, componentParameterType)
+					if err != nil {
+						return fillableParameterCount, fmt.Errorf("failed to validate media ID in %s: %v", componentType, err)
 					}
+					fillableParameterCount[componentType]["mediatype_db_"+componentParameterType] = mediaID
 				} else if componentParameterType == "text" {
 					if parameterFormat == "NAMED" {
 						parameterName, err := extractStringField(p, "parameter_name")
@@ -183,7 +232,7 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 						}
 						fillableParameterCount[componentType][parameterName] = ""
 					} else {
-						fillableParameterCount[componentType][fmt.Sprintf("%d", len(fillableParameterCount[componentType])+1)] = ""
+						fillableParameterCount[componentType][fmt.Sprintf("%d", i+1)] = ""
 					}
 				}
 			}
@@ -250,17 +299,24 @@ func extractSendTemplateComponents(templateSendPayload map[string]any) ([]map[st
 	return components, nil
 }
 
-func validateMediaID(client *whatsapp_business.Client, mediaID string) (int, error) {
-	_, httpCode, err := client.GetMediaURL(mediaID)
+func validateMediaID(client *whatsapp_business.Client, mediaID string, mediaType string) error {
+	res, httpCode, err := client.GetMediaURL(mediaID)
 	if err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
 			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
-			return httpCode, waErr
+			return waErr
 		}
 		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] Failed to validate media ID %s: %v", mediaID, err)
-		return httpCode, err
+		return err
+	} else if httpCode != http.StatusOK {
+		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] Failed to validate media ID %s, unexpected HTTP code: %d", mediaID, httpCode)
+		return fmt.Errorf("failed to validate media ID %s, unexpected HTTP code: %d", mediaID, httpCode)
 	}
-	return httpCode, nil
+	isAllowed := whatsapp_business.IsMediaAllowed(mediaType, res.MimeType)
+	if !isAllowed {
+		return fmt.Errorf("media type '%s' with MIME type '%s' is not allowed for component", mediaType, res.MimeType)
+	}
+	return nil
 }
 
 func validateParameterMatch(dbParsedParameter, sendParsedParameter map[string]map[string]any) error {
@@ -270,7 +326,10 @@ func validateParameterMatch(dbParsedParameter, sendParsedParameter map[string]ma
 		}
 		for paramName := range parameters {
 			if _, exists := sendParsedParameter[componentType][paramName]; !exists {
-				return fmt.Errorf("missing parameter '%s' for component type %s in the payload", paramName, componentType)
+				if mediaType, ok := strings.CutPrefix(paramName, "mediatype_db_"); ok {
+					return fmt.Errorf("missing media '%s' for %s in the payload", mediaType, componentType)
+				}
+				return fmt.Errorf("missing parameter '%s' for %s in the payload", paramName, componentType)
 			}
 		}
 	}

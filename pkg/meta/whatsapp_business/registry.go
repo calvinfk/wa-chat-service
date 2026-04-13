@@ -27,6 +27,14 @@ var mimeTypeExtensionMap = map[string]string{
 	"video/mp4":  ".mp4",
 }
 
+var allowedMediaTypes = map[message_components.MessageType][]string{
+	message_components.AudioMessageType:    {"audio/aac", "audio/amr", "audio/mpeg", "audio/mp4", "audio/ogg"},
+	message_components.DocumentMessageType: {"text/plain", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/pdf"},
+	message_components.ImageMessageType:    {"image/jpeg", "image/png", "image/webp"},
+	message_components.StickerMessageType:  {"image/webp"},
+	message_components.VideoMessageType:    {"video/3gpp", "video/mp4"},
+}
+
 var resumableUploadMimeTypes = map[string]bool{
 	"application/pdf": true,
 	"image/jpeg":      true,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"strings"
 
 	"wa_chat_service/pkg/meta/whatsapp_business/message_components"
 )
@@ -85,6 +86,7 @@ func NewTemplateComponent(payloadBytes []byte) (message_components.Template, err
 }
 
 func IsMediaMessageType(messageTypeStr string) bool {
+	messageTypeStr = strings.ToLower(messageTypeStr)
 	messageType := message_components.MessageType(messageTypeStr)
 	switch messageType {
 	case message_components.AudioMessageType,
@@ -96,6 +98,20 @@ func IsMediaMessageType(messageTypeStr string) bool {
 	default:
 		return false
 	}
+}
+
+func IsMediaAllowed(messageTypeStr, mimeTypeStr string) bool {
+	messageType := message_components.MessageType(strings.ToLower(messageTypeStr))
+	allowedTypes, exists := allowedMediaTypes[messageType]
+	if !exists {
+		return false
+	}
+	for _, allowedMimeType := range allowedTypes {
+		if allowedMimeType == mimeTypeStr {
+			return true
+		}
+	}
+	return false
 }
 
 func (wb *Client) SendMessage(to, recipientType string, payload MessageComponent) (MessageResponse, int, error) {

@@ -3,7 +3,6 @@ package broadcast_usecase
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -138,11 +137,10 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 				return true, err
 			}
 		}
-		err = fmt.Errorf("testing")
-		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to test transaction rollback: ", err)
-			return false, err
-		}
+		// err = fmt.Errorf("testing")
+		// if err != nil {
+		// 	return false, err
+		// }
 		err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, sendingTime)
 		if err != nil {
 			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)

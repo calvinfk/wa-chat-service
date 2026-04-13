@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
 )
-
-var templateParameterRegex = regexp.MustCompile(`{{\s*([^{}\s]+)\s*}}`)
 
 type WhatsappBusiness struct {
 }
@@ -111,37 +108,23 @@ func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, inp
 }
 
 func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error {
-	// assume language, name is already validated
-	if templateDB.Status != "APPROVED" {
-		return fmt.Errorf("template is not approved, current status: %s", templateDB.Status)
-	}
-	if templateSend.GetType() != "template" {
-		return fmt.Errorf("invalid type: expected 'template', got '%s'", templateSend.GetType())
-	}
-
-	templateDBComponents, err := parseTemplateComponentsJSON(templateDB.Components)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal template components: %v", err)
-	}
-
-	sendComponents, err := extractSendTemplateComponents(templateSend.GetPayload())
+	validationInput, err := parseTemplateValidationInput(templateDB, templateSend)
 	if err != nil {
 		return err
 	}
 
-	if templateDB.ParameterFormat == nil {
-		if len(sendComponents) > 0 {
+	if validationInput.parameterFormat == nil {
+		if len(validationInput.sendComponents) > 0 {
 			return fmt.Errorf("template does not have components but components found in the payload")
 		}
 		return nil
 	}
 
-	dbParsedParameter, err := parseDBTemplateComponents(templateDBComponents)
+	dbParsedParameter, err := parseDBTemplateComponents(validationInput.dbComponents)
 	if err != nil {
 		return fmt.Errorf("failed to parse template components from database: %v", err)
 	}
-
-	sendParsedParameter, err := validateSendComponents(client, *templateDB.ParameterFormat, sendComponents)
+	sendParsedParameter, err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents)
 	if err != nil {
 		return err
 	}

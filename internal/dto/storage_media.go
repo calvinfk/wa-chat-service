@@ -17,6 +17,8 @@ type (
 
 	StorageMediaResponse struct {
 		ID           string  `json:"id"`
+		MediaID      *string `json:"media_id,omitempty"`
+		AssetHandle  *string `json:"asset_handle,omitempty"`
 		OriginalName string  `json:"original_name"`
 		MimeType     string  `json:"mime_type"`
 		AccessURL    *string `json:"access_url"`
@@ -77,6 +79,8 @@ func (StorageMediaResponse) FromModel(media model.StorageMedia, accessURL *strin
 		OriginalName: media.OriginalName,
 		MimeType:     media.MimeType,
 		AccessURL:    accessURL,
+		MediaID:      media.MediaID,
+		AssetHandle:  media.AssetHandle,
 	}
 }
 
