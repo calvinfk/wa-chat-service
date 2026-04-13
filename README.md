@@ -15,6 +15,12 @@ All routes are mounted under:
 - `GET /api/ping` - public health check
 - `GET /api/ping-protected` - protected health check (see Authentication Notes)
 
+### Auth (`/api/v1/auth`)
+
+- `POST /login`
+  - Body (JSON): auth login payload (handled by `dto.AuthLoginRequest`)
+  - On success, sets encrypted token cookie `access_token` (HttpOnly)
+
 ### Chat (`/api/v1/chat`)
 
 - `POST /send`
@@ -32,14 +38,35 @@ All routes are mounted under:
       }
     }
     ```
-- `GET /template-list`
-  - Query: `phone_number_id`
 - `GET /by-phone-number-id`
   - Query: `phone_number_id`
   - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
 - `GET /messages`
   - Query: `chat_id`
   - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+
+### Template (`/api/v1/template`)
+
+- `GET /get`
+  - Query: `phone_number_id`
+  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+- `POST /create`
+- `POST /sync`
+- `PUT /update`
+- `DELETE /delete`
+
+### Broadcast (`/api/v1/broadcast`)
+
+- `POST /schedule`
+- `POST /send`
+  - Expects encrypted bearer token in `Authorization` header (parsed via JWT middleware)
+
+### Tenant Contact (`/api/v1/tenant/contact`)
+
+- `POST /create`
+- `GET /filter`
+  - Supports filter/pagination query params
+- `PUT /update`
 
 ### Storage Media (`/api/v1/storage-media`)
 
@@ -50,8 +77,14 @@ All routes are mounted under:
   - Returns streamed media bytes (`Content-Type` from stored object metadata)
 - `DELETE /delete`
   - Query: `phone_number_id` and one of `id` or `media_id`
-- `POST /upload-media-id`
+- `POST /save-media-id`
   - Body (JSON): `media_id`, `phone_number_id`
+- `POST /resumable`
+  - Body (JSON): resumable upload payload
+- `POST /upload-meta`
+  - Body (JSON): media metadata payload
+- `GET /list`
+  - Optional query: filter/pagination params
 
 ## Standard JSON Response Shape
 
@@ -74,8 +107,11 @@ Notes:
 ## Authentication Notes
 
 - Token parsing middleware exists and expects an AES-encrypted token in cookie `access_token`.
-- The protected guard (`/api/ping-protected`) checks `jwt_error_message` and `userID` from request context.
-- In current router wiring, `AccessToken` middleware is commented out, so `/api/ping-protected` will return `401 Unauthorized` until token middleware is enabled for incoming requests.
+- `AccessToken` middleware is enabled globally in router wiring.
+- The protected guard (`/api/ping-protected` and most `/api/v1/*` routes) checks:
+  - `token_error_message` request header (if provided)
+  - `token_sub` context value
+- If token cookie is missing/invalid/expired, protected routes return `401 Unauthorized`.
 
 ## Global Middleware
 
