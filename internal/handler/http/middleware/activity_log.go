@@ -30,7 +30,7 @@ func ActivityLog(activityLogUsecase usecase.ActivityLog) fiber.Handler {
 			descriptionBuilder.WriteString(" " + string(ctx.Request().Header.Method()))
 			descriptionBuilder.WriteString(" " + ctx.Request().URI().String())
 		}
-		jwtError := ctx.Get("jwt_error_message")
+		jwtError := ctx.Get("token_error_message", "")
 		if jwtError == "Token expired" {
 			descriptionBuilder.WriteString(" with expired token")
 		}

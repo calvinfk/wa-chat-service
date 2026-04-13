@@ -14,6 +14,7 @@ import (
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	"wa_chat_service/internal/usecase"
 	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
+	auth_usecase "wa_chat_service/internal/usecase/auth"
 	broadcast_usecase "wa_chat_service/internal/usecase/broadcast"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
 	message_usecase "wa_chat_service/internal/usecase/message"
@@ -65,6 +66,7 @@ type Usecases struct {
 	Tenant       usecase.Tenant
 	Template     usecase.Template
 	Broadcast    usecase.Broadcast
+	Auth         usecase.Auth
 }
 
 func NewDefaultWiring(config *config.Config) (Clients, Services, Repositories, Usecases) {
@@ -163,6 +165,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask)
+	authUsecase := auth_usecase.NewAuthUsecase(repositories.Tenant, services.AccessToken, services.Encrypt)
 	return Usecases{
 		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,
@@ -171,6 +174,7 @@ func newDefaultUsecases(clients Clients, repositories Repositories, services Ser
 		Chat:         chatUsecase,
 		Tenant:       tenantUsecase,
 		Broadcast:    broadcastUsecase,
+		Auth:         authUsecase,
 	}
 }
 

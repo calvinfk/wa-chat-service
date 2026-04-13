@@ -8,17 +8,17 @@ import (
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"cloud.google.com/go/storage"
-	"github.com/google/uuid"
 )
 
 type (
 	// AccessToken is an interface that defines methods for generating and parsing access tokens.
 	AccessToken interface {
+		GenerateAccessToken(sub string) (string, error)
 		// ParseAccessToken parses a AccessToken access token string and extracts the user ID (subject) from the token claims.
 		// It validates the token using the configured JWK and returns the user ID as a UUID if the token is valid.
 		// If the token is expired, it returns an error indicating that the token has expired and the sub.
 		// If the token is invalid for any other reason, it returns only the error indicating that the token is invalid.
-		ParseAccessTokenSub(tokenStr string) (uuid.UUID, error)
+		ParseAccessTokenSub(tokenStr string) (string, error)
 	}
 	Encrypt interface {
 		// Encrypt encrypts a byte slice and returns the encrypted string. If there is an error during encryption, it returns the error.

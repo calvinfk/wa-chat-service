@@ -2,6 +2,7 @@ package http_v1
 
 import (
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -22,11 +23,11 @@ func NewTemplateHandler(templateUsecase usecase.Template) *TemplateHandler {
 func (h *TemplateHandler) RegisterRoute(router fiber.Router) {
 	templateRoutes := router.Group("/template")
 	{
-		templateRoutes.Get("/get", h.getTemplates)
-		templateRoutes.Post("/create", h.createTemplate)
-		templateRoutes.Post("/sync", h.syncTemplate)
-		templateRoutes.Delete("/delete", h.deleteTemplate)
-		templateRoutes.Put("/update", h.updateTemplate)
+		templateRoutes.Get("/get", middleware.Protected(), h.getTemplates)
+		templateRoutes.Post("/create", middleware.Protected(), h.createTemplate)
+		templateRoutes.Post("/sync", middleware.Protected(), h.syncTemplate)
+		templateRoutes.Delete("/delete", middleware.Protected(), h.deleteTemplate)
+		templateRoutes.Put("/update", middleware.Protected(), h.updateTemplate)
 	}
 }
 

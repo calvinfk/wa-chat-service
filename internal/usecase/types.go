@@ -53,4 +53,8 @@ type (
 		ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error)
 		SendBroadcast(ctx context.Context, broadcastID string) (bool, error)
 	}
+
+	Auth interface {
+		Login(ctx context.Context, req dto.AuthLoginRequest) (string, bool, error)
+	}
 )

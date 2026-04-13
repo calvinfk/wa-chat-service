@@ -27,8 +27,10 @@ func Run(config *config.Config) {
 		TemplateUsecase:     usecases.Template,
 		BroadcastUsecase:    usecases.Broadcast,
 		TenantUsecase:       usecases.Tenant,
+		AuthUsecase:         usecases.Auth,
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
+		AccessTokenService:  services.AccessToken,
 	}
 
 	app := fiber.New(fiber.Config{

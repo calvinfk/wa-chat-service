@@ -18,7 +18,7 @@ func NewRouter(app *fiber.App, config *config.Config, routerHandlerV1 http_v1.Ro
 		middleware.Cors(&config.CORS),
 		middleware.OptionsRoute(),
 		middleware.FileSizeLimit(16*1024*1024), // 16MB
-		// middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
+		middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
 		// middleware.ActivityLog(routerHandlerV1.ActivityLogUsecase),
 	)
 

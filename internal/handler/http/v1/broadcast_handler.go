@@ -29,7 +29,7 @@ func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService serv
 func (h *BroadcastHandler) RegisterRoute(api fiber.Router) {
 	broadcastRoute := api.Group("/broadcast")
 	{
-		broadcastRoute.Post("/schedule", h.scheduleBroadcast)
+		broadcastRoute.Post("/schedule", middleware.Protected(), h.scheduleBroadcast)
 		broadcastRoute.Post("/send", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true), h.sendBroadcast)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -25,13 +26,13 @@ func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia) *StorageMe
 func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 	storageMediaRouter := router.Group("/storage-media")
 	{
-		storageMediaRouter.Post("/upload", h.uploadMedia)
-		storageMediaRouter.Get("/get", h.getMedia)
-		storageMediaRouter.Delete("/delete", h.deleteMedia)
-		storageMediaRouter.Post("/save-media-id", h.saveMediaID)
-		storageMediaRouter.Post("/resumable", h.uploadResumableMedia)
-		storageMediaRouter.Post("/upload-meta", h.uploadMediaMeta)
-		storageMediaRouter.Get("/list", h.getMediaList)
+		storageMediaRouter.Post("/upload", middleware.Protected(), h.uploadMedia)
+		storageMediaRouter.Get("/get", middleware.Protected(), h.getMedia)
+		storageMediaRouter.Delete("/delete", middleware.Protected(), h.deleteMedia)
+		storageMediaRouter.Post("/save-media-id", middleware.Protected(), h.saveMediaID)
+		storageMediaRouter.Post("/resumable", middleware.Protected(), h.uploadResumableMedia)
+		storageMediaRouter.Post("/upload-meta", middleware.Protected(), h.uploadMediaMeta)
+		storageMediaRouter.Get("/list", middleware.Protected(), h.getMediaList)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type (
@@ -59,7 +60,8 @@ type (
 	}
 
 	JOSE struct {
-		RSAPrivateKey *rsa.PrivateKey
+		RSAPrivateKey     *rsa.PrivateKey
+		AccessTokenExpiry time.Duration
 	}
 )
 
@@ -259,6 +261,16 @@ func joseEnv() (JOSE, error) {
 		}
 	} else {
 		errors = append(errors, "JOSE_RSA_PRIVATE_KEY is required")
+	}
+	if accessTokenExpiryStr := os.Getenv("JOSE_ACCESS_TOKEN_EXPIRY"); accessTokenExpiryStr != "" {
+		accessTokenExpiry, err := time.ParseDuration(accessTokenExpiryStr)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("JOSE_ACCESS_TOKEN_EXPIRY must be a valid duration string: %v", err))
+		} else {
+			cfg.AccessTokenExpiry = accessTokenExpiry
+		}
+	} else {
+		errors = append(errors, "JOSE_ACCESS_TOKEN_EXPIRY is required")
 	}
 	if len(errors) > 0 {
 		return JOSE{}, fmt.Errorf("missing required JOSE environment variables: %s", strings.Join(errors, ", "))

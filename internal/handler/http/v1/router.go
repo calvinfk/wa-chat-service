@@ -16,8 +16,10 @@ type RouterHandlerV1 struct {
 	TemplateUsecase     usecase.Template
 	BroadcastUsecase    usecase.Broadcast
 	TenantUsecase       usecase.Tenant
+	AuthUsecase         usecase.Auth
 	EncryptService      service.Encrypt
 	JWTService          service.JWT
+	AccessTokenService  service.AccessToken
 }
 
 type HandlerV1 interface {
@@ -35,4 +37,6 @@ func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *con
 	broadcastHandler.RegisterRoute(api)
 	tenantHandler := NewTenantHandler(routerHandler.TenantUsecase)
 	tenantHandler.RegisterRoute(api)
+	authHandler := NewAuthHandler(routerHandler.AuthUsecase, config)
+	authHandler.RegisterRoutes(api)
 }

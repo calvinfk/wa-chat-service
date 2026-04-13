@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -26,9 +27,9 @@ func NewChatHandler(messageUsecase usecase.Message, chatUsecase usecase.Chat) Ha
 func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	chatGroup := api.Group("/chat")
 	{
-		chatGroup.Post("/send", h.sendMessage)
-		chatGroup.Get("/by-phone-number-id", h.getChatByPhoneNumberID)
-		chatGroup.Get("/messages", h.getMessagesByChatID)
+		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
+		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberID)
+		chatGroup.Get("/messages", middleware.Protected(), h.getMessagesByChatID)
 	}
 }
 

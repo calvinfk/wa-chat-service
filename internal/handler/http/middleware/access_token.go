@@ -16,30 +16,30 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 		var err error
 		tokenString := ctx.Cookies("access_token", "")
 		if tokenString == "" {
-			ctx.Set("jwt_error_message", "Access token is missing")
+			ctx.Locals("token_error_message", "Access token is missing")
 			ctx.Next()
 			return nil
 		}
 		decryptedToken, err := encryptService.Decrypt(tokenString)
 		if err != nil {
 			log.Printf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error decrypting token: %v", err)
-			ctx.Set("jwt_error_message", "Invalid token")
+			ctx.Locals("token_error_message", "Invalid token")
 			ctx.Next()
 			return nil
 		}
 		sub, err := accessTokenService.ParseAccessTokenSub(string(decryptedToken))
 		if err != nil {
 			if err == errs.ErrAuthExpiredAccessToken {
-				ctx.Set("userID", sub.String())
-				ctx.Set("jwt_error_message", "Token expired")
+				ctx.Locals("token_sub", sub)
+				ctx.Locals("token_error_message", "Token expired")
 			} else {
 				log.Printf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error parsing token: %v", err)
-				ctx.Set("jwt_error_message", "Invalid token")
+				ctx.Locals("token_error_message", "Invalid token")
 			}
 			ctx.Next()
 			return nil
 		}
-		ctx.Set("userID", sub.String())
+		ctx.Locals("token_sub", sub)
 		ctx.Next()
 		return nil
 	}

@@ -2,6 +2,7 @@ package http_v1
 
 import (
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -24,10 +25,10 @@ func (h *TenantHandler) RegisterRoute(router fiber.Router) {
 	{
 		tenantContactRoutes := tenantRoutes.Group("/contact")
 		{
-			tenantContactRoutes.Post("/create", h.createContact)
-			tenantContactRoutes.Get("/filter", h.getFiltered)
-			tenantContactRoutes.Put("/update", h.updateContact)
-			// tenantContactRoutes.Delete("/delete", h.deleteContact)
+			tenantContactRoutes.Post("/create", middleware.Protected(), h.createContact)
+			tenantContactRoutes.Get("/filter", middleware.Protected(), h.getFiltered)
+			tenantContactRoutes.Put("/update", middleware.Protected(), h.updateContact)
+			// tenantContactRoutes.Delete("/delete", middleware.Protected(), h.deleteContact)
 		}
 	}
 }
