@@ -141,7 +141,7 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 	return parsedParameter, nil
 }
 
-func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any) (map[string]map[string]any, error) {
+func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any, templateFields map[string]model.TemplateField) (map[string]map[string]any, error) {
 	fillableParameterCount := map[string]map[string]any{
 		"HEADER":  {},
 		"BODY":    {},
@@ -201,6 +201,14 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					if err != nil {
 						return fillableParameterCount, fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
 					}
+					matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
+					if len(matches) > 0 {
+						for _, match := range matches {
+							if _, exists := templateFields[match[1]]; !exists {
+								return fillableParameterCount, fmt.Errorf("parameter '%s' in %s component is not defined in template fields", match[1], componentType)
+							}
+						}
+					}
 					componentParameterPayload = map[string]any{"body": componentText}
 				} else {
 					componentParameterPayload, err = extractMapField(p, componentParameterType)
@@ -234,6 +242,7 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					} else {
 						fillableParameterCount[componentType][fmt.Sprintf("%d", i+1)] = ""
 					}
+
 				}
 			}
 			currentNumOfComponents[componentType]++
@@ -251,6 +260,14 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					fillableParameterCount[componentType][parameterName] = componentText
 				} else {
 					fillableParameterCount[componentType][fmt.Sprintf("%d", i+1)] = componentText
+				}
+				matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
+				if len(matches) > 0 {
+					for _, match := range matches {
+						if _, exists := templateFields[match[1]]; !exists {
+							return fillableParameterCount, fmt.Errorf("parameter '%s' in %s component is not defined in template fields", match[1], componentType)
+						}
+					}
 				}
 			}
 			currentNumOfComponents[componentType]++

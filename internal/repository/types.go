@@ -53,6 +53,7 @@ type (
 		GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]model.Contact, error)
 		GetContactByID(ctx context.Context, tenantID string, contactID string) (model.Contact, error)
 		UpdateContact(ctx context.Context, contact model.Contact) error
+		GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error)
 	}
 
 	Template interface {

@@ -53,13 +53,16 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
 		return true, err
 	}
+	templateFields, err := u.tenantRepository.GetTemplateFields(ctx, tenantID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template fields: ", err)
+		return true, err
+	}
 	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, inputData.Recipients)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
 		return true, err
 	}
-	// TODO: validate components before creating template component
-	// var sendTemplate map[string]any
 	payload := make(map[string]any)
 	payload["template"] = map[string]any{
 		"name":       template.Name,
@@ -76,7 +79,7 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create template component: ", err)
 		return true, err
 	}
-	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
+	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent, templateFields)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
 		return false, err

@@ -107,7 +107,7 @@ func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, inp
 	return response, httpCode, nil
 }
 
-func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error {
+func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent, templateFields map[string]model.TemplateField) error {
 	validationInput, err := parseTemplateValidationInput(templateDB, templateSend)
 	if err != nil {
 		return err
@@ -124,7 +124,8 @@ func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cl
 	if err != nil {
 		return fmt.Errorf("failed to parse template components from database: %v", err)
 	}
-	sendParsedParameter, err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents)
+
+	sendParsedParameter, err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents, templateFields)
 	if err != nil {
 		return err
 	}

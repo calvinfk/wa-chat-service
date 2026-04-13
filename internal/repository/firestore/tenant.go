@@ -11,9 +11,10 @@ import (
 )
 
 type TenantRepository struct {
-	tenant  model.Tenant
-	contact model.Contact
-	db      *firestore.Client
+	tenant        model.Tenant
+	contact       model.Contact
+	templateField model.TemplateField
+	db            *firestore.Client
 }
 
 func NewTenantRepository(db *firestore.Client) *TenantRepository {
@@ -129,4 +130,24 @@ func (r *TenantRepository) UpdateContact(ctx context.Context, contact model.Cont
 		Collection(r.contact.TableName()).Doc(contact.DocumentID).
 		Set(ctx, contact)
 	return err
+}
+
+func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error) {
+	docs, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.templateField.TableName()).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	templateFields := make(map[string]model.TemplateField)
+	for _, doc := range docs {
+		var templateField model.TemplateField
+		docData := doc.Data()
+		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["tenant_id"] = tenantID
+		err = utils.MapToStruct(docData, &templateField)
+		if err != nil {
+			return nil, err
+		}
+		templateFields[templateField.Key] = templateField
+	}
+	return templateFields, nil
 }
