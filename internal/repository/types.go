@@ -65,12 +65,12 @@ type (
 	}
 
 	Broadcast interface {
-		Insert(ctx context.Context, broadcast model.Broadcast) error
+		Insert(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error
 		GetByID(ctx context.Context, broadcastID string) (model.Broadcast, error)
-		Update(ctx context.Context, broadcast model.Broadcast) error
-		Delete(ctx context.Context, broadcastID string) error
-		InsertRecipient(ctx context.Context, broadcastRecipient model.BroadcastRecipient) error
+		Update(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error
+		Delete(ctx context.Context, tx *firestore.Transaction, broadcastID string) error
+		InsertRecipient(ctx context.Context, tx *firestore.Transaction, broadcastRecipient model.BroadcastRecipient) error
 		GetRecipientsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error)
-		UpdateRecipientStatus(ctx context.Context, data model.BroadcastRecipient) error
+		UpdateRecipientStatus(ctx context.Context, tx *firestore.Transaction, data model.BroadcastRecipient) error
 	}
 )

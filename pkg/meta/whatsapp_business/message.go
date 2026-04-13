@@ -10,6 +10,12 @@ import (
 )
 
 func NewComponent(componentType string, component any) (MessageComponent, error) {
+	if component == nil {
+		return nil, fmt.Errorf("component is nil")
+	}
+	if componentType == "" {
+		return nil, fmt.Errorf("component type is empty")
+	}
 	var messageStruct MessageComponent
 	var ok bool
 	messageType := message_components.MessageType(componentType)
@@ -28,6 +34,9 @@ func NewComponent(componentType string, component any) (MessageComponent, error)
 	}
 	if err := json.Unmarshal(messageBytes, &messageStruct); err != nil {
 		return nil, err
+	}
+	if messageStruct == nil {
+		return nil, fmt.Errorf("message struct is nil after unmarshalling")
 	}
 	if err := messageStruct.Validate(); err != nil {
 		return nil, err

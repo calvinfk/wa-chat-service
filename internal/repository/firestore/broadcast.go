@@ -20,9 +20,13 @@ func NewBroadcastRepository(db *firestore.Client) *BroadcastRepository {
 	}
 }
 
-func (r *BroadcastRepository) Insert(ctx context.Context, broadcast model.Broadcast) error {
-	_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
-	return err
+func (r *BroadcastRepository) Insert(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error {
+	if tx != nil {
+		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID), broadcast)
+	} else {
+		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
+		return err
+	}
 }
 
 func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (model.Broadcast, error) {
@@ -40,22 +44,34 @@ func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (
 	return broadcast, nil
 }
 
-func (r *BroadcastRepository) Update(ctx context.Context, broadcast model.Broadcast) error {
-	_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
-	return err
+func (r *BroadcastRepository) Update(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error {
+	if tx != nil {
+		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID), broadcast)
+	} else {
+		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
+		return err
+	}
 }
 
-func (r *BroadcastRepository) Delete(ctx context.Context, broadcastID string) error {
-	_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Delete(ctx)
-	return err
+func (r *BroadcastRepository) Delete(ctx context.Context, tx *firestore.Transaction, broadcastID string) error {
+	if tx != nil {
+		return tx.Delete(r.db.Collection(r.broadcast.TableName()).Doc(broadcastID))
+	} else {
+		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Delete(ctx)
+		return err
+	}
 }
 
-func (r *BroadcastRepository) InsertRecipient(ctx context.Context, broadcastRecipient model.BroadcastRecipient) error {
-	_, err := r.db.
-		Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).
-		Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID).
-		Set(ctx, broadcastRecipient)
-	return err
+func (r *BroadcastRepository) InsertRecipient(ctx context.Context, tx *firestore.Transaction, broadcastRecipient model.BroadcastRecipient) error {
+	if tx != nil {
+		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID), broadcastRecipient)
+	} else {
+		_, err := r.db.
+			Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).
+			Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID).
+			Set(ctx, broadcastRecipient)
+		return err
+	}
 }
 
 func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error) {
@@ -79,14 +95,22 @@ func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, br
 	return recipients, nil
 }
 
-func (r *BroadcastRepository) UpdateRecipientStatus(ctx context.Context, data model.BroadcastRecipient) error {
-	_, err := r.db.
-		Collection(r.broadcast.TableName()).Doc(data.BroadcastID).
-		Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID).
-		Update(ctx, []firestore.Update{
+func (r *BroadcastRepository) UpdateRecipientStatus(ctx context.Context, tx *firestore.Transaction, data model.BroadcastRecipient) error {
+	if tx != nil {
+		return tx.Update(r.db.Collection(r.broadcast.TableName()).Doc(data.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID), []firestore.Update{
 			{Path: "status", Value: data.Status},
 			{Path: "updated_at", Value: data.UpdatedAt},
 			{Path: "errors", Value: data.Errors},
 		})
-	return err
+	} else {
+		_, err := r.db.
+			Collection(r.broadcast.TableName()).Doc(data.BroadcastID).
+			Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID).
+			Update(ctx, []firestore.Update{
+				{Path: "status", Value: data.Status},
+				{Path: "updated_at", Value: data.UpdatedAt},
+				{Path: "errors", Value: data.Errors},
+			})
+		return err
+	}
 }

@@ -5,12 +5,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
 )
+
+type ParsedParameter struct {
+	Name  string
+	Value string
+}
 
 type WhatsappBusiness struct {
 }
@@ -118,93 +124,202 @@ func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cl
 	if templateSend.GetType() != "template" {
 		return fmt.Errorf("invalid type: expected 'template', got '%s'", templateSend.GetType())
 	}
-	sendPayload := templateSend.GetPayload()
+	templateSendPayload := templateSend.GetPayload()
+	if templateSendPayload["template"] == nil {
+		return fmt.Errorf("template payload is required but missing")
+	}
+	sendPayload := templateSendPayload["template"].(map[string]any)
+
 	// parse template components
 	var templateDBComponents []map[string]any
 	err = json.Unmarshal([]byte(templateDB.Components), &templateDBComponents)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal template components: %v", err)
 	}
-	sendComponents, sendComponentsOk := sendPayload["components"].([]map[string]any)
-	if templateDB.ParameterFormat == nil && sendComponentsOk {
-		return fmt.Errorf("template does not have components but components found in the payload")
-	} else if templateDB.ParameterFormat != nil && !sendComponentsOk {
-		return fmt.Errorf("template has components but components missing in the payload")
+	sendComponents := make([]map[string]any, 0)
+	sendComponentsAny := sendPayload["components"].([]any)
+	for _, c := range sendComponentsAny {
+		if component, ok := c.(map[string]any); ok {
+			sendComponents = append(sendComponents, component)
+		} else {
+			return fmt.Errorf("invalid component format in send payload, expected array of objects")
+		}
 	}
-	if !sendComponentsOk {
-		return nil // if template has no components and payload has no components, then it's valid
-	}
-	ws.validateTemplateParameter(templateDB.ParameterFormat, templateDBComponents, sendComponents)
-	err = json.Unmarshal([]byte(templateDB.Components), &templateDBComponents)
+	err = ws.validateTemplateParameter(client, templateDB.ParameterFormat, templateDBComponents, sendComponents)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal template components: %v", err)
-	}
-	if sendPayload["body"] == nil {
-		return fmt.Errorf("body component is required")
+		return fmt.Errorf("template parameter validation failed: %v", err)
 	}
 	return nil
 }
 
-func (ws *WhatsappBusiness) countParameters(parameterType string, components []map[string]any) map[string]int {
-	return nil
+func (ws *WhatsappBusiness) parseDBTemplateComponents(components []map[string]any) (map[string]map[string]any, error) {
+	parsedParameter := map[string]map[string]any{
+		"HEADER":  make(map[string]any),
+		"BODY":    make(map[string]any),
+		"FOOTER":  make(map[string]any),
+		"BUTTONS": make(map[string]any),
+	}
+	for _, component := range components {
+		componentType, ok := component["type"].(string)
+		if !ok {
+			return nil, fmt.Errorf("component type is required but missing in the payload")
+		}
+		// log.Println("[DEBUG][internal/service/whatsapp/whatsapp.go][parseDBTemplateComponents] Parsing component:", component)
+		componentType = strings.ToUpper(componentType)
+		switch componentType {
+		case "HEADER", "BODY", "FOOTER":
+			if component["text"] != nil {
+				componentText := component["text"].(string)
+				regexCountParam := regexp.MustCompile(`{{\s*([^{}\s]+)\s*}}`)
+				matches := regexCountParam.FindAllStringSubmatch(componentText, -1)
+				for _, match := range matches {
+					parsedParameter[componentType][match[1]] = ""
+				}
+			}
+		}
+	}
+	return parsedParameter, nil
 }
 
-func (ws *WhatsappBusiness) validateTemplateParameter(parameterType *string, dbComponents, sendComponents []map[string]any) error {
+// returns the number of parameters for each component type, e.g. {"header": 1, "body": 2, "button": 3}
+func (ws *WhatsappBusiness) validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any) (map[string]map[string]any, error) {
+	fillableParameterCount := map[string]map[string]any{
+		"HEADER":  {},
+		"BODY":    {},
+		"FOOTER":  {},
+		"BUTTONS": {},
+	}
+	if len(sendComponents) == 0 {
+		log.Println("[DEBUG][internal/service/whatsapp/whatsapp.go][validateSendComponents] No components in send payload, skipping parameter validation")
+		return fillableParameterCount, nil
+	}
+	if parameterFormat == "" {
+		return fillableParameterCount, fmt.Errorf("parameter format is required when components are present")
+	}
+	maxNumOfComponents := map[string]int{
+		"HEADER":  1,
+		"BODY":    1,
+		"FOOTER":  1,
+		"BUTTONS": 10,
+	}
+	for _, component := range sendComponents {
+		componentType, ok := component["type"].(string)
+		if !ok {
+			return fillableParameterCount, fmt.Errorf("component type is required but missing in the payload")
+		}
+		componentType = strings.ToUpper(componentType)
+		if _, exists := fillableParameterCount[componentType]; !exists {
+			return fillableParameterCount, fmt.Errorf("unsupported component type: %s", componentType)
+		}
+		componentParametersAny, ok := component["parameters"].([]any)
+		if !ok {
+			return fillableParameterCount, fmt.Errorf("parameters field is required but missing or not an array in the payload for component type %s", componentType)
+		}
+		componentParameters := make([]map[string]any, 0)
+		for _, p := range componentParametersAny {
+			if param, ok := p.(map[string]any); ok {
+				componentParameters = append(componentParameters, param)
+			} else {
+				return fillableParameterCount, fmt.Errorf("invalid parameter format in the payload for component type %s, expected array of objects", componentType)
+			}
+		}
+		switch componentType {
+		case "HEADER":
+			for _, p := range componentParameters {
+				componentParameterType := p["type"].(string)
+				var componentParameterPayload map[string]any
+				if componentParameterType == "text" {
+					componentParameterPayload = map[string]any{
+						"body": p["text"],
+					}
+				} else {
+					componentParameterPayload = p[componentParameterType].(map[string]any)
+				}
+				_, err := whatsapp_business.NewComponent(componentParameterType, componentParameterPayload)
+				if err != nil {
+					return fillableParameterCount, fmt.Errorf("failed to parse component for type %s.%s: %v", componentType, componentParameterType, err)
+				}
+				if whatsapp_business.IsMediaMessageType(componentParameterType) {
+					mediaID, ok := componentParameterPayload["id"].(string)
+					if !ok {
+						return fillableParameterCount, fmt.Errorf("media id is required for media component in %s but missing or not a string", componentType)
+					}
+					httpCode, err := ws.validateMediaID(whatsappClient, mediaID)
+					if err != nil || httpCode != http.StatusOK {
+						return fillableParameterCount, fmt.Errorf("failed to validate media ID '%s' in %s: %v (HTTP code: %d)", mediaID, componentType, err, httpCode)
+					}
+				} else if componentParameterType == "text" {
+					if parameterFormat == "NAMED" {
+						parameterName, ok := p["parameter_name"].(string)
+						if !ok {
+							return fillableParameterCount, fmt.Errorf("parameter_name is required for text component in %s with NAMED parameter format but missing or not a string", componentType)
+						}
+						fillableParameterCount[componentType][parameterName] = ""
+					} else {
+						fillableParameterCount[componentType][fmt.Sprintf("%d", len(fillableParameterCount[componentType])+1)] = ""
+					}
+				}
+			}
+			maxNumOfComponents[componentType]--
+		case "BODY", "FOOTER":
+			for i, p := range componentParameters {
+				componentText, ok := p["text"].(string)
+				if !ok {
+					return fillableParameterCount, fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
+				}
+				if parameterFormat == "NAMED" {
+					fillableParameterCount[componentType][p["parameter_name"].(string)] = componentText
+				} else {
+					fillableParameterCount[componentType][fmt.Sprintf("%d", i+1)] = componentText
+				}
+			}
+			maxNumOfComponents[componentType]--
+		case "BUTTONS":
+			maxNumOfComponents[componentType]--
+		}
+	}
+
+	if maxNumOfComponents["BODY"] != 0 {
+		return fillableParameterCount, fmt.Errorf("body component is required but missing in the payload")
+	} else if maxNumOfComponents["HEADER"] < 0 {
+		return fillableParameterCount, fmt.Errorf("too many header components in the payload, maximum allowed is 1")
+	} else if maxNumOfComponents["FOOTER"] < 0 {
+		return fillableParameterCount, fmt.Errorf("too many footer components in the payload, maximum allowed is 1")
+	} else if maxNumOfComponents["BUTTONS"] < 0 {
+		return fillableParameterCount, fmt.Errorf("too many button components in the payload, maximum allowed is 10")
+	}
+
+	return fillableParameterCount, nil
+}
+
+func (ws *WhatsappBusiness) validateTemplateParameter(whatsappClient *whatsapp_business.Client, parameterFormat *string, dbComponents, sendComponents []map[string]any) error {
 	// Check parameter format
-	if parameterType == nil {
+	if parameterFormat == nil {
+		if len(sendComponents) > 0 {
+			return fmt.Errorf("template does not have components but components found in the payload")
+		}
 		return nil // if parameter format is not defined, skip parameter validation
 	}
-	data := make(map[string]int)
-	checkComponentType := []string{"header", "body", "footer", "button"}
-	for _, key := range checkComponentType {
-		data[key] = 0
+	dbParsedParameter, err := ws.parseDBTemplateComponents(dbComponents)
+	if err != nil {
+		return fmt.Errorf("failed to parse template components from database: %v", err)
 	}
-	switch strings.ToUpper(*parameterType) {
-	case "NAMED":
-	case "POSITIONAL":
+	// Count parameters in send components
+	data, err := ws.validateSendComponents(whatsappClient, *parameterFormat, sendComponents)
+	if err != nil {
+		return err
 	}
-	return nil
-}
-
-func (ws *WhatsappBusiness) validateTemplateHeader(client *whatsapp_business.Client, dbComponents map[string]any, sendPayload map[string]any) error {
-	sendHeader, sendHeaderOk := sendPayload["header"].(map[string]any)
-	dbHeader, dbHeaderOk := dbComponents["header"].(map[string]any)
-	if !sendHeaderOk && dbHeaderOk {
-		return fmt.Errorf("header component is required but missing in the payload")
-	} else if sendHeaderOk && !dbHeaderOk {
-		return fmt.Errorf("header component is not expected but found in the payload")
-	} else if !sendHeaderOk && !dbHeaderOk {
-		return nil
-	}
-	// check header type
-	if sendHeader["type"] != dbHeader["format"] {
-		return fmt.Errorf("header type mismatch: expected '%s', got '%s'", dbHeader["format"], sendHeader["type"])
-	}
-	// if header type is media, validate media ID
-	headerType, ok := sendHeader["type"].(string)
-	if !ok {
-		return fmt.Errorf("header type is missing or not a string")
-	}
-	if whatsapp_business.IsMediaMessageType(headerType) {
-		media, ok := sendHeader[headerType].(map[string]string)
-		if !ok {
-			return fmt.Errorf("media content is required for media header but missing or not a map")
+	for componentType, parameters := range dbParsedParameter {
+		if len(parameters) != len(data[componentType]) {
+			return fmt.Errorf("parameter count mismatch for component type %s: expected %d, got %d", componentType, len(parameters), len(data[componentType]))
 		}
-		mediaID, ok := media["id"]
-		if !ok {
-			return fmt.Errorf("media id is required for media header but missing or not a string")
+		for paramName := range parameters {
+			if _, exists := data[componentType][paramName]; !exists {
+				return fmt.Errorf("missing parameter '%s' for component type %s in the payload", paramName, componentType)
+			}
 		}
-		httpCode, err := ws.validateMediaID(client, mediaID)
-		if err != nil {
-			return fmt.Errorf("failed to validate media ID '%s': %v (HTTP code: %d)", mediaID, err, httpCode)
-		}
-	} else if headerType == "text" {
-		if sendHeader["text"] == nil {
-			return fmt.Errorf("text content is required for text header but missing")
-		}
-	} else {
-		return fmt.Errorf("unsupported header type: %s", headerType)
 	}
+	// log.Printf("[DEBUG][internal/service/whatsapp/whatsapp.go][validateTemplateParameter] Fillable parameter count in send payload: %+v", data)
 	return nil
 }
 

@@ -6,11 +6,51 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"wa_chat_service/pkg/meta/whatsapp_business/template_components"
+	"wa_chat_service/pkg/utils"
 )
 
 const (
 	endpointTemplate = "message_templates"
 )
+
+func NewTemplateSendButton(buttonData map[string]any) (any, error) {
+	if buttonData == nil {
+		return nil, fmt.Errorf("button data is nil")
+	}
+	buttonType, ok := buttonData["type"].(string)
+	if !ok {
+		return nil, fmt.Errorf("button type is missing or not a string")
+	}
+	var buttonStruct any
+	switch buttonType {
+	case "COPY_CODE":
+		buttonStruct = &template_components.CopyCodeButton{}
+	case "PHONE_NUMBER":
+		buttonStruct = &template_components.PhoneNumberButton{}
+	case "QUICK_REPLY":
+		buttonStruct = &template_components.QuickReplyButton{}
+	case "URL":
+		buttonStruct = &template_components.URLButton{}
+	default:
+		return nil, fmt.Errorf("unsupported button type: %s", buttonType)
+	}
+	buttonBytes, err := json.Marshal(buttonData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal button data: %v", err)
+	}
+	if err := json.Unmarshal(buttonBytes, &buttonStruct); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal button data into struct: %v", err)
+	}
+	if buttonStruct == nil {
+		return nil, fmt.Errorf("button struct is nil after unmarshalling")
+	}
+	validator := utils.NewValidator()
+	if err := validator.Struct(buttonStruct); err != nil {
+		return nil, fmt.Errorf("button struct validation failed: %v", err)
+	}
+	return buttonStruct, nil
+}
 
 func (wb *Client) GetTemplateList(query ...string) ([]any, Paging, int, error) {
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)

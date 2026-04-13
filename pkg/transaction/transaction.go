@@ -2,9 +2,17 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 
 	firestore "cloud.google.com/go/firestore"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrInvalidTxManager              = fmt.Errorf("invalid transaction manager: both DB and Firestore client are nil")
+	ErrInvalidTxFunction             = fmt.Errorf("invalid transaction function: function cannot be nil")
+	ErrFirestoreClientNotInitialized = fmt.Errorf("Firestore client is not initialized")
+	ErrGormDBNotInitialized          = fmt.Errorf("GORM DB is not initialized")
 )
 
 // TxManager is a struct that manages database transactions using GORM. It provides a method to execute a function within a transaction context, handling the commit and rollback logic based on the success or failure of the function execution.
@@ -23,27 +31,63 @@ func (txm *TxManager) Do(ctx context.Context, fn func(ctx context.Context, txGor
 	var serverError bool
 	var err error
 	var txGorm *gorm.DB
-	if txm.DB != nil {
-		txGorm = txm.DB.WithContext(ctx).Begin()
+	if txm.DB == nil || txm.firestoreClient == nil {
+		return true, ErrInvalidTxManager
 	}
-	if txm.firestoreClient != nil {
-		err = txm.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) error {
-			serverError, err = fn(ctx, txGorm, txFirestore)
-			return nil
-		})
-	} else {
-		serverError, err = fn(ctx, txGorm, nil)
+	if fn == nil {
+		return true, ErrInvalidTxFunction
 	}
-	if err != nil {
-		if txGorm != nil {
-			txGorm.Rollback()
-		}
+	txGorm = txm.DB.WithContext(ctx).Begin()
+	err = txm.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) error {
+		serverError, err = fn(ctx, txGorm, txFirestore)
+		return err
+	})
+	if serverError || err != nil {
+		txGorm.Rollback()
 		return serverError, err
-	} else if txGorm != nil {
-		if err := txGorm.Commit().Error; err != nil {
-			serverError = true
-			return serverError, err
-		}
 	}
+	if err := txGorm.Commit().Error; err != nil {
+		serverError = true
+		return serverError, err
+	}
+	return false, nil
+}
+
+func (txm *TxManager) DoFirestore(ctx context.Context, fn func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error)) (bool, error) {
+	var serverError bool
+	var err error
+	if txm.firestoreClient == nil {
+		return true, ErrFirestoreClientNotInitialized
+	}
+	if fn == nil {
+		return true, ErrInvalidTxFunction
+	}
+	err = txm.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) error {
+		serverError, err = fn(ctx, txFirestore)
+		return err
+	})
 	return serverError, err
+}
+
+func (txm *TxManager) DoGorm(ctx context.Context, fn func(ctx context.Context, txGorm *gorm.DB) (bool, error)) (bool, error) {
+	var serverError bool
+	var err error
+	var txGorm *gorm.DB
+	if txm.DB == nil {
+		return true, ErrGormDBNotInitialized
+	}
+	if fn == nil {
+		return true, ErrInvalidTxFunction
+	}
+	txGorm = txm.DB.WithContext(ctx).Begin()
+	serverError, err = fn(ctx, txGorm)
+	if err != nil {
+		txGorm.Rollback()
+		return serverError, err
+	}
+	if err := txGorm.Commit().Error; err != nil {
+		serverError = true
+		return serverError, err
+	}
+	return false, nil
 }

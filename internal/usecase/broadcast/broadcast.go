@@ -3,6 +3,7 @@ package broadcast_usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -12,7 +13,9 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/transaction"
 
+	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
 )
 
@@ -23,9 +26,11 @@ type BroadcastUsecase struct {
 	messageUsecase      usecase.Message
 	tenantUsecase       usecase.Tenant
 	googleTaskService   service.GoogleTask
+	whatsappService     service.WhatsappBusiness
+	txManager           *transaction.TxManager
 }
 
-func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask) *BroadcastUsecase {
+func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *transaction.TxManager) *BroadcastUsecase {
 	return &BroadcastUsecase{
 		templateRepository:  templateRepository,
 		broadcastRepository: broadcastRepository,
@@ -33,11 +38,13 @@ func NewBroadcastUsecase(templateRepository repository.Template, broadcastReposi
 		messageUsecase:      messageUsecase,
 		tenantUsecase:       tenantUsecase,
 		googleTaskService:   googleTaskService,
+		whatsappService:     whatsappService,
+		txManager:           txManager,
 	}
 }
 
 func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error) {
-	_, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
 		return true, err
@@ -70,6 +77,11 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create template component: ", err)
 		return true, err
 	}
+	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
+		return false, err
+	}
 	broadcastID, err := uuid.NewV7()
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
@@ -80,53 +92,65 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
 		return true, err
 	}
-	var sendingTime time.Time
-	if inputData.SendAt == nil {
-		sendingTime = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided
-	} else {
-		sendingTime = *inputData.SendAt
-	}
-	broadcast := model.Broadcast{
-		DocumentID:    broadcastID.String(),
-		Name:          inputData.Name,
-		TemplateID:    inputData.TemplateID,
-		PhoneNumberID: inputData.PhoneNumberID,
-		Payload:       string(payloadString),
-		Status:        string(dto.BroadcastScheduleScheduled),
-		SendAt:        sendingTime,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-	}
-	err = u.broadcastRepository.Insert(ctx, broadcast)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast: ", err)
-		return true, err
-	}
-	for _, recipient := range inputData.Recipients {
-		var recipientName string
-		contact, exists := phoneNumbers[recipient]
-		if exists {
-			recipientName = contact.Name
+	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
+		var sendingTime time.Time
+		if inputData.SendAt == nil {
+			sendingTime = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided
 		} else {
-			recipientName = recipient
+			sendingTime = *inputData.SendAt
 		}
-		broadcastRecipient := model.BroadcastRecipient{
-			DocumentID:    uuid.NewString(),
-			BroadcastID:   broadcast.DocumentID,
-			RecipientID:   recipient,
-			RecipientName: recipientName,
-			RecipientType: "individual", // TODO: support group recipient type
+		broadcast := model.Broadcast{
+			DocumentID:    broadcastID.String(),
+			Name:          inputData.Name,
+			TemplateID:    inputData.TemplateID,
+			PhoneNumberID: inputData.PhoneNumberID,
+			Payload:       string(payloadString),
+			Status:        string(dto.BroadcastScheduleScheduled),
+			SendAt:        sendingTime,
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		err = u.broadcastRepository.InsertRecipient(ctx, broadcastRecipient)
-	}
-	err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, sendingTime)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)
-		return true, err
-	}
-	return false, nil
+		err = u.broadcastRepository.Insert(ctx, txFirestore, broadcast)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast: ", err)
+			return true, err
+		}
+		for _, recipient := range inputData.Recipients {
+			var recipientName string
+			contact, exists := phoneNumbers[recipient]
+			if exists {
+				recipientName = contact.Name
+			} else {
+				recipientName = recipient
+			}
+			broadcastRecipient := model.BroadcastRecipient{
+				DocumentID:    uuid.NewString(),
+				BroadcastID:   broadcast.DocumentID,
+				RecipientID:   recipient,
+				RecipientName: recipientName,
+				RecipientType: "individual", // TODO: support group recipient type
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+			err = u.broadcastRepository.InsertRecipient(ctx, txFirestore, broadcastRecipient)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast recipient: ", err)
+				return true, err
+			}
+		}
+		err = fmt.Errorf("testing")
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to test transaction rollback: ", err)
+			return false, err
+		}
+		err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, sendingTime)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)
+			return true, err
+		}
+		return false, nil
+	})
+	return serverError, err
 }
 
 func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string) (bool, error) {
@@ -157,7 +181,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	}
 	broadcast.Status = string(broadcastStatus)
 	broadcast.UpdatedAt = time.Now()
-	err = u.broadcastRepository.Update(ctx, broadcast)
+	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast status: ", err)
 		return true, err
@@ -206,7 +230,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 					mu.Unlock()
 				}
 				req.Recipient.UpdatedAt = time.Now()
-				err = u.broadcastRepository.UpdateRecipientStatus(ctx, req.Recipient)
+				err = u.broadcastRepository.UpdateRecipientStatus(ctx, nil, req.Recipient)
 				if err != nil {
 					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast recipient status: ", err)
 				}
@@ -230,7 +254,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcast.Status = string(dto.BroadcastScheduleFailedPartially)
 	}
 	broadcast.UpdatedAt = time.Now()
-	err = u.broadcastRepository.Update(ctx, broadcast)
+	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast status after sending: ", err)
 		return true, err
