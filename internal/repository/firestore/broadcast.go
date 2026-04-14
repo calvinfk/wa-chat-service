@@ -143,3 +143,31 @@ func (r *BroadcastRepository) GetFiltered(ctx context.Context, inputData filter_
 	return response, nil
 
 }
+
+func (r *BroadcastRepository) GetRecipientsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], error) {
+	var emptyResponse filter_request.FilterResponse[dto.BroadcastRecipientResponse]
+	query := r.db.Collection(r.broadcast.TableName()).Doc(inputData.SpecificFilter.BroadcastID).Collection(r.broadcastRecipient.TableName()).Query
+	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.broadcastRecipient.AllowedFilterFields(), r.broadcastRecipient.AllowedSortFields())
+	if err != nil {
+		return emptyResponse, err
+	}
+	docRef, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
+	if err != nil {
+		return emptyResponse, err
+	}
+	var results []dto.BroadcastRecipientResponse
+	for _, doc := range docRef {
+		var broadcast model.BroadcastRecipient
+		docData := doc.Data()
+		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["broadcast_id"] = inputData.SpecificFilter.BroadcastID
+		err = utils.MapToStruct(docData, &broadcast)
+		if err != nil {
+			return emptyResponse, err
+		}
+		results = append(results, dto.BroadcastRecipientResponse{}.FromModel(broadcast))
+	}
+	response := filter_request.NewFilterResponse(results, paginate, totalData)
+	return response, nil
+
+}

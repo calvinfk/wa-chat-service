@@ -35,6 +35,7 @@ func (h *BroadcastHandler) RegisterRoute(api fiber.Router) {
 		broadcastRoute.Post("/send", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true), h.sendBroadcast)
 		broadcastRoute.Put("/cancel", middleware.Protected(), h.cancelBroadcast)
 		broadcastRoute.Get("/get-filtered", middleware.Protected(), h.getFilteredBroadcast)
+		broadcastRoute.Get("/get-recipients-filtered", middleware.Protected(), h.getFilteredBroadcastRecipients)
 	}
 }
 
@@ -105,5 +106,24 @@ func (h *BroadcastHandler) getFilteredBroadcast(ctx fiber.Ctx) error {
 	}
 	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcast(ctx.Context(), inputData)
 	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get filtered broadcast", data)
+	return ctx.Status(httpCode).JSON(apiResponse)
+}
+
+func (h *BroadcastHandler) getFilteredBroadcastRecipients(ctx fiber.Ctx) error {
+	var inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]
+	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
+		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	if err := ctx.Bind().Query(&inputData); err != nil {
+		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	if err := inputData.Validate(); err != nil {
+		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcastRecipients(ctx.Context(), inputData)
+	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get filtered broadcast recipients", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }

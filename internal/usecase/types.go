@@ -55,6 +55,7 @@ type (
 		UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error)
 		CancelBroadcast(ctx context.Context, inputData dto.BroadcastCancelRequest) (bool, error)
 		GetFilteredBroadcast(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error)
+		GetFilteredBroadcastRecipients(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], bool, error)
 	}
 
 	Auth interface {

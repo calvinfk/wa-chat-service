@@ -18,3 +18,11 @@ type BroadcastRecipient struct {
 func (b BroadcastRecipient) TableName() string {
 	return "recipients"
 }
+
+func (b BroadcastRecipient) AllowedFilterFields() []string {
+	return []string{"recipient_id", "recipient_type", "status"}
+}
+
+func (b BroadcastRecipient) AllowedSortFields() []string {
+	return []string{"created_at", "updated_at"}
+}

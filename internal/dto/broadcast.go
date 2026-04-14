@@ -46,6 +46,23 @@ type (
 		TenantID      string  `json:"-"`
 		Status        *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
 	}
+
+	BroadcastGetRecipientsFilteredRequest struct {
+		BroadcastID string `json:"-" query:"broadcast_id" validate:"required"`
+	}
+
+	BroadcastRecipientResponse struct {
+		ID            string    `json:"id"`           // uuid v7
+		BroadcastID   string    `json:"broadcast_id"` // reference to broadcast document
+		RecipientID   string    `json:"recipient_id"`
+		RecipientName string    `json:"recipient_name"`
+		RecipientType string    `json:"recipient_type"` // individual, group
+		ReplyData     *string   `json:"reply_data"`
+		Status        string    `json:"status"` // pending, sent, failed
+		CreatedAt     time.Time `json:"created_at"`
+		UpdatedAt     time.Time `json:"updated_at"`
+		Errors        *string   `json:"errors"`
+	}
 )
 
 type BroadcastScheduleStatus string
@@ -82,4 +99,27 @@ func (r BroadcastGetFilteredRequest) Validate() map[string]string {
 		return utils.GetValidatorErrorMessages(err)
 	}
 	return nil
+}
+
+func (r BroadcastGetRecipientsFilteredRequest) Validate() map[string]string {
+	validator := utils.NewValidator()
+	if err := validator.Struct(r); err != nil {
+		return utils.GetValidatorErrorMessages(err)
+	}
+	return nil
+}
+
+func (r BroadcastRecipientResponse) FromModel(data model.BroadcastRecipient) BroadcastRecipientResponse {
+	return BroadcastRecipientResponse{
+		ID:            data.DocumentID,
+		BroadcastID:   data.BroadcastID,
+		RecipientID:   data.RecipientID,
+		RecipientName: data.RecipientName,
+		RecipientType: data.RecipientType,
+		ReplyData:     data.ReplyData,
+		Status:        data.Status,
+		CreatedAt:     data.CreatedAt,
+		UpdatedAt:     data.UpdatedAt,
+		Errors:        data.Errors,
+	}
 }

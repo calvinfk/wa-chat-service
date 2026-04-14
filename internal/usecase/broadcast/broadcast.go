@@ -577,3 +577,13 @@ func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, inputData f
 	}
 	return broadcasts, false, nil
 }
+
+func (u *BroadcastUsecase) GetFilteredBroadcastRecipients(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], bool, error) {
+	var emptyResponse filter_request.FilterResponse[dto.BroadcastRecipientResponse]
+	recipients, err := u.broadcastRepository.GetRecipientsFiltered(ctx, inputData)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcastRecipients] failed to get filtered broadcast recipients: ", err)
+		return emptyResponse, true, err
+	}
+	return recipients, false, nil
+}
