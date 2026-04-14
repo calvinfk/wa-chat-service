@@ -54,11 +54,6 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
 		return true, err
 	}
-	templateFields, err := u.tenantRepository.GetTemplateFields(ctx, tenantID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template fields: ", err)
-		return true, err
-	}
 	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, inputData.Recipients)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
@@ -80,7 +75,7 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create template component: ", err)
 		return true, err
 	}
-	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent, templateFields)
+	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
 		return false, err
@@ -316,7 +311,6 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	// TODO: consider to use pubsub to handle sending messages in case the number of recipients is too large and might cause memory issue if we load all recipients into memory at once. For now we assume the number of recipients is manageable and can be loaded into memory.
 	// TODO: consider to implement retry mechanism for failed messages
 	// TODO: change only the components that have parameters instead of replacing the whole payload to avoid potential issue of replacing non-parameter value that has the same value as parameter format
-	log.Println(replaceVariable)
 	for _, recipient := range broadcastRecipients {
 		broadcastCopy := broadcast
 		for key, value := range replaceVariable {

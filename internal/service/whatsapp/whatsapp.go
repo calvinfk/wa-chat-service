@@ -107,17 +107,15 @@ func (ws *WhatsappBusiness) CreateTemplate(client *whatsapp_business.Client, inp
 	return response, httpCode, nil
 }
 
-func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent, templateFields map[string]model.TemplateField) error {
+func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error {
 	validationInput, err := parseTemplateValidationInput(templateDB, templateSend)
 	if err != nil {
 		return err
 	}
 
 	if validationInput.parameterFormat == nil {
-		if len(validationInput.sendComponents) > 0 {
-			return fmt.Errorf("template does not have components but components found in the payload")
-		}
-		return nil
+		defaultParameter := "POSITIONAL"
+		validationInput.parameterFormat = &defaultParameter
 	}
 
 	dbParsedParameter, err := parseDBTemplateComponents(validationInput.dbComponents)
@@ -125,7 +123,7 @@ func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cl
 		return fmt.Errorf("failed to parse template components from database: %v", err)
 	}
 
-	if err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents, templateFields); err != nil {
+	if err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents); err != nil {
 		return err
 	}
 
@@ -142,10 +140,10 @@ func (ws *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cl
 
 func (ws *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat string, sendComponents []map[string]any) (map[string]map[string]string, error) {
 	parameterValues := map[string]map[string]string{
-		"HEADER":  {},
-		"BODY":    {},
-		"FOOTER":  {},
-		"BUTTONS": {},
+		"HEADER": {},
+		"BODY":   {},
+		"FOOTER": {},
+		"BUTTON": {},
 	}
 	if parameterFormat == "" {
 		return parameterValues, fmt.Errorf("parameter format is required when components are present")
@@ -227,8 +225,16 @@ func (ws *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat 
 					parameterValues[componentType][fmt.Sprintf("%d", i+1)] = componentText
 				}
 			}
-		case "BUTTONS":
-			continue
+		case "BUTTON":
+			buttonComponent, err := whatsapp_business.NewTemplateSendButton(component)
+			if err != nil {
+				return parameterValues, fmt.Errorf("invalid button component: %v", err)
+			}
+			buttonPayload, err := buttonComponent.GetMap()
+			if err != nil {
+				return parameterValues, fmt.Errorf("failed to get button component payload: %v", err)
+			}
+			parameterValues[componentType][buttonPayload["index"].(string)] = ""
 		}
 	}
 

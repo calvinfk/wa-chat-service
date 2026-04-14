@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
@@ -98,10 +99,10 @@ func parseTemplateValidationInput(templateDB model.Template, templateSend whatsa
 
 func parseDBTemplateComponents(components []map[string]any) (map[string]map[string]string, error) {
 	parsedParameter := map[string]map[string]string{
-		"HEADER":  {},
-		"BODY":    {},
-		"FOOTER":  {},
-		"BUTTONS": {},
+		"HEADER": {},
+		"BODY":   {},
+		"FOOTER": {},
+		"BUTTON": {},
 	}
 	for _, component := range components {
 		componentType, err := normalizeComponentType(component)
@@ -136,26 +137,34 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 			for _, match := range matches {
 				parsedParameter[componentType][match[1]] = ""
 			}
+		case "BUTTONS":
+			buttons, err := extractArrayField(component, "buttons")
+			if err != nil {
+				return nil, err
+			}
+			for i := range buttons {
+				parsedParameter["BUTTON"][fmt.Sprintf("%d", i)] = ""
+			}
 		}
 	}
 	return parsedParameter, nil
 }
 
-func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any, templateFields map[string]model.TemplateField) error {
+func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any) error {
 	if parameterFormat == "" {
 		return fmt.Errorf("parameter format is required when components are present")
 	}
 	maxNumOfComponents := map[string]int{
-		"HEADER":  1,
-		"BODY":    1,
-		"FOOTER":  1,
-		"BUTTONS": 10,
+		"HEADER": 1,
+		"BODY":   1,
+		"FOOTER": 1,
+		"BUTTON": 10,
 	}
 	currentNumOfComponents := map[string]int{
-		"HEADER":  0,
-		"BODY":    0,
-		"FOOTER":  0,
-		"BUTTONS": 0,
+		"HEADER": 0,
+		"BODY":   0,
+		"FOOTER": 0,
+		"BUTTON": 0,
 	}
 
 	for _, component := range sendComponents {
@@ -195,14 +204,6 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					if err != nil {
 						return fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
 					}
-					matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
-					if len(matches) > 0 {
-						for _, match := range matches {
-							if _, exists := templateFields[match[1]]; !exists {
-								return fmt.Errorf("parameter '%s' in %s component is not defined in template fields", match[1], componentType)
-							}
-						}
-					}
 					componentParameterPayload = map[string]any{"body": componentText}
 				} else {
 					componentParameterPayload, err = extractMapField(p, componentParameterType)
@@ -229,22 +230,11 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 			}
 			currentNumOfComponents[componentType]++
 		case "BODY", "FOOTER":
-			for _, p := range componentParameters {
-				componentText, err := extractStringField(p, "text")
-				if err != nil {
-					return fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
-				}
-				matches := templateParameterRegex.FindAllStringSubmatch(componentText, -1)
-				if len(matches) > 0 {
-					for _, match := range matches {
-						if _, exists := templateFields[match[1]]; !exists {
-							return fmt.Errorf("parameter '%s' in %s component is not defined in template fields", match[1], componentType)
-						}
-					}
-				}
-			}
 			currentNumOfComponents[componentType]++
-		case "BUTTONS":
+		case "BUTTON":
+			// for _, p := range componentParameters {
+
+			// }
 			currentNumOfComponents[componentType]++
 		}
 	}
@@ -255,7 +245,7 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 		return fmt.Errorf("too many header components in the payload, maximum allowed is 1")
 	} else if currentNumOfComponents["FOOTER"] > maxNumOfComponents["FOOTER"] {
 		return fmt.Errorf("too many footer components in the payload, maximum allowed is 1")
-	} else if currentNumOfComponents["BUTTONS"] > maxNumOfComponents["BUTTONS"] {
+	} else if currentNumOfComponents["BUTTON"] > maxNumOfComponents["BUTTON"] {
 		return fmt.Errorf("too many button components in the payload, maximum allowed is 10")
 	}
 
@@ -311,15 +301,30 @@ func validateMediaID(client *whatsapp_business.Client, mediaID string, mediaType
 
 func validateParameterMatch(dbParsedParameter, sendParsedParameter map[string]map[string]string) error {
 	for componentType, parameters := range dbParsedParameter {
-		if len(parameters) != len(sendParsedParameter[componentType]) {
-			return fmt.Errorf("parameter count mismatch for component type %s: expected %d, got %d", componentType, len(parameters), len(sendParsedParameter[componentType]))
-		}
-		for paramName := range parameters {
-			if _, exists := sendParsedParameter[componentType][paramName]; !exists {
-				if mediaType, ok := strings.CutPrefix(paramName, "mediatype_db_"); ok {
-					return fmt.Errorf("missing media '%s' for %s in the payload", mediaType, componentType)
+		if componentType == "BUTTON" {
+			// check if the number of button not exceed the number of button parameter in the template
+			if len(sendParsedParameter[componentType]) > len(parameters) {
+				return fmt.Errorf("too many button parameters in the payload: expected at most %d, got %d", len(parameters), len(sendParsedParameter[componentType]))
+			}
+			// check if the button parameter in the payload is in the format of "0", "1", ..., "n"
+			for paramName := range sendParsedParameter[componentType] {
+				if index, err := strconv.Atoi(paramName); err != nil {
+					return fmt.Errorf("invalid button parameter name '%s' in the payload, expected numeric string", paramName)
+				} else if index < 0 || index >= len(parameters) {
+					return fmt.Errorf("button parameter index out of range for '%s' in the payload: expected between 0 and %d, got %d", paramName, len(parameters)-1, index)
 				}
-				return fmt.Errorf("missing parameter '%s' for %s in the payload", paramName, componentType)
+			}
+		} else {
+			if len(parameters) != len(sendParsedParameter[componentType]) {
+				return fmt.Errorf("parameter count mismatch for component type %s: expected %d, got %d", componentType, len(parameters), len(sendParsedParameter[componentType]))
+			}
+			for paramName := range parameters {
+				if _, exists := sendParsedParameter[componentType][paramName]; !exists {
+					if mediaType, ok := strings.CutPrefix(paramName, "mediatype_db_"); ok {
+						return fmt.Errorf("missing media '%s' for %s in the payload", mediaType, componentType)
+					}
+					return fmt.Errorf("missing parameter '%s' for %s in the payload", paramName, componentType)
+				}
 			}
 		}
 	}

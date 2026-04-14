@@ -103,3 +103,14 @@ type UploadFileRequest struct {
 type UploadFileResponse struct {
 	H string `json:"h"`
 }
+
+type TemplateCreateButton interface {
+	GetType() string
+	GetText() string
+	GetMap() (map[string]any, error)
+}
+
+type TemplateSendButton interface {
+	GetType() string
+	GetMap() (map[string]any, error)
+}

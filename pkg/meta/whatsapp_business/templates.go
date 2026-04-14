@@ -14,32 +14,73 @@ const (
 	endpointTemplate = "message_templates"
 )
 
-func NewTemplateSendButton(buttonData map[string]any) (any, error) {
-	if buttonData == nil {
+func NewTemplateSendButton(button any) (TemplateSendButton, error) {
+	if button == nil {
 		return nil, fmt.Errorf("button data is nil")
 	}
-	buttonType, ok := buttonData["type"].(string)
-	if !ok {
-		return nil, fmt.Errorf("button type is missing or not a string")
+	type buttonType struct {
+		Type    string `json:"type" validate:"required"`
+		SubType string `json:"sub_type" validate:"required"`
 	}
-	var buttonStruct any
+	var buttonBytes []byte
+	var err error
+	validator := utils.NewValidator()
+	if buttonMap, ok := button.(map[string]any); ok {
+		buttonBytes, err = json.Marshal(buttonMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal button map: %v", err)
+		}
+	} else if buttonStr, ok := button.(string); ok {
+		buttonBytes = []byte(buttonStr)
+	} else if buttonB, ok := button.([]byte); ok {
+		buttonBytes = buttonB
+	} else {
+		return nil, fmt.Errorf("unsupported button data type: %T", button)
+	}
+	var bt buttonType
+	if err := json.Unmarshal(buttonBytes, &bt); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal button data to get type: %v", err)
+	}
+	if err := validator.Struct(bt); err != nil {
+		return nil, fmt.Errorf("button type struct validation failed: %v", err)
+	}
+	bt.Type = strings.ToUpper(bt.Type)
+	bt.SubType = strings.ToUpper(bt.SubType)
+	var buttonStruct TemplateSendButton
+	switch bt.SubType {
+	case "QUICK_REPLY":
+		buttonStruct = &template_components.SendQuickReplyButton{}
+	default:
+		return nil, fmt.Errorf("unsupported button type: %s", bt.Type)
+	}
+	if err := json.Unmarshal(buttonBytes, &buttonStruct); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal button data into struct: %v", err)
+	}
+	if buttonStruct == nil {
+		return nil, fmt.Errorf("button struct is nil after unmarshalling")
+	}
+	if err := validator.Struct(buttonStruct); err != nil {
+		return nil, fmt.Errorf("button struct validation failed: %v", err)
+	}
+	return buttonStruct, nil
+}
+
+func NewTemplateCreateButton(buttonType string, button []byte) (TemplateCreateButton, error) {
+	buttonType = strings.ToUpper(buttonType)
+	var buttonStruct TemplateCreateButton
 	switch buttonType {
 	case "COPY_CODE":
-		buttonStruct = &template_components.CopyCodeButton{}
+		buttonStruct = &template_components.CreateCopyCodeButton{}
 	case "PHONE_NUMBER":
-		buttonStruct = &template_components.PhoneNumberButton{}
+		buttonStruct = &template_components.CreatePhoneNumberButton{}
 	case "QUICK_REPLY":
-		buttonStruct = &template_components.QuickReplyButton{}
+		buttonStruct = &template_components.CreateQuickReplyButton{}
 	case "URL":
-		buttonStruct = &template_components.URLButton{}
+		buttonStruct = &template_components.CreateURLButton{}
 	default:
 		return nil, fmt.Errorf("unsupported button type: %s", buttonType)
 	}
-	buttonBytes, err := json.Marshal(buttonData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal button data: %v", err)
-	}
-	if err := json.Unmarshal(buttonBytes, &buttonStruct); err != nil {
+	if err := json.Unmarshal(button, &buttonStruct); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal button data into struct: %v", err)
 	}
 	if buttonStruct == nil {
