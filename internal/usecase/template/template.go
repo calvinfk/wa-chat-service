@@ -14,7 +14,6 @@ import (
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	"wa_chat_service/pkg/transaction"
 	"wa_chat_service/pkg/utils"
 )
 
@@ -22,10 +21,10 @@ type TemplateUsecase struct {
 	templateRepository repository.Template
 	tenantUsecase      usecase.Tenant
 	whatsappService    service.WhatsappBusiness
-	txManager          *transaction.TxManager
+	txManager          *utils.TxManager
 }
 
-func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *transaction.TxManager) *TemplateUsecase {
+func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *utils.TxManager) *TemplateUsecase {
 	return &TemplateUsecase{
 		templateRepository: templateRepository,
 		tenantUsecase:      tenantUsecase,

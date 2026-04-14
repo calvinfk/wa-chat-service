@@ -7,6 +7,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/meta/whatsapp_business/template_components"
 	"wa_chat_service/pkg/utils"
 )
 
@@ -157,7 +158,6 @@ func (ws *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat 
 		if _, exists := parameterValues[componentType]; !exists {
 			return parameterValues, fmt.Errorf("unsupported component type: %s", componentType)
 		}
-
 		componentParametersAny, err := extractArrayField(component, "parameters")
 		if err != nil {
 			return parameterValues, fmt.Errorf("parameters field is required but missing or not an array in the payload for component type %s", componentType)
@@ -230,13 +230,23 @@ func (ws *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat 
 			if err != nil {
 				return parameterValues, fmt.Errorf("invalid button component: %v", err)
 			}
-			buttonPayload, err := buttonComponent.GetMap()
-			if err != nil {
-				return parameterValues, fmt.Errorf("failed to get button component payload: %v", err)
+			if buttonComponent.GetSubType() == "QUICK_REPLY" {
+				quickReplyButton, ok := buttonComponent.(*template_components.SendQuickReplyButton)
+				if !ok {
+					return parameterValues, fmt.Errorf("failed to assert button component as QuickReplyButton")
+				}
+				parameterValues[componentType][quickReplyButton.Index] = quickReplyButton.Parameters[0].Payload
 			}
-			parameterValues[componentType][buttonPayload["index"].(string)] = ""
 		}
 	}
 
 	return parameterValues, nil
+}
+
+func (ws *WhatsappBusiness) ParseTemplateComponentParameter(value string) string {
+	matches := templateParameterRegex.FindStringSubmatch(value)
+	if len(matches) < 2 {
+		return ""
+	}
+	return matches[1]
 }

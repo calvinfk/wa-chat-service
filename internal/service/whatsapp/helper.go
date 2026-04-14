@@ -142,8 +142,12 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 			if err != nil {
 				return nil, err
 			}
-			for i := range buttons {
-				parsedParameter["BUTTON"][fmt.Sprintf("%d", i)] = ""
+			for i, button := range buttons {
+				buttonComponent, err := whatsapp_business.NewTemplateCreateButton(button)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create button component: %v", err)
+				}
+				parsedParameter["BUTTON"][fmt.Sprintf("%s_%d", buttonComponent.GetType(), i)] = ""
 			}
 		}
 	}
@@ -175,7 +179,6 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 		if _, exists := maxNumOfComponents[componentType]; !exists {
 			return fmt.Errorf("unsupported component type: %s", componentType)
 		}
-
 		componentParametersAny, err := extractArrayField(component, "parameters")
 		if err != nil {
 			return fmt.Errorf("parameters field is required but missing or not an array in the payload for component type %s", componentType)
@@ -232,9 +235,6 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 		case "BODY", "FOOTER":
 			currentNumOfComponents[componentType]++
 		case "BUTTON":
-			// for _, p := range componentParameters {
-
-			// }
 			currentNumOfComponents[componentType]++
 		}
 	}

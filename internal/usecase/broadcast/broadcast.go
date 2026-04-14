@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/meta/whatsapp_business"
-	"wa_chat_service/pkg/transaction"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
@@ -27,10 +28,10 @@ type BroadcastUsecase struct {
 	tenantUsecase       usecase.Tenant
 	googleTaskService   service.GoogleTask
 	whatsappService     service.WhatsappBusiness
-	txManager           *transaction.TxManager
+	txManager           *utils.TxManager
 }
 
-func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *transaction.TxManager) *BroadcastUsecase {
+func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *utils.TxManager) *BroadcastUsecase {
 	return &BroadcastUsecase{
 		templateRepository:  templateRepository,
 		broadcastRepository: broadcastRepository,
@@ -59,6 +60,25 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
 		return true, err
 	}
+	broadcastID, err := uuid.NewV7()
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
+		return true, err
+	}
+	var templateDBComponents []map[string]any
+	err = json.Unmarshal([]byte(template.Components), &templateDBComponents)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template components: ", err)
+		return true, err
+	}
+	quickReplyPayload, err := u.injectQuickReplyPayload(broadcastID.String(), templateDBComponents)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to inject quick reply payload: ", err)
+		return true, err
+	}
+	for _, payload := range quickReplyPayload {
+		inputData.Components = append(inputData.Components, payload)
+	}
 	payload := make(map[string]any)
 	payload["template"] = map[string]any{
 		"name":       template.Name,
@@ -79,11 +99,6 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
 		return false, err
-	}
-	broadcastID, err := uuid.NewV7()
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
-		return true, err
 	}
 	payloadString, err := json.Marshal(templateComponent.GetPayload())
 	if err != nil {
@@ -152,6 +167,37 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 	return serverError, err
 }
 
+func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, templateDBComponents []map[string]any) ([]map[string]any, error) {
+	// broadcast_{{broadcast-id}}_{{contact-phone}}_{{text}}
+	var quickReplyPayload []map[string]any
+	for _, component := range templateDBComponents {
+		if component["type"] == "BUTTONS" {
+			for i, buttonComponent := range component["buttons"].([]any) {
+				button, err := whatsapp_business.NewTemplateCreateButton(buttonComponent)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][injectQuickReplyPayload] failed to create button component: ", err)
+					return nil, err
+				}
+				iStr := strconv.Itoa(i)
+				if button.GetType() == "QUICK_REPLY" {
+					quickReplyPayload = append(quickReplyPayload, map[string]any{
+						"type":     "button",
+						"sub_type": "QUICK_REPLY",
+						"index":    iStr,
+						"parameters": []map[string]any{{
+							"type":    "payload",
+							"payload": "broadcast_" + broadcastID + "_" + iStr + "_" + button.GetText(),
+						}},
+					})
+				}
+			}
+		}
+	}
+
+	return quickReplyPayload, nil
+
+}
+
 func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, broadcastID)
 	if err != nil {
@@ -189,7 +235,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		return true, err
 	}
 	sendComponents := make([]map[string]any, 0)
-	if components, ok := payload["template"].(map[string]any)["components"].([]interface{}); ok {
+	if components, ok := payload["template"].(map[string]any)["components"].([]any); ok {
 		for _, component := range components {
 			if componentMap, ok := component.(map[string]any); ok {
 				sendComponents = append(sendComponents, componentMap)
@@ -216,8 +262,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	replaceVariable := make(map[string]string)
 	for _, parameters := range sendParameter {
 		for _, parameterValue := range parameters {
-			parameterValue = strings.Trim(parameterValue, "{{")
-			parameterValue = strings.Trim(parameterValue, "}}")
+			parameterValue = u.whatsappService.ParseTemplateComponentParameter(parameterValue)
 			// replace if its a format from template fields
 			if field, ok := templateFields[parameterValue]; ok {
 				replaceVariable[parameterValue] = field.Field

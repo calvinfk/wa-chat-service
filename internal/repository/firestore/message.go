@@ -13,8 +13,7 @@ import (
 )
 
 type MessageRepository struct {
-	message model.Message
-	// messageLog           model.MessageLog
+	message              model.Message
 	db                   *firestore.Client
 	googleStorageService service.GoogleStorage
 }

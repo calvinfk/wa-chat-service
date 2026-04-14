@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
 	"unicode"
 )
 
@@ -10,4 +12,18 @@ func CapitalizeFirstLetter(s string) string {
 		return s
 	}
 	return string(unicode.ToUpper(rune(s[0]))) + s[1:]
+}
+
+func AnyToBytes(data any) ([]byte, error) {
+	if data == nil {
+		return nil, fmt.Errorf("data is nil")
+	}
+	if _, ok := data.(string); ok {
+		return []byte(data.(string)), nil
+	}
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data to bytes: %v", err)
+	}
+	return bytes, nil
 }

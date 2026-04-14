@@ -112,5 +112,6 @@ type TemplateCreateButton interface {
 
 type TemplateSendButton interface {
 	GetType() string
+	GetSubType() string
 	GetMap() (map[string]any, error)
 }

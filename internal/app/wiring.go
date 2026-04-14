@@ -21,7 +21,7 @@ import (
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
-	"wa_chat_service/pkg/transaction"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -34,7 +34,7 @@ type Clients struct {
 	firebaseClient   *firebase.App
 	firestoreClient  *firestore.Client
 	gcpStorageClient *storage.Client
-	txManager        *transaction.TxManager
+	txManager        *utils.TxManager
 	gcpTaskClient    *cloudtasks.Service
 }
 
@@ -104,7 +104,7 @@ func newDefaultClients(config *config.Config) Clients {
 	// if err != nil {
 	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
 	// }
-	txManager := transaction.NewTxManager(nil, firestoreClient)
+	txManager := utils.NewTxManager(nil, firestoreClient)
 	gcpTaskClient, err := cloudtasks.NewService(context.Background())
 	if err != nil {
 		panic("Failed to create Cloud Tasks client: " + err.Error())
