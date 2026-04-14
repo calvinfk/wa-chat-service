@@ -59,7 +59,8 @@ All routes are mounted under:
 
 - `POST /schedule`
 - `POST /send`
-  - Expects encrypted bearer token in `Authorization` header (parsed via JWT middleware)
+  - Accepts encrypted bearer token in `Authorization` header (parsed via JWT middleware)
+  - Endpoint returns `200` immediately and only continues async send flow when a valid `jwt_sub` is present
 
 ### Tenant Contact (`/api/v1/tenant/contact`)
 
@@ -111,7 +112,7 @@ Notes:
 - The protected guard (`/api/ping-protected` and most `/api/v1/*` routes) checks:
   - `token_error_message` request header (if provided)
   - `token_sub` context value
-- If token cookie is missing/invalid/expired, protected routes return `401 Unauthorized`.
+- If `token_sub` is missing, protected routes return `401 Unauthorized`.
 
 ## Global Middleware
 
@@ -135,8 +136,10 @@ Required variables:
 - `DATABASE_URL`
 - `AES_ENCRYPTION_KEY`
 - `GCP_PROJECT_ID`
-- `GCP_TASK_API_KEY`
-- `GCP_ATTACHMENT_BUCKET`
+- `GCP_APP_BASE_URL`
+- `GCP_TASK_BROADCAST_PARENT`
+- `JOSE_RSA_PRIVATE_KEY` (path to RSA private key file)
+- `JOSE_ACCESS_TOKEN_EXPIRY` (Go duration format, for example `24h`)
 - `CORS_ENABLED`
 
 Optional/common variables:
@@ -147,8 +150,8 @@ Optional/common variables:
 - `CORS_ALLOW_HEADERS`
 - `CORS_EXPOSE_HEADERS`
 - `CORS_ALLOW_CREDENTIALS`
-- `GCP_ATTACHMENT_LINK_EXPIRY` (seconds, `-1` to disable)
-- `GCP_ATTACHMENT_MAX_SIZE` (bytes)
+- `META_APP_ID`
+- `META_GRAPH_API_VERSION`
 - `GOOGLE_APPLICATION_CREDENTIALS` (recommended for local/dev if using ADC)
 
 ## Running Locally
@@ -189,8 +192,17 @@ At startup, the service initializes:
 
 - Firebase app
 - Firestore client
-- Firebase Messaging client
-- Firebase Storage client
 - Google Cloud Storage client
+- Google Cloud Tasks client
 
-PostgreSQL connection bootstrap is currently not active in `internal/app/app.go` (the connection code is present but commented out).
+PostgreSQL connection bootstrap is currently not active in wiring (the connection code is present but commented out).
+
+## Notes
+### Template
+-  When creating templates, if there's no parameter in the components, the `parameter_format` can be filled or left null, both are valid. If there's parameter(s) in the components, the `parameter_format` must be filled with either "NAMED" or "POSITIONAL".
+
+### Broadcast
+- Currently does not support Button for multi product message, one time password, voice call, single product message
+
+### Media
+- Resumable api is for creating template and profile picture.
