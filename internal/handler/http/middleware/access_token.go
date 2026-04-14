@@ -17,15 +17,13 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 		tokenString := ctx.Cookies("access_token", "")
 		if tokenString == "" {
 			ctx.Locals("token_error_message", "Access token is missing")
-			ctx.Next()
-			return nil
+			return ctx.Next()
 		}
 		decryptedToken, err := encryptService.Decrypt(tokenString)
 		if err != nil {
 			log.Printf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error decrypting token: %v", err)
 			ctx.Locals("token_error_message", "Invalid token")
-			ctx.Next()
-			return nil
+			return ctx.Next()
 		}
 		sub, err := accessTokenService.ParseAccessTokenSub(string(decryptedToken))
 		if err != nil {
@@ -36,11 +34,9 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 				log.Printf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error parsing token: %v", err)
 				ctx.Locals("token_error_message", "Invalid token")
 			}
-			ctx.Next()
-			return nil
+			return ctx.Next()
 		}
 		ctx.Locals("token_sub", sub)
-		ctx.Next()
-		return nil
+		return ctx.Next()
 	}
 }
