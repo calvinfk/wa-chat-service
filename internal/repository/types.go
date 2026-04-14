@@ -50,7 +50,7 @@ type (
 		GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (model.Tenant, error)
 		InsertContact(ctx context.Context, contact model.Contact) error
 		GetContactsFiltered(ctx context.Context, tenantID string, filterRequest filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], error)
-		GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]model.Contact, error)
+		GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]map[string]string, error)
 		GetContactByID(ctx context.Context, tenantID string, contactID string) (model.Contact, error)
 		UpdateContact(ctx context.Context, contact model.Contact) error
 		GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error)

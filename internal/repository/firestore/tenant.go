@@ -2,6 +2,7 @@ package repository_firestore
 
 import (
 	"context"
+	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
@@ -87,23 +88,22 @@ func (r *TenantRepository) GetContactsFiltered(ctx context.Context, tenantID str
 	return response, nil
 }
 
-func (r *TenantRepository) GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]model.Contact, error) {
+func (r *TenantRepository) GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]map[string]string, error) {
 	docs, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.contact.TableName()).Where("phone_number", "in", phoneNumbers).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}
 	// Unmarshal the documents into Contact models
-	contacts := make(map[string]model.Contact)
+	contacts := make(map[string]map[string]string)
 	for _, doc := range docs {
-		var contact model.Contact
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
-		err = utils.MapToStruct(docData, &contact)
-		if err != nil {
-			return nil, err
+		docDataCopy := make(map[string]string)
+		for key, value := range docData {
+			docDataCopy[key] = fmt.Sprintf("%v", value)
 		}
-		contacts[contact.PhoneNumber] = contact
+		contacts[docDataCopy["phone_number"]] = docDataCopy
 	}
 	return contacts, nil
 }

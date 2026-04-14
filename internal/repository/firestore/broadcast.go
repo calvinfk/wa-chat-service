@@ -32,14 +32,14 @@ func (r *BroadcastRepository) Insert(ctx context.Context, tx *firestore.Transact
 func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (model.Broadcast, error) {
 	docRef, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Get(ctx)
 	if err != nil {
-		return model.Broadcast{}, err
+		return r.broadcast, err
 	}
 	var broadcast model.Broadcast
 	docData := docRef.Data()
 	docData[firestore.DocumentID] = docRef.Ref.ID
 	err = utils.MapToStruct(docData, &broadcast)
 	if err != nil {
-		return model.Broadcast{}, err
+		return r.broadcast, err
 	}
 	return broadcast, nil
 }

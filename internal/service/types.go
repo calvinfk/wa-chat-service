@@ -78,6 +78,7 @@ type (
 		DeleteMedia(client *whatsapp_business.Client, mediaID string) (int, error)
 		CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error)
 		ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent, templateFields map[string]model.TemplateField) error
+		ExtractSendComponentParameterValues(parameterFormat string, sendComponents []map[string]any) (map[string]map[string]string, error)
 	}
 
 	GoogleTask interface {
