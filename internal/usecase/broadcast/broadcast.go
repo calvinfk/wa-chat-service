@@ -3,6 +3,7 @@ package broadcast_usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -54,27 +55,33 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
 		return false, nil
 	}
-	broadcast.Status = string(dto.BroadcastScheduleScheduled)
-	if inputData.SendAt != nil {
-		broadcast.SendAt = *inputData.SendAt
-	} else if broadcast.SendAt.IsZero() || broadcast.SendAt.Before(time.Now()) {
-		broadcast.SendAt = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided or send_at is in the past
-	}
-	err = u.broadcastRepository.Update(ctx, nil, broadcast)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast status: ", err)
-		return true, err
-	}
 	template, err := u.templateRepository.GetByID(ctx, broadcast.TenantID, broadcast.TemplateID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
 		return true, err
 	}
-	serverError, err := u.createScheduleBroadcastTask(ctx, broadcast, template)
+	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, tx *firestore.Transaction) (bool, error) {
+		broadcast.Status = string(dto.BroadcastScheduleScheduled)
+		if inputData.SendAt != nil {
+			broadcast.SendAt = *inputData.SendAt
+		} else if broadcast.SendAt.IsZero() || broadcast.SendAt.Before(time.Now()) {
+			broadcast.SendAt = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided or send_at is in the past
+		}
+		err = u.broadcastRepository.Update(ctx, tx, broadcast)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast status: ", err)
+			return true, err
+		}
+		serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
+		if err != nil {
+			return serverError, err
+		}
+		return false, nil
+	})
 	return serverError, err
 }
 
-func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, broadcast model.Broadcast, template model.Template) (bool, error) {
+func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast, template model.Template) (bool, error) {
 	var broadcastPayload map[string]any
 	err := json.Unmarshal([]byte(broadcast.Payload), &broadcastPayload)
 	if err != nil {
@@ -113,7 +120,7 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, broa
 		return true, err
 	}
 	broadcast.Payload = string(payloadBytes)
-	err = u.broadcastRepository.Update(ctx, nil, broadcast)
+	err = u.broadcastRepository.Update(ctx, tx, broadcast)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast with quick reply payload: ", err)
 		return true, err
@@ -141,7 +148,7 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, broa
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		err = u.broadcastRepository.InsertRecipient(ctx, nil, broadcastRecipient)
+		err = u.broadcastRepository.InsertRecipient(ctx, tx, broadcastRecipient)
 		if err != nil {
 			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast recipient: ", err)
 			return true, err
@@ -157,7 +164,20 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, broa
 }
 
 func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error) {
+	var err error
+	var broadcast model.Broadcast
 	var emptyResponse dto.BroadcastResponse
+	if inputData.ID != nil {
+		broadcast, err = u.broadcastRepository.GetByID(ctx, *inputData.ID)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get broadcast by ID: ", err)
+			return emptyResponse, true, err
+		}
+		if broadcast.Status != string(dto.BroadcastScheduleDraft) {
+			log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
+			return emptyResponse, false, fmt.Errorf("broadcast currently in %s status, only broadcast in draft status can be updated", broadcast.Status)
+		}
+	}
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
@@ -199,47 +219,49 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
 		return emptyResponse, true, err
 	}
-	var broadcast model.Broadcast
-	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
-		var sendingTime time.Time
-		if inputData.SendAt == nil {
-			sendingTime = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided
-		} else {
-			sendingTime = *inputData.SendAt
+	var sendingTime time.Time
+	if inputData.SendAt == nil {
+		sendingTime = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided
+	} else {
+		sendingTime = *inputData.SendAt
+	}
+	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, tx *firestore.Transaction) (bool, error) {
+		if inputData.ID == nil {
+			broadcast = model.Broadcast{
+				DocumentID:      broadcastID.String(),
+				TenantID:        tenantID,
+				ParameterFormat: template.ParameterFormat,
+				CreatedBy:       inputData.PhoneNumberID,
+				CreatedAt:       time.Now(),
+			}
 		}
-		broadcast = model.Broadcast{
-			DocumentID:      broadcastID.String(),
-			Name:            inputData.Name,
-			TemplateID:      inputData.TemplateID,
-			TenantID:        tenantID,
-			RecipientIDs:    inputData.Recipients,
-			PhoneNumberID:   inputData.PhoneNumberID,
-			ParameterFormat: template.ParameterFormat,
-			Payload:         string(payloadString),
-			Status:          inputData.Status,
-			SendAt:          sendingTime,
-			CreatedBy:       inputData.PhoneNumberID,
-			CreatedAt:       time.Now(),
-			UpdatedAt:       time.Now(),
-		}
-		err = u.broadcastRepository.Insert(ctx, txFirestore, broadcast)
+		broadcast.Name = inputData.Name
+		broadcast.TemplateID = inputData.TemplateID
+		broadcast.RecipientIDs = inputData.Recipients
+		broadcast.PhoneNumberID = inputData.PhoneNumberID
+		broadcast.Payload = string(payloadString)
+		broadcast.Status = inputData.Status
+		broadcast.SendAt = sendingTime
+		broadcast.UpdatedAt = time.Now()
+		err = u.broadcastRepository.Insert(ctx, tx, broadcast)
 		if err != nil {
 			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast: ", err)
 			return true, err
+		}
+		if broadcast.Status == string(dto.BroadcastScheduleScheduled) {
+			serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to schedule broadcast: ", err)
+				broadcast.Status = string(dto.BroadcastScheduleDraft)
+				return serverError, err
+			}
 		}
 		return false, nil
 	})
 	if err != nil {
 		return emptyResponse, serverError, err
 	}
-	if broadcast.Status == string(dto.BroadcastScheduleScheduled) {
-		serverError, err := u.createScheduleBroadcastTask(ctx, broadcast, template)
-		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to schedule broadcast: ", err)
-			return emptyResponse, serverError, err
-		}
-	}
-	return dto.BroadcastResponse{}.FromModel(broadcast), serverError, err
+	return dto.BroadcastResponse{}.FromModel(broadcast), false, err
 }
 
 func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template model.Template) ([]map[string]any, error) {
