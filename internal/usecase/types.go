@@ -52,6 +52,7 @@ type (
 	Broadcast interface {
 		ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error)
 		SendBroadcast(ctx context.Context, broadcastID string) (bool, error)
+		UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error)
 	}
 
 	Auth interface {

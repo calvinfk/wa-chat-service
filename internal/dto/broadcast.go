@@ -1,21 +1,46 @@
 package dto
 
-import "time"
+import (
+	"time"
+	"wa_chat_service/internal/model"
+)
 
 type (
-	BroadcastScheduleRequest struct {
+	BroadcastUpsertRequest struct {
+		ID            *string          `query:"id,omitempty"`
 		PhoneNumberID string           `json:"phone_number_id" validate:"required"`
 		TemplateID    string           `json:"template_id" validate:"required"`
 		Name          string           `json:"name" validate:"required"`
 		SendAt        *time.Time       `json:"send_at" validate:"omitempty,gt"`
+		Status        string           `json:"status" validate:"required,oneof=draft scheduled"`
 		Recipients    []string         `json:"recipients" validate:"required,min=1,dive,required"`
 		Components    []map[string]any `json:"components" validate:"required,min=1,dive"`
+	}
+
+	BroadcastResponse struct {
+		ID              string    `json:"id"` // uuid v7
+		Name            string    `json:"name"`
+		TemplateID      string    `json:"template_id"`
+		PhoneNumberID   string    `json:"phone_number_id"`
+		ParameterFormat *string   `json:"parameter_format"`
+		Payload         string    `json:"payload"` // raw json string of template
+		Status          string    `json:"status"`  // scheduled, sent, cancelled
+		SendAt          time.Time `json:"send_at"`
+		CreatedBy       string    `json:"created_by"`
+		CreatedAt       time.Time `json:"created_at"`
+		UpdatedAt       time.Time `json:"updated_at"`
+	}
+
+	BroadcastScheduleRequest struct {
+		ID     string     `query:"id" validate:"required"`
+		SendAt *time.Time `json:"send_at" validate:"omitempty,gt"` // if empty or null, will be sent as soon as possible
 	}
 )
 
 type BroadcastScheduleStatus string
 
 const (
+	BroadcastScheduleDraft           BroadcastScheduleStatus = "draft"
 	BroadcastScheduleFailed          BroadcastScheduleStatus = "failed"
 	BroadcastScheduleFailedPartially BroadcastScheduleStatus = "failed_partially"
 	BroadcastScheduleCancelled       BroadcastScheduleStatus = "cancelled"
@@ -23,3 +48,19 @@ const (
 	BroadcastScheduleSending         BroadcastScheduleStatus = "sending"
 	BroadcastScheduleScheduled       BroadcastScheduleStatus = "scheduled"
 )
+
+func (BroadcastResponse) FromModel(data model.Broadcast) BroadcastResponse {
+	return BroadcastResponse{
+		ID:              data.DocumentID,
+		Name:            data.Name,
+		TemplateID:      data.TemplateID,
+		PhoneNumberID:   data.PhoneNumberID,
+		ParameterFormat: data.ParameterFormat,
+		Payload:         data.Payload,
+		Status:          data.Status,
+		SendAt:          data.SendAt,
+		CreatedBy:       data.CreatedBy,
+		CreatedAt:       data.CreatedAt,
+		UpdatedAt:       data.UpdatedAt,
+	}
+}

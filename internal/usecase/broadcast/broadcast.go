@@ -45,39 +45,133 @@ func NewBroadcastUsecase(templateRepository repository.Template, broadcastReposi
 }
 
 func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error) {
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get broadcast by ID: ", err)
 		return true, err
 	}
-	template, err := u.templateRepository.GetByID(ctx, tenantID, inputData.TemplateID)
+	if broadcast.Status != string(dto.BroadcastScheduleDraft) {
+		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
+		return false, nil
+	}
+	broadcast.Status = string(dto.BroadcastScheduleScheduled)
+	if inputData.SendAt != nil {
+		broadcast.SendAt = *inputData.SendAt
+	} else if broadcast.SendAt.IsZero() || broadcast.SendAt.Before(time.Now()) {
+		broadcast.SendAt = time.Now().Add(time.Second * 10) // default to 10 seconds later if send_at is not provided or send_at is in the past
+	}
+	err = u.broadcastRepository.Update(ctx, nil, broadcast)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast status: ", err)
+		return true, err
+	}
+	template, err := u.templateRepository.GetByID(ctx, broadcast.TenantID, broadcast.TemplateID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
 		return true, err
 	}
-	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, inputData.Recipients)
+	serverError, err := u.createScheduleBroadcastTask(ctx, broadcast, template)
+	return serverError, err
+}
+
+func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, broadcast model.Broadcast, template model.Template) (bool, error) {
+	var broadcastPayload map[string]any
+	err := json.Unmarshal([]byte(broadcast.Payload), &broadcastPayload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to unmarshal template components: ", err)
 		return true, err
 	}
-	broadcastID, err := uuid.NewV7()
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
+	templateSend, ok := broadcastPayload["template"].(map[string]any)
+	if !ok {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to parse template payload: ", err)
 		return true, err
 	}
-	var templateDBComponents []map[string]any
-	err = json.Unmarshal([]byte(template.Components), &templateDBComponents)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template components: ", err)
+	var templateSendComponents []map[string]any
+	if components, ok := templateSend["components"].([]any); ok {
+		for _, component := range components {
+			if componentMap, ok := component.(map[string]any); ok {
+				templateSendComponents = append(templateSendComponents, componentMap)
+			}
+		}
+	} else {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to parse template payload components: ", err)
 		return true, err
 	}
-	quickReplyPayload, err := u.injectQuickReplyPayload(broadcastID.String(), templateDBComponents)
+	quickReplyPayload, err := u.injectQuickReplyPayload(broadcast.DocumentID, template)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to inject quick reply payload: ", err)
 		return true, err
 	}
 	for _, payload := range quickReplyPayload {
-		inputData.Components = append(inputData.Components, payload)
+		templateSendComponents = append(templateSendComponents, payload)
+	}
+	templateSend["components"] = templateSendComponents
+	broadcastPayload["template"] = templateSend
+	payloadBytes, err := json.Marshal(broadcastPayload)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal broadcast payload with quick reply: ", err)
+		return true, err
+	}
+	broadcast.Payload = string(payloadBytes)
+	err = u.broadcastRepository.Update(ctx, nil, broadcast)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast with quick reply payload: ", err)
+		return true, err
+	}
+
+	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, broadcast.TenantID, broadcast.RecipientIDs)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
+		return true, err
+	}
+	for _, recipient := range broadcast.RecipientIDs {
+		var recipientName string
+		contact, exists := phoneNumbers[recipient]
+		if exists {
+			recipientName = contact["name"]
+		} else {
+			recipientName = recipient
+		}
+		broadcastRecipient := model.BroadcastRecipient{
+			DocumentID:    uuid.NewString(),
+			BroadcastID:   broadcast.DocumentID,
+			RecipientID:   recipient,
+			RecipientName: recipientName,
+			RecipientType: "individual", // TODO: support group recipient type
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		err = u.broadcastRepository.InsertRecipient(ctx, nil, broadcastRecipient)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast recipient: ", err)
+			return true, err
+		}
+	}
+
+	err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, broadcast.SendAt)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)
+		return true, err
+	}
+	return false, nil
+}
+
+func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error) {
+	var emptyResponse dto.BroadcastResponse
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
+		return emptyResponse, true, err
+	}
+	template, err := u.templateRepository.GetByID(ctx, tenantID, inputData.TemplateID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
+		return emptyResponse, true, err
+	}
+	broadcastID, err := uuid.NewV7()
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
+		return emptyResponse, true, err
 	}
 	payload := make(map[string]any)
 	payload["template"] = map[string]any{
@@ -88,23 +182,24 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
-		return true, err
+		return emptyResponse, true, err
 	}
 	templateComponent, err := whatsapp_business.NewTemplateComponent(payloadBytes)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create template component: ", err)
-		return true, err
+		return emptyResponse, true, err
 	}
 	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
-		return false, err
+		return emptyResponse, true, err
 	}
 	payloadString, err := json.Marshal(templateComponent.GetPayload())
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
-		return true, err
+		return emptyResponse, true, err
 	}
+	var broadcast model.Broadcast
 	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
 		var sendingTime time.Time
 		if inputData.SendAt == nil {
@@ -112,14 +207,16 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		} else {
 			sendingTime = *inputData.SendAt
 		}
-		broadcast := model.Broadcast{
+		broadcast = model.Broadcast{
 			DocumentID:      broadcastID.String(),
 			Name:            inputData.Name,
 			TemplateID:      inputData.TemplateID,
+			TenantID:        tenantID,
+			RecipientIDs:    inputData.Recipients,
 			PhoneNumberID:   inputData.PhoneNumberID,
 			ParameterFormat: template.ParameterFormat,
 			Payload:         string(payloadString),
-			Status:          string(dto.BroadcastScheduleScheduled),
+			Status:          inputData.Status,
 			SendAt:          sendingTime,
 			CreatedBy:       inputData.PhoneNumberID,
 			CreatedAt:       time.Now(),
@@ -130,44 +227,28 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast: ", err)
 			return true, err
 		}
-		for _, recipient := range inputData.Recipients {
-			var recipientName string
-			contact, exists := phoneNumbers[recipient]
-			if exists {
-				recipientName = contact["name"]
-			} else {
-				recipientName = recipient
-			}
-			broadcastRecipient := model.BroadcastRecipient{
-				DocumentID:    uuid.NewString(),
-				BroadcastID:   broadcast.DocumentID,
-				RecipientID:   recipient,
-				RecipientName: recipientName,
-				RecipientType: "individual", // TODO: support group recipient type
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
-			}
-			err = u.broadcastRepository.InsertRecipient(ctx, txFirestore, broadcastRecipient)
-			if err != nil {
-				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast recipient: ", err)
-				return true, err
-			}
-		}
-		// err = fmt.Errorf("testing")
-		// if err != nil {
-		// 	return false, err
-		// }
-		err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, sendingTime)
-		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)
-			return true, err
-		}
 		return false, nil
 	})
-	return serverError, err
+	if err != nil {
+		return emptyResponse, serverError, err
+	}
+	if broadcast.Status == string(dto.BroadcastScheduleScheduled) {
+		serverError, err := u.createScheduleBroadcastTask(ctx, broadcast, template)
+		if err != nil {
+			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to schedule broadcast: ", err)
+			return emptyResponse, serverError, err
+		}
+	}
+	return dto.BroadcastResponse{}.FromModel(broadcast), serverError, err
 }
 
-func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, templateDBComponents []map[string]any) ([]map[string]any, error) {
+func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template model.Template) ([]map[string]any, error) {
+	var templateDBComponents []map[string]any
+	err := json.Unmarshal([]byte(template.Components), &templateDBComponents)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template components: ", err)
+		return nil, err
+	}
 	// broadcast_{{broadcast-id}}_{{contact-phone}}_{{text}}
 	var quickReplyPayload []map[string]any
 	for _, component := range templateDBComponents {

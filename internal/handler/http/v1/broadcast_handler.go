@@ -29,9 +29,21 @@ func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService serv
 func (h *BroadcastHandler) RegisterRoute(api fiber.Router) {
 	broadcastRoute := api.Group("/broadcast")
 	{
+		broadcastRoute.Post("/upsert", middleware.Protected(), h.upsertBroadcast)
 		broadcastRoute.Post("/schedule", middleware.Protected(), h.scheduleBroadcast)
 		broadcastRoute.Post("/send", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true), h.sendBroadcast)
 	}
+}
+
+func (h *BroadcastHandler) upsertBroadcast(ctx fiber.Ctx) error {
+	var inputData dto.BroadcastUpsertRequest
+	if err := ctx.Bind().All(&inputData); err != nil {
+		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	data, serverError, err := h.broadcastUsecase.UpsertBroadcast(ctx.Context(), inputData)
+	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully insert/update broadcast", data)
+	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
 func (h *BroadcastHandler) scheduleBroadcast(ctx fiber.Ctx) error {
@@ -40,9 +52,8 @@ func (h *BroadcastHandler) scheduleBroadcast(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-
 	serverError, err := h.broadcastUsecase.ScheduleBroadcast(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully scheduled broadcast", nil)
+	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully schedule broadcast", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
