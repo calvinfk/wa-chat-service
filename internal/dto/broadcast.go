@@ -23,6 +23,7 @@ type (
 		Name            string    `json:"name"`
 		TemplateID      string    `json:"template_id"`
 		PhoneNumberID   string    `json:"phone_number_id"`
+		RecipientIDs    []string  `json:"recipient_ids"`
 		ParameterFormat *string   `json:"parameter_format"`
 		Payload         string    `json:"payload"` // raw json string of template
 		Status          string    `json:"status"`  // scheduled, sent, cancelled
@@ -82,6 +83,7 @@ func (BroadcastResponse) FromModel(data model.Broadcast) BroadcastResponse {
 		ID:              data.DocumentID,
 		Name:            data.Name,
 		TemplateID:      data.TemplateID,
+		RecipientIDs:    data.RecipientIDs,
 		PhoneNumberID:   data.PhoneNumberID,
 		ParameterFormat: data.ParameterFormat,
 		Payload:         data.Payload,
