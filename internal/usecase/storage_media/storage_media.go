@@ -115,7 +115,11 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 	if media.URL == nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Media URL is nil")
 		return response, true, fmt.Errorf("media URL is nil")
+	} else if !media.IsURLFromStorage {
+		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Media URL is not from storage, cannot be accessed")
+		return response, true, fmt.Errorf("media URL is not from storage, cannot be accessed")
 	}
+
 	rc, attrs, err := u.googleStorageService.GetFile(ctx, *media.URL)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/storage_media/storage_media.go][GetMedia] Failed to get file from Google Cloud Storage:", err)

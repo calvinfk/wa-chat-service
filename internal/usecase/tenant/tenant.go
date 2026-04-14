@@ -2,6 +2,7 @@ package tenant_usecase
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 	"wa_chat_service/internal/dto"
@@ -47,6 +48,15 @@ func (u *TenantUsecase) CreateContact(ctx context.Context, inputData dto.Contact
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][CreateContact] Failed to get tenant by ID:", err)
 		return true, err
 	}
+	contacts, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenant.DocumentID, []string{inputData.PhoneNumber})
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/tenant/tenant.go][CreateContact] Failed to get contacts by phone number:", err)
+		return true, err
+	}
+	if contacts != nil {
+		log.Println("[ERROR][internal/usecase/tenant/tenant.go][CreateContact] Contact with the same phone number already exists")
+		return false, fmt.Errorf("contact with the same phone number already exists")
+	}
 	contactID, err := uuid.NewV7()
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][CreateContact] Failed to generate contact ID:", err)
@@ -88,7 +98,15 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.Contact
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Failed to get tenant by ID:", err)
 		return true, err
 	}
-	// TODO: check if contact is duplicate
+	contacts, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenant.DocumentID, []string{inputData.PhoneNumber})
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Failed to get contacts by phone number:", err)
+		return true, err
+	}
+	if contacts != nil && contacts[inputData.PhoneNumber]["__name__"] != inputData.ID {
+		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Contact with the same phone number already exists")
+		return true, fmt.Errorf("contact with the same phone number already exists")
+	}
 	contact, err := u.tenantRepository.GetContactByID(ctx, tenant.DocumentID, inputData.ID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Failed to get contact by ID:", err)

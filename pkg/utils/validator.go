@@ -84,8 +84,6 @@ func NewValidator() *validator.Validate {
 			return slices.Contains(allowedOptions, value)
 		}
 	})
-	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
-	// TODO: check if from google storage, check the extension is allowed
 	return v
 }
 

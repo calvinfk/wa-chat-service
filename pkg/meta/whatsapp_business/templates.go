@@ -177,7 +177,6 @@ func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateR
 		return TemplateCreateResponse{}, 0, err
 	}
 	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
-	// TODO: validate payload before sending request
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
 	if err != nil {
 		return TemplateCreateResponse{}, httpCode, err

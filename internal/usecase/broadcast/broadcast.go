@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -412,14 +414,25 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		Recipient model.BroadcastRecipient
 	}
 
-	successCount := 0
-	// limit to 100 message per second
-	// TODO: consider to make the worker pool size configurable based on tenant's whatsapp message sending limit and use dynamic worker pool size to optimize the sending process
-	workers := make(chan broadcastSend, 100)
-	wg := sync.WaitGroup{}
-	mu := sync.Mutex{}
+	var hasError atomic.Bool
+	var hasSuccess atomic.Bool
+	// limit to log(n) workers with max of 100 workers
+	workerSize := int(math.Max(1, math.Min(math.Log(float64(len(broadcastRecipients))), 100)))
+	workers := make(chan broadcastSend, workerSize)
+	recipientStatusUpdates := make(chan model.BroadcastRecipient, workerSize)
+	workerWg := sync.WaitGroup{}
+	statusWg := sync.WaitGroup{}
+	statusWg.Go(func() {
+		for recipient := range recipientStatusUpdates {
+			err := u.broadcastRepository.UpdateRecipientStatus(ctx, nil, recipient)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update recipient status: ", err)
+			}
+		}
+	})
+	// TODO: consider to implement retry mechanism for failed messages
 	for i := 0; i < cap(workers); i++ {
-		wg.Go(func() {
+		workerWg.Go(func() {
 			for req := range workers {
 				payloadMap := make(map[string]any)
 				err := json.Unmarshal([]byte(req.Broadcast.Payload), &payloadMap)
@@ -441,29 +454,67 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 					errStr := err.Error()
 					req.Recipient.Status = string(dto.BroadcastScheduleFailed)
 					req.Recipient.Errors = &errStr
+					hasError.Store(true)
 				} else {
 					req.Recipient.Status = string(dto.BroadcastScheduleSuccess)
-					mu.Lock()
-					successCount++
-					mu.Unlock()
+					req.Recipient.Errors = nil
+					hasSuccess.Store(true)
 				}
 				req.Recipient.UpdatedAt = time.Now()
-				err = u.broadcastRepository.UpdateRecipientStatus(ctx, nil, req.Recipient)
-				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast recipient status: ", err)
-				}
+				recipientStatusUpdates <- req.Recipient
 				time.Sleep(time.Second * 1) // add delay between sending messages to avoid hitting rate limits
 			}
 		})
 	}
-
-	// TODO: consider to use pubsub to handle sending messages in case the number of recipients is too large and might cause memory issue if we load all recipients into memory at once. For now we assume the number of recipients is manageable and can be loaded into memory.
-	// TODO: consider to implement retry mechanism for failed messages
-	// TODO: change only the components that have parameters instead of replacing the whole payload to avoid potential issue of replacing non-parameter value that has the same value as parameter format
 	for _, recipient := range broadcastRecipients {
 		broadcastCopy := broadcast
+		var errStr string
 		for key, value := range replaceVariable {
-			broadcastCopy.Payload = strings.ReplaceAll(broadcastCopy.Payload, "{{"+key+"}}", contacts[recipient.RecipientID][value])
+			broadcastPayload := make(map[string]any)
+			err := json.Unmarshal([]byte(broadcastCopy.Payload), &broadcastPayload)
+			if err != nil {
+				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast payload for recipient: ", err)
+				errStr = err.Error()
+				break
+			}
+			if templatePayload, ok := broadcastPayload["template"].(map[string]any); ok {
+				componentsBytes, err := json.Marshal(templatePayload["components"])
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to marshal broadcast components for recipient: ", err)
+					errStr = err.Error()
+					break
+				}
+				componentsStr := string(componentsBytes)
+				componentsStr = strings.ReplaceAll(componentsStr, "{{"+key+"}}", contacts[recipient.RecipientID][value])
+				var components []map[string]any
+				err = json.Unmarshal([]byte(componentsStr), &components)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast components after replacement for recipient: ", err)
+					errStr = err.Error()
+					break
+				}
+				templatePayload["components"] = components
+				broadcastPayload["template"] = templatePayload
+				payloadBytes, err := json.Marshal(broadcastPayload)
+				if err != nil {
+					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to marshal broadcast payload after replacement for recipient: ", err)
+					errStr = err.Error()
+					break
+				}
+				broadcastCopy.Payload = string(payloadBytes)
+			} else {
+				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to parse broadcast payload for recipient: ", err)
+				errStr = "failed to parse broadcast payload for recipient"
+				break
+			}
+		}
+		if errStr != "" {
+			recipient.Status = string(dto.BroadcastScheduleFailed)
+			recipient.Errors = &errStr
+			recipient.UpdatedAt = time.Now()
+			hasError.Store(true)
+			recipientStatusUpdates <- recipient
+			continue
 		}
 		workers <- broadcastSend{
 			Broadcast: broadcastCopy,
@@ -471,13 +522,17 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		}
 	}
 	close(workers)
-	wg.Wait()
-	if successCount == len(broadcastRecipients) {
-		finalStatus = dto.BroadcastScheduleSuccess
-	} else if successCount == 0 {
-		finalStatus = dto.BroadcastScheduleFailed
+	workerWg.Wait()
+	close(recipientStatusUpdates)
+	statusWg.Wait()
+	if hasError.Load() {
+		if hasSuccess.Load() {
+			finalStatus = dto.BroadcastScheduleFailedPartially
+		} else {
+			finalStatus = dto.BroadcastScheduleFailed
+		}
 	} else {
-		finalStatus = dto.BroadcastScheduleFailedPartially
+		finalStatus = dto.BroadcastScheduleSuccess
 	}
 	return false, nil
 }

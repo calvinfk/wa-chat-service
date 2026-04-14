@@ -92,7 +92,6 @@ func InitializeFilter[T Validatable](filterRequest FilterRequest[T], allowedFilt
 	if !sortFieldMap[sort.SortBy] {
 		return nil, filterRequest.Sort, filterRequest.Paginate, fmt.Errorf("invalid sort_by field: %s", sort.SortBy)
 	}
-	// TODO: implement get all
 	if paginate.Page <= 0 {
 		paginate.Page = DEFAULT_PAGE
 	}
