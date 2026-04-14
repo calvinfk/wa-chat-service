@@ -4,6 +4,7 @@ import (
 	"mime/multipart"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -53,7 +54,6 @@ func NewValidator() *validator.Validate {
 		min, _ := strconv.Atoi(fl.Param())
 		return len(files) >= min
 	})
-
 	v.RegisterValidation("max_files", func(fl validator.FieldLevel) bool {
 		files, ok := fl.Field().Interface().([]*multipart.FileHeader)
 		if !ok {
@@ -61,6 +61,28 @@ func NewValidator() *validator.Validate {
 		}
 		max, _ := strconv.Atoi(fl.Param())
 		return len(files) <= max
+	})
+	v.RegisterValidation("filter_options", func(fl validator.FieldLevel) bool {
+		if fl.Field().Kind() != reflect.String {
+			return false
+		}
+		value := fl.Field().String()
+		valueParts := strings.SplitN(value, ":", 2)
+		if len(valueParts) == 2 {
+			value = valueParts[1]
+		}
+		param := fl.Param()
+		allowedOptions := strings.Split(param, " ")
+		if valueParts[0] == "in" {
+			for option := range strings.SplitSeq(valueParts[1], ",") {
+				if !slices.Contains(allowedOptions, option) {
+					return false
+				}
+			}
+			return true
+		} else {
+			return slices.Contains(allowedOptions, value)
+		}
 	})
 	// TODO: Add validator if link is expired or not valid anymore (e.g., for media links)
 	// TODO: check if from google storage, check the extension is allowed

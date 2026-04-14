@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/utils"
 )
 
 type (
@@ -35,6 +36,16 @@ type (
 		ID     string     `query:"id" validate:"required"`
 		SendAt *time.Time `json:"send_at" validate:"omitempty,gt"` // if empty or null, will be sent as soon as possible
 	}
+
+	BroadcastCancelRequest struct {
+		ID string `query:"id" validate:"required"`
+	}
+
+	BroadcastGetFilteredRequest struct {
+		PhoneNumberID string  `json:"-" query:"phone_number_id" validate:"required"`
+		TenantID      string  `json:"-"`
+		Status        *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
+	}
 )
 
 type BroadcastScheduleStatus string
@@ -63,4 +74,12 @@ func (BroadcastResponse) FromModel(data model.Broadcast) BroadcastResponse {
 		CreatedAt:       data.CreatedAt,
 		UpdatedAt:       data.UpdatedAt,
 	}
+}
+
+func (r BroadcastGetFilteredRequest) Validate() map[string]string {
+	validator := utils.NewValidator()
+	if err := validator.Struct(r); err != nil {
+		return utils.GetValidatorErrorMessages(err)
+	}
+	return nil
 }

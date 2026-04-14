@@ -53,6 +53,8 @@ type (
 		ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error)
 		SendBroadcast(ctx context.Context, broadcastID string) (bool, error)
 		UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error)
+		CancelBroadcast(ctx context.Context, inputData dto.BroadcastCancelRequest) (bool, error)
+		GetFilteredBroadcast(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error)
 	}
 
 	Auth interface {

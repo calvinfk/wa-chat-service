@@ -14,6 +14,7 @@ import (
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
+	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
 
@@ -481,17 +482,17 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	return false, nil
 }
 
-func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, broadcastID string) (bool, error) {
-	broadcast, err := u.broadcastRepository.GetByID(ctx, broadcastID)
+func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, inputData dto.BroadcastCancelRequest) (bool, error) {
+	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][CancelBroadcast] failed to get broadcast by ID: ", err)
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", broadcastID)
-		return false, nil
+		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
+		return false, fmt.Errorf("broadcast currently in %s status, only broadcast in scheduled status can be cancelled", broadcast.Status)
 	}
-	err = u.googleTaskService.DeleteBroadcastTask(broadcastID)
+	err = u.googleTaskService.DeleteBroadcastTask(inputData.ID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][CancelBroadcast] failed to delete broadcast task: ", err)
 		return true, err
@@ -504,4 +505,20 @@ func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, broadcastID stri
 		return true, err
 	}
 	return false, nil
+}
+
+func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error) {
+	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
+	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, inputData.SpecificFilter.PhoneNumberID)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcast] failed to get tenant by phone number ID: ", err)
+		return emptyResponse, true, err
+	}
+	inputData.SpecificFilter.TenantID = tenant.DocumentID
+	broadcasts, err := u.broadcastRepository.GetFiltered(ctx, inputData)
+	if err != nil {
+		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcast] failed to get filtered broadcasts: ", err)
+		return emptyResponse, true, err
+	}
+	return broadcasts, false, nil
 }

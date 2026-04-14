@@ -50,6 +50,8 @@ func ParseOperator(opStr string) (Operator, error) {
 		op = OpLike
 	case "ilike":
 		op = OpIlike
+	case "in":
+		op = OpIn
 	}
 	if op == "" {
 		return "", ErrInvalidOperator
@@ -71,7 +73,8 @@ func parseFilterValue(value string) (Operator, any, error) {
 	// If the operator is "in", we need to split the value into a slice of values
 	if op == OpIn {
 		cleanStr := strings.TrimSpace(parts[1])
-		cleanStr = strings.Trim(cleanStr, "[]")
+		cleanStr = strings.TrimPrefix(cleanStr, "[")
+		cleanStr = strings.TrimSuffix(cleanStr, "]")
 		val = strings.Split(cleanStr, ",")
 	}
 	return op, val, nil
@@ -91,6 +94,8 @@ func parseOperatorToFirestoreCondition(op Operator) string {
 		return "<"
 	case OpLte:
 		return "<="
+	case OpIn:
+		return "in"
 	default:
 		return ""
 	}

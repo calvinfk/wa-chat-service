@@ -8,7 +8,7 @@ import (
 
 func Protected() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		if tokenErrorMessage := ctx.Get("token_error_message"); tokenErrorMessage != "" {
+		if tokenErrorMessage := ctx.Locals("token_error_message"); tokenErrorMessage != nil {
 			ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
 				"code":    http.StatusUnauthorized,
 				"message": tokenErrorMessage,
@@ -16,7 +16,7 @@ func Protected() fiber.Handler {
 				"errors":  nil,
 			})
 			return nil
-		} else if sub := ctx.Locals("token_sub"); sub == "" {
+		} else if sub := ctx.Locals("token_sub"); sub == nil {
 			ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
 				"code":    http.StatusUnauthorized,
 				"message": "Unauthorized",

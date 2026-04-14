@@ -23,3 +23,11 @@ type (
 func (b Broadcast) TableName() string {
 	return "broadcasts"
 }
+
+func (b Broadcast) AllowedFilterFields() []string {
+	return []string{"name", "template_id", "phone_number_id", "status", "created_by", "created_at", "updated_at"}
+}
+
+func (b Broadcast) AllowedSortFields() []string {
+	return []string{"name", "template_id", "phone_number_id", "status", "created_by", "created_at", "updated_at"}
+}

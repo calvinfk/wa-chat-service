@@ -2,7 +2,9 @@ package repository_firestore
 
 import (
 	"context"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
@@ -113,4 +115,31 @@ func (r *BroadcastRepository) UpdateRecipientStatus(ctx context.Context, tx *fir
 			})
 		return err
 	}
+}
+
+func (r *BroadcastRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error) {
+	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
+	query := r.db.Collection(r.broadcast.TableName()).Query.Where("tenant_id", "==", inputData.SpecificFilter.TenantID)
+	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.broadcast.AllowedFilterFields(), r.broadcast.AllowedSortFields())
+	if err != nil {
+		return emptyResponse, err
+	}
+	docRef, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
+	if err != nil {
+		return emptyResponse, err
+	}
+	var results []dto.BroadcastResponse
+	for _, doc := range docRef {
+		var broadcast model.Broadcast
+		docData := doc.Data()
+		docData[firestore.DocumentID] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &broadcast)
+		if err != nil {
+			return emptyResponse, err
+		}
+		results = append(results, dto.BroadcastResponse{}.FromModel(broadcast))
+	}
+	response := filter_request.NewFilterResponse(results, paginate, totalData)
+	return response, nil
+
 }
