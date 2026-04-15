@@ -103,9 +103,6 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 				templateSendComponents = append(templateSendComponents, componentMap)
 			}
 		}
-	} else {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to parse template payload components: ", err)
-		return true, err
 	}
 	quickReplyPayload, err := u.injectQuickReplyPayload(broadcast.DocumentID, template)
 	if err != nil {
@@ -225,7 +222,7 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
-		return emptyResponse, true, err
+		return emptyResponse, false, err
 	}
 	payloadString, err := json.Marshal(templateComponent.GetPayload())
 	if err != nil {
@@ -579,12 +576,6 @@ func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, inputData dto.Br
 
 func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error) {
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
-	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, inputData.SpecificFilter.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcast] failed to get tenant by phone number ID: ", err)
-		return emptyResponse, true, err
-	}
-	inputData.SpecificFilter.TenantID = tenant.DocumentID
 	broadcasts, err := u.broadcastRepository.GetFiltered(ctx, inputData)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcast] failed to get filtered broadcasts: ", err)

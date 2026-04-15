@@ -239,14 +239,16 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 		}
 	}
 
-	if currentNumOfComponents["BODY"] == 0 {
-		return fmt.Errorf("body component is required but missing in the payload")
-	} else if currentNumOfComponents["HEADER"] > maxNumOfComponents["HEADER"] {
-		return fmt.Errorf("too many header components in the payload, maximum allowed is 1")
-	} else if currentNumOfComponents["FOOTER"] > maxNumOfComponents["FOOTER"] {
-		return fmt.Errorf("too many footer components in the payload, maximum allowed is 1")
-	} else if currentNumOfComponents["BUTTON"] > maxNumOfComponents["BUTTON"] {
-		return fmt.Errorf("too many button components in the payload, maximum allowed is 10")
+	if len(sendComponents) > 0 {
+		if currentNumOfComponents["BODY"] == 0 {
+			return fmt.Errorf("body component is required but missing in the payload")
+		} else if currentNumOfComponents["HEADER"] > maxNumOfComponents["HEADER"] {
+			return fmt.Errorf("too many header components in the payload, maximum allowed is 1")
+		} else if currentNumOfComponents["FOOTER"] > maxNumOfComponents["FOOTER"] {
+			return fmt.Errorf("too many footer components in the payload, maximum allowed is 1")
+		} else if currentNumOfComponents["BUTTON"] > maxNumOfComponents["BUTTON"] {
+			return fmt.Errorf("too many button components in the payload, maximum allowed is 10")
+		}
 	}
 
 	return nil
@@ -264,7 +266,7 @@ func extractSendTemplateComponents(templateSendPayload map[string]any) ([]map[st
 
 	componentsAny, err := extractArrayField(templatePayload, "components")
 	if err != nil {
-		return nil, fmt.Errorf("components field is required but missing or not an array")
+		return nil, nil
 	}
 
 	components := make([]map[string]any, 0, len(componentsAny))

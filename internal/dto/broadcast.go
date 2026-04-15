@@ -15,7 +15,7 @@ type (
 		SendAt        *time.Time       `json:"send_at" validate:"omitempty,gt"`
 		Status        string           `json:"status" validate:"required,oneof=draft scheduled"`
 		Recipients    []string         `json:"recipients" validate:"required,min=1,dive,required"`
-		Components    []map[string]any `json:"components" validate:"required,min=1,dive"`
+		Components    []map[string]any `json:"components" validate:"omitempty,min=1,dive"`
 	}
 
 	BroadcastResponse struct {
@@ -43,9 +43,8 @@ type (
 	}
 
 	BroadcastGetFilteredRequest struct {
-		PhoneNumberID string  `json:"-" query:"phone_number_id" validate:"required"`
-		TenantID      string  `json:"-"`
-		Status        *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
+		TenantID string  `json:"-" query:"tenant_id" validate:"required"`
+		Status   *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
 	}
 
 	BroadcastGetRecipientsFilteredRequest struct {
