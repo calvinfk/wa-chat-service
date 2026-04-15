@@ -103,9 +103,10 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.Contact
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Failed to get contacts by phone number:", err)
 		return true, err
 	}
-	if contacts != nil && contacts[inputData.PhoneNumber]["__name__"] != inputData.ID {
+	fmt.Print(contacts)
+	if len(contacts) > 0 && contacts[inputData.PhoneNumber]["__name__"] != inputData.ID {
 		log.Println("[ERROR][internal/usecase/tenant/tenant.go][UpdateContact] Contact with the same phone number already exists")
-		return true, fmt.Errorf("contact with the same phone number already exists")
+		return false, fmt.Errorf("contact with the same phone number already exists")
 	}
 	contact, err := u.tenantRepository.GetContactByID(ctx, tenant.DocumentID, inputData.ID)
 	if err != nil {

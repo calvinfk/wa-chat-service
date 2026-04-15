@@ -181,6 +181,16 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 			return emptyResponse, false, fmt.Errorf("broadcast currently in %s status, only broadcast in draft status can be updated", broadcast.Status)
 		}
 	}
+	// remove duplicate recipient IDs
+	recipientIDMap := make(map[string]bool)
+	var uniqueRecipientIDs []string
+	for _, recipientID := range inputData.Recipients {
+		if _, exists := recipientIDMap[recipientID]; !exists {
+			recipientIDMap[recipientID] = true
+			uniqueRecipientIDs = append(uniqueRecipientIDs, recipientID)
+		}
+	}
+	inputData.Recipients = uniqueRecipientIDs
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
@@ -365,6 +375,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		return true, err
 	}
 	// replace fields
+	// TODO: maybe make a default data for replacement if the field is not found in contact
 	replaceVariable := make(map[string]string)
 	for _, parameters := range sendParameter {
 		for _, parameterValue := range parameters {
@@ -430,7 +441,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			}
 		}
 	})
-	// TODO: consider to implement retry mechanism for failed messages
+	// TODO: implement retry mechanism for failed messages
 	for i := 0; i < cap(workers); i++ {
 		workerWg.Go(func() {
 			for req := range workers {
@@ -485,7 +496,11 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 					break
 				}
 				componentsStr := string(componentsBytes)
-				componentsStr = strings.ReplaceAll(componentsStr, "{{"+key+"}}", contacts[recipient.RecipientID][value])
+				replaceWith, exists := contacts[recipient.RecipientID][value]
+				if !exists || replaceWith == "" {
+					replaceWith = "-"
+				}
+				componentsStr = strings.ReplaceAll(componentsStr, "{{"+key+"}}", replaceWith)
 				var components []map[string]any
 				err = json.Unmarshal([]byte(componentsStr), &components)
 				if err != nil {
