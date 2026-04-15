@@ -33,11 +33,11 @@ func (c *Chat) GetPhoneNumberID() string {
 }
 
 func (c *Chat) AllowedFilterFields() []string {
-	return []string{"chat_type", "display_name"}
+	return []string{"phone_number_id"}
 }
 
 func (c *Chat) AllowedSortFields() []string {
-	return []string{"created_at", "updated_at"}
+	return []string{"created_at"}
 }
 
 func (c *Chat) TableName() string {

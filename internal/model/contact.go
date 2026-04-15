@@ -16,9 +16,9 @@ func (c Contact) TableName() string {
 }
 
 func (c Contact) AllowedFilterFields() []string {
-	return []string{"phone_number", "name"}
+	return []string{"tenant_id"}
 }
 
 func (c Contact) AllowedSortFields() []string {
-	return []string{"created_at", "updated_at"}
+	return []string{"created_at"}
 }

@@ -20,9 +20,9 @@ func (b BroadcastRecipient) TableName() string {
 }
 
 func (b BroadcastRecipient) AllowedFilterFields() []string {
-	return []string{"recipient_id", "recipient_type", "status"}
+	return []string{"broadcast_id"}
 }
 
 func (b BroadcastRecipient) AllowedSortFields() []string {
-	return []string{"created_at", "updated_at"}
+	return []string{"created_at"}
 }

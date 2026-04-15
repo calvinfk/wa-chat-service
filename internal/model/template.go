@@ -4,6 +4,7 @@ import "time"
 
 type Template struct {
 	DocumentID                  string    `json:"__name__" firestore:"-"` // id from whatsapp
+	TenantID                    string    `json:"tenant_id" firestore:"-"`
 	Name                        string    `json:"name" firestore:"name"`
 	Category                    string    `json:"category" firestore:"category"` // marketing, utility, authentication
 	IsPrimaryDeviceDeliveryOnly bool      `json:"is_primary_device_delivery_only" firestore:"is_primary_device_delivery_only"`
@@ -21,8 +22,8 @@ func (t Template) TableName() string {
 }
 
 func (Template) AllowedFilterFields() []string {
-	return []string{"name", "category", "language", "status"}
+	return []string{"tenant_id", "name", "category", "status"}
 }
 func (Template) AllowedSortFields() []string {
-	return []string{"created_at", "updated_at"}
+	return []string{"created_at"}
 }

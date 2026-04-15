@@ -25,9 +25,9 @@ func (b Broadcast) TableName() string {
 }
 
 func (b Broadcast) AllowedFilterFields() []string {
-	return []string{"name", "template_id", "phone_number_id", "status", "created_by", "created_at", "updated_at"}
+	return []string{"phone_number_id", "status", "tenant_id"}
 }
 
 func (b Broadcast) AllowedSortFields() []string {
-	return []string{"name", "template_id", "phone_number_id", "status", "created_by", "created_at", "updated_at"}
+	return []string{"created_at"}
 }

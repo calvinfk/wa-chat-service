@@ -24,9 +24,9 @@ func (m Message) TableName() string {
 }
 
 func (m Message) AllowedFilterFields() []string {
-	return []string{"message_type", "message_category", "sender_name", "status"}
+	return []string{"chat_id"}
 }
 
 func (m Message) AllowedSortFields() []string {
-	return []string{"created_at", "updated_at"}
+	return []string{"created_at"}
 }

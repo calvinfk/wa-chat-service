@@ -69,7 +69,7 @@ type (
 	}
 
 	StorageMediaGetListRequest struct {
-		PhoneNumberID string `query:"phone_number_id" validate:"required"`
+		TenantID string `json:"tenant_id" query:"tenant_id" validate:"required"`
 	}
 )
 

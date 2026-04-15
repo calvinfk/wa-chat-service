@@ -52,6 +52,7 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 	}
 	newTemplate := model.Template{
 		DocumentID:            response.ID,
+		TenantID:              tenantID,
 		Name:                  inputData.Name,
 		Category:              response.Category,
 		Language:              inputData.Language,
@@ -63,7 +64,7 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 		UpdatedAt:             time.Now(),
 	}
 
-	if _, err := u.templateRepository.Upsert(ctx, nil, tenantID, newTemplate); err != nil {
+	if _, err := u.templateRepository.Upsert(ctx, nil, newTemplate); err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to upsert template:", err)
 		return nil, true, err
 	}
@@ -73,13 +74,8 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 func (u *TemplateUsecase) GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error) {
 	var emptyResponse filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
 	var err error
-	_, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.SpecificFilter.PhoneNumberID)
-	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][GetFilteredByPhoneNumberID] failed to get whatsapp client:", err)
-		return emptyResponse, true, err
-	}
 	var response filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
-	response, err = u.templateRepository.GetFilteredByPhoneNumberID(ctx, tenantID, inputData)
+	response, err = u.templateRepository.GetFilteredByPhoneNumberID(ctx, inputData.SpecificFilter.TenantID, inputData)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][GetFilteredByPhoneNumberID] failed to get templates by phone number id:", err)
 		return emptyResponse, true, err
@@ -132,6 +128,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 				}
 				template = model.Template{
 					DocumentID:                  templateMeta.ID,
+					TenantID:                    tenantID,
 					Name:                        templateMeta.Name,
 					Category:                    templateMeta.Category,
 					IsPrimaryDeviceDeliveryOnly: templateMeta.IsPrimaryDeviceDeliveryOnly,
@@ -147,7 +144,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			template.Status = templateMeta.Status
 			template.Category = templateMeta.Category
 			template.UpdatedAt = time.Now()
-			if _, err := u.templateRepository.Upsert(ctx, nil, tenantID, template); err != nil {
+			if _, err := u.templateRepository.Upsert(ctx, nil, template); err != nil {
 				log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to upsert template:", err)
 			}
 		}
@@ -234,7 +231,7 @@ func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.Temp
 	currentTemplate.ParameterFormat = payload.ParameterFormat
 	currentTemplate.Components = componentsString
 	currentTemplate.UpdatedAt = time.Now()
-	_, err = u.templateRepository.Upsert(ctx, nil, tenantID, currentTemplate)
+	_, err = u.templateRepository.Upsert(ctx, nil, currentTemplate)
 	if err != nil {
 		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to upsert template:", err)
 		return false, err

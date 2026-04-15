@@ -40,6 +40,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 		var template model.Template
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["tenant_id"] = tenantID
 		err := utils.MapToStruct(docData, &template)
 		if err != nil {
 			return response, err
@@ -62,6 +63,7 @@ func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]mod
 		var template model.Template
 		docData := doc.Data()
 		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["tenant_id"] = tenantID
 		err := utils.MapToStruct(docData, &template)
 		if err != nil {
 			return templates, err
@@ -84,6 +86,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 	}
 	docData := doc.Data()
 	docData[firestore.DocumentID] = doc.Ref.ID
+	docData["tenant_id"] = tenantID
 	err = utils.MapToStruct(docData, &template)
 	if err != nil {
 		return template, err
@@ -91,11 +94,11 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 	return template, nil
 }
 
-func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transaction, tenantID string, inputData model.Template) (model.Template, error) {
+func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transaction, inputData model.Template) (model.Template, error) {
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		doc := r.db.
 			Collection("tenants").
-			Doc(tenantID).
+			Doc(inputData.TenantID).
 			Collection(r.template.TableName()).
 			Doc(inputData.DocumentID)
 		_, getErr := tx.Get(doc)

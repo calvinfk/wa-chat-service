@@ -21,7 +21,7 @@ func (m StorageMedia) TableName() string {
 }
 
 func (m StorageMedia) AllowedFilterFields() []string {
-	return []string{"document_id", "media_id", "original_name", "mime_type", "url", "access_url", "created_at"}
+	return []string{"tenant_id"}
 }
 func (m StorageMedia) AllowedSortFields() []string {
 	return []string{"created_at"}
