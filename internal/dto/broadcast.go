@@ -23,7 +23,7 @@ type (
 		Name            string    `json:"name"`
 		TemplateID      string    `json:"template_id"`
 		PhoneNumberID   string    `json:"phone_number_id"`
-		RecipientIDs    []string  `json:"recipient_ids"`
+		RecipientTotal  int       `json:"recipient_total"`
 		ParameterFormat *string   `json:"parameter_format"`
 		Payload         string    `json:"payload"` // raw json string of template
 		Status          string    `json:"status"`  // scheduled, sent, cancelled
@@ -54,6 +54,7 @@ type (
 	BroadcastRecipientResponse struct {
 		ID            string    `json:"id"`           // uuid v7
 		BroadcastID   string    `json:"broadcast_id"` // reference to broadcast document
+		WamID         string    `json:"wamid,omitempty"`
 		RecipientID   string    `json:"recipient_id"`
 		RecipientName string    `json:"recipient_name"`
 		RecipientType string    `json:"recipient_type"` // individual, group
@@ -82,7 +83,7 @@ func (BroadcastResponse) FromModel(data model.Broadcast) BroadcastResponse {
 		ID:              data.DocumentID,
 		Name:            data.Name,
 		TemplateID:      data.TemplateID,
-		RecipientIDs:    data.RecipientIDs,
+		RecipientTotal:  len(data.RecipientIDs),
 		PhoneNumberID:   data.PhoneNumberID,
 		ParameterFormat: data.ParameterFormat,
 		Payload:         data.Payload,
@@ -114,6 +115,7 @@ func (r BroadcastRecipientResponse) FromModel(data model.BroadcastRecipient) Bro
 	return BroadcastRecipientResponse{
 		ID:            data.DocumentID,
 		BroadcastID:   data.BroadcastID,
+		WamID:         data.WamID,
 		RecipientID:   data.RecipientID,
 		RecipientName: data.RecipientName,
 		RecipientType: data.RecipientType,
