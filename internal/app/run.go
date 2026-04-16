@@ -11,5 +11,4 @@ func Run(config *config.Config, zslog *zap.SugaredLogger) {
 	servers := NewDefaultWiring(zslog, config)
 	servers.startServers()
 	servers.waitForShutdown(zslog.Desugar())
-	zslog.Info("Server exiting")
 }

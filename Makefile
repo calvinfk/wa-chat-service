@@ -31,6 +31,9 @@ build:
 clean:
 	@if exist $(APP_NAME).exe del $(APP_NAME).exe
 
+proto:
+	protoc --go_out=. --go-grpc_out=. --proto_path=./docs/proto/ ./docs/proto/**/*.proto
+
 save:
 ifeq ($(VER),)
 	docker build -t $(APP_NAME):latest .

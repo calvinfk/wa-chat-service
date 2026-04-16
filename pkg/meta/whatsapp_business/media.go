@@ -119,10 +119,14 @@ func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) 
 }
 
 func (wb *Client) GetHeaders(url string) (http.Header, error) {
-	req, err := http.NewRequest(http.MethodHead, url, nil)
+	// Some upstreams return a response body to HEAD and trigger protocol warnings in Go's client.
+	// Use a minimal GET with Range to fetch headers without downloading the full file.
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Range", "bytes=0-0")
+	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
 	resp, err := wb.httpClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -30,11 +30,14 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (stri
 	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, req.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[Login] tenantRepository.GetByPhoneNumberID error : %v", err)
+		if err == errs.ErrGenericNotFound {
+			return "", false, err
+		}
 		return "", true, err
 	}
 	if tenant.DocumentID != req.TenantID {
-		u.zslog.Errorf("[Login] tenant.DocumentID != req.TenantID : %v", errs.ErrUserNotFound)
-		return "", false, errs.ErrUserNotFound
+		u.zslog.Errorf("[Login] tenant.DocumentID != req.TenantID : %v", errs.ErrGenericNotFound)
+		return "", false, errs.ErrGenericNotFound
 	}
 	accessToken, err := u.accessTokenService.GenerateAccessToken(tenant.DocumentID)
 	if err != nil {

@@ -13,20 +13,18 @@ var (
 	ErrAuthMissingRefreshToken = errors.New("refresh token is missing")
 )
 
-// User
+// Database
 var (
-	ErrUserRoleUserNotFound = errors.New("user role not found")
-	ErrUserNotFound         = errors.New("user not found")
+	ErrDBTxNil     = errors.New("transaction requires a non-nil database connection")
+	ErrDBTxInvalid = errors.New("invalid transaction type provided")
 )
 
-// Role
-var (
-	ErrRoleNotFound = errors.New("role not found")
-)
-
-// Report
-var (
-	ErrReportStatusInvalid = errors.New("report status invalid")
-	ErrReportStatusOpen    = errors.New("report status is open, cannot perform this action")
-	ErrReportNotInactive   = errors.New("report is active, cannot perform this action")
-)
+func IsUnauthenticatedError(err error) bool {
+	unauthenticatedErrors := map[error]bool{
+		ErrAuthInvalidCredentials:  true,
+		ErrAuthInvalidAccessToken:  true,
+		ErrAuthExpiredAccessToken:  true,
+		ErrAuthMissingRefreshToken: true,
+	}
+	return unauthenticatedErrors[err]
+}

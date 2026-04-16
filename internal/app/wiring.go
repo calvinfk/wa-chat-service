@@ -8,7 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 	"wa_chat_service/config"
-	http_internal "wa_chat_service/internal/handler/http"
+	handler_grpc "wa_chat_service/internal/handler/grpc"
+	grpc_v1 "wa_chat_service/internal/handler/grpc/v1"
+	handler_http "wa_chat_service/internal/handler/http"
 	http_v1 "wa_chat_service/internal/handler/http/v1"
 	"wa_chat_service/internal/repository"
 	repository_firestore "wa_chat_service/internal/repository/firestore"
@@ -36,6 +38,7 @@ import (
 	firebase "firebase.google.com/go/v4"
 	"go.uber.org/zap"
 	"google.golang.org/api/cloudtasks/v2"
+	"google.golang.org/grpc/reflection"
 )
 
 type servers struct {
@@ -198,6 +201,14 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		zslog.Desugar().Named("gRPC"),
 		server_grpc.Port(fmt.Sprintf("%d", config.GRPC.Port)),
 	)
+	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
+		StorageMedia: usecases.StorageMedia,
+		ZSLog:        zslog,
+	}
+	handler_grpc.NewRouter(grpcServer.App, handlerGRPCV1)
+	if config.App.Environment != "production" {
+		reflection.Register(grpcServer.App)
+	}
 
 	httpServer := server_http.New(
 		zslog.Desugar().Named("HTTP"),
@@ -205,7 +216,7 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		server_http.Port(fmt.Sprintf("%d", config.App.Port)),
 	)
 	// Router Handler
-	routerHandlerV1 := http_v1.RouterHandlerV1{
+	handlerHTTPV1 := http_v1.HandlerHTTPV1{
 		ActivityLogUsecase:  usecases.ActivityLog,
 		MessageUsecase:      usecases.Message,
 		StorageMediaUsecase: usecases.StorageMedia,
@@ -219,7 +230,7 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		AccessTokenService:  services.AccessToken,
 		ZSLog:               zslog.Named("HTTP"),
 	}
-	http_internal.NewRouter(httpServer.App, config, routerHandlerV1)
+	handler_http.NewRouter(httpServer.App, config, handlerHTTPV1)
 	return servers{
 		grpc: grpcServer,
 		http: httpServer,

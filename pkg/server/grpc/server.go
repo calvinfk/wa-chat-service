@@ -86,7 +86,7 @@ func (s *Server) unaryRequestLogger() grpc.UnaryServerInterceptor {
 			codeStr,
 			timeTakenStr,
 			peerAddr,
-			"GRPC",
+			"gRPC",
 			info.FullMethod,
 		)
 

@@ -47,6 +47,9 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[UploadMedia] Failed to get tenant data from repository: %v", err)
+		if err == errs.ErrGenericNotFound {
+			return response, false, err
+		}
 		return response, true, err
 	}
 	documentID, err := uuid.NewV7()
@@ -187,9 +190,12 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 
 func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.StorageMediaSaveMediaIDRequest) (dto.StorageMediaSaveMediaIDResponse, bool, error) {
 	var emptyResponse dto.StorageMediaSaveMediaIDResponse
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[UploadMediaUsingMediaID] Failed to get WhatsApp client: %v", err)
+		if err == errs.ErrGenericNotFound {
+			return emptyResponse, false, err
+		}
 		return emptyResponse, true, err
 	}
 	url, httpCode, err := u.whatsappService.GetMediaURL(whatsappClient, inputData.MediaID)
@@ -224,6 +230,7 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 	media := model.StorageMedia{
 		DocumentID:       mediaDocumentID.String(),
 		OriginalName:     originalFileName,
+		TenantID:         tenantID,
 		MediaID:          &inputData.MediaID,
 		MimeType:         mimeType,
 		IsURLFromStorage: false,

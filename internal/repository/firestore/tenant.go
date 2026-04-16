@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type TenantRepository struct {
@@ -41,6 +43,9 @@ func (r *TenantRepository) GetByID(ctx context.Context, tenantID string) (model.
 func (r *TenantRepository) GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (model.Tenant, error) {
 	doc, err := r.db.Collection(r.tenant.TableName()).Where("phone_number_id", "==", phoneNumberID).Limit(1).Documents(ctx).Next()
 	if err != nil {
+		if err == iterator.Done {
+			return model.Tenant{}, errs.ErrGenericNotFound
+		}
 		return model.Tenant{}, err
 	}
 	// Unmarshal the document into a Tenant model

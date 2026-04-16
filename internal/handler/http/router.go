@@ -1,4 +1,4 @@
-package http_internal
+package handler_http
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 )
 
-func NewRouter(app *fiber.App, config *config.Config, routerHandlerV1 http_v1.RouterHandlerV1) {
+func NewRouter(app *fiber.App, config *config.Config, handlerHTTPV1 http_v1.HandlerHTTPV1) {
 	// Set up middleware
 	app.Use(
 		logger.New(),
@@ -18,8 +18,8 @@ func NewRouter(app *fiber.App, config *config.Config, routerHandlerV1 http_v1.Ro
 		middleware.Cors(&config.CORS),
 		middleware.OptionsRoute(),
 		middleware.FileSizeLimit(16*1024*1024), // 16MB
-		middleware.AccessToken(routerHandlerV1.AccessTokenService, routerHandlerV1.EncryptService),
-		// middleware.ActivityLog(routerHandlerV1.ActivityLogUsecase),
+		middleware.AccessToken(handlerHTTPV1.AccessTokenService, handlerHTTPV1.EncryptService),
+		// middleware.ActivityLog(handlerHTTPV1.ActivityLogUsecase),
 	)
 
 	api := app.Group("api")
@@ -43,6 +43,6 @@ func NewRouter(app *fiber.App, config *config.Config, routerHandlerV1 http_v1.Ro
 	})
 
 	apiV1 := api.Group("v1")
-	http_v1.NewApiV1Routes(apiV1, routerHandlerV1, config)
+	http_v1.New(apiV1, handlerHTTPV1, config)
 
 }

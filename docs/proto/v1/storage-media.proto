@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package grpc.v1;
+
+option go_package = "docs/proto/v1";
+
+// StorageMedia defines the gRPC service for managing media.
+service StorageMedia {
+  // SaveMediaID saves a media ID and returns the result.
+  rpc SaveMediaID(SaveMediaIDRequest) returns (SaveMediaIDResponse);
+}
+
+
+// SaveMediaIDRequest contains the media ID to be saved and the associated phone number ID.
+message SaveMediaIDRequest {
+  string media_id = 1;
+  string phone_number_id = 2;
+}
+
+// SaveMediaIDResponse indicates whether the media ID was saved successfully.
+message SaveMediaIDResponse {
+  string id = 1;
+}
