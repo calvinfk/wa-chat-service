@@ -2,25 +2,26 @@ package google_service
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"wa_chat_service/config"
 
 	"firebase.google.com/go/v4/messaging"
 	"firebase.google.com/go/v4/storage"
+	"go.uber.org/zap"
 )
 
 type GoogleFirebaseService struct {
 	config                  *config.GCP
 	firebaseMessagingClient *messaging.Client
 	firebaseStorageClient   *storage.Client
+	zslog                   *zap.SugaredLogger
 }
 
-func NewGoogleFirebaseService(config *config.GCP, firebaseMessagingClient *messaging.Client, firebaseStorageClient *storage.Client) *GoogleFirebaseService {
+func NewGoogleFirebaseService(config *config.GCP, firebaseMessagingClient *messaging.Client, firebaseStorageClient *storage.Client, zslog *zap.SugaredLogger) *GoogleFirebaseService {
 	return &GoogleFirebaseService{
 		config:                  config,
 		firebaseMessagingClient: firebaseMessagingClient,
 		firebaseStorageClient:   firebaseStorageClient,
+		zslog:                   zslog,
 	}
 }
 
@@ -33,14 +34,14 @@ func (s *GoogleFirebaseService) SendNotification(ctx context.Context, title stri
 		Tokens: tokens,
 	})
 	if err != nil {
-		return fmt.Errorf("error sending message: %v", err)
+		s.zslog.Errorf("[SendNotification] error sending message: %v", err)
+		return err
 	}
 	for idx, resp := range response.Responses {
 		if !resp.Success {
-			log.Printf("Failed to send message to token: %s, error: %v\n", tokens[idx], resp.Error)
+			s.zslog.Errorf("[SendNotification] Failed to send message to token: %s, error: %v", tokens[idx], resp.Error)
 		}
 	}
-	log.Printf("Successfully sent message to %d tokens\n", response.SuccessCount)
 	return nil
 }
 
@@ -48,9 +49,14 @@ func (s *GoogleFirebaseService) SubscribeToTopic(ctx context.Context, topics []s
 	for _, t := range topics {
 		response, err := s.firebaseMessagingClient.SubscribeToTopic(ctx, tokens, t)
 		if err != nil {
-			return fmt.Errorf("error subscribing to topic: %v", err)
+			s.zslog.Errorf("[SubscribeToTopic] error subscribing to topic: %v", err)
+			return err
 		}
-		log.Printf("Successfully subscribed %d tokens to topic %s\n", response.SuccessCount, t)
+		if response.Errors != nil {
+			for _, subErr := range response.Errors {
+				s.zslog.Errorf("[SubscribeToTopic] Failed to subscribe token: %s to topic: %s, error: %v", subErr.Index, t, subErr.Reason)
+			}
+		}
 	}
 	return nil
 }
@@ -60,15 +66,20 @@ func (s *GoogleFirebaseService) UnsubscribeFromTopic(ctx context.Context, topics
 	for _, t := range topics {
 		response, err := s.firebaseMessagingClient.UnsubscribeFromTopic(ctx, tokens, t)
 		if err != nil {
-			return fmt.Errorf("error unsubscribing from topic: %v", err)
+			s.zslog.Errorf("[UnsubscribeFromTopic] error unsubscribing from topic: %v", err)
+			return err
 		}
-		log.Printf("Successfully unsubscribed %d tokens from topic %s\n", response.SuccessCount, t)
+		if response.Errors != nil {
+			for _, subErr := range response.Errors {
+				s.zslog.Errorf("[UnsubscribeFromTopic] Failed to unsubscribe token: %s from topic: %s, error: %v", subErr.Index, t, subErr.Reason)
+			}
+		}
 	}
 	return nil
 }
 
 func (s *GoogleFirebaseService) SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error {
-	response, err := s.firebaseMessagingClient.Send(ctx, &messaging.Message{
+	_, err := s.firebaseMessagingClient.Send(ctx, &messaging.Message{
 		Notification: &messaging.Notification{
 			Title: title,
 			Body:  body,
@@ -76,8 +87,8 @@ func (s *GoogleFirebaseService) SendNotificationToTopic(ctx context.Context, tit
 		Topic: topic,
 	})
 	if err != nil {
-		return fmt.Errorf("error sending message: %v", err)
+		s.zslog.Errorf("[SendNotificationToTopic] error sending message to topic: %v", err)
+		return err
 	}
-	log.Printf("Successfully sent message to topic %s: %s\n", topic, response)
 	return nil
 }

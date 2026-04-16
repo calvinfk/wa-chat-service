@@ -6,6 +6,7 @@ import (
 	"wa_chat_service/config"
 	"wa_chat_service/internal/service"
 
+	"go.uber.org/zap"
 	"google.golang.org/api/cloudtasks/v2"
 )
 
@@ -14,60 +15,17 @@ type GoogleTaskService struct {
 	cfg            *config.GCP
 	jwtService     service.JWT
 	encryptService service.Encrypt
+	zslog          *zap.SugaredLogger
 }
 
-func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt) *GoogleTaskService {
+func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zslog *zap.SugaredLogger) *GoogleTaskService {
 	return &GoogleTaskService{
 		client:         client,
 		cfg:            cfg,
 		jwtService:     jwtService,
 		encryptService: encryptService,
+		zslog:          zslog,
 	}
-}
-
-// func (s *GoogleTaskService) CreateGoogleTask(ctx context.Context) error {
-// 	// Implementation for creating a Google Task
-// 	req := &cloudtasks.CreateTaskRequest{
-// 		Task: &cloudtasks.Task{
-// 			HttpRequest: &cloudtasks.HttpRequest{
-// 				Url: s.cfg.AppBaseURL + "/ping",
-// 			},
-// 			ScheduleTime: time.Now().Add(1 * time.Minute).Format(time.RFC3339), // Schedule task to run after 1 minute
-// 		},
-// 	}
-// 	// err := s.client.Projects.Locations.Queues.Tasks.Create("projects/"+s.cfg.ProjectID+"/locations/asia-southeast2"+"/queues/"+s.cfg.QueueID, req).Context(ctx).Do()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-func (s *GoogleTaskService) CreatePingTask() error {
-	token, err := s.jwtService.GenerateJWT("ping-task", time.Now().Add(time.Second*20).Unix())
-	if err != nil {
-		return err
-	}
-	encryptedToken, err := s.encryptService.Encrypt(token)
-	if err != nil {
-		return err
-	}
-	req := &cloudtasks.CreateTaskRequest{
-		Task: &cloudtasks.Task{
-			HttpRequest: &cloudtasks.HttpRequest{
-				Url:        s.cfg.AppBaseURL + "/api/v1/broadcast/send",
-				HttpMethod: http.MethodPost,
-				Headers: map[string]string{
-					"Authorization": "Bearer " + encryptedToken,
-				},
-			},
-			ScheduleTime: time.Now().Add(15 * time.Second).Format(time.RFC3339), // Schedule task to run after 15 seconds
-		},
-	}
-	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.BroadcastTaskParent, req).Do()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error {
@@ -94,6 +52,7 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 	}
 	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.BroadcastTaskParent, req).Do()
 	if err != nil {
+		s.zslog.Errorf("[CreateBroadcastTask] error creating broadcast task: %v", err)
 		return err
 	}
 	return nil
@@ -101,5 +60,9 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 
 func (s *GoogleTaskService) DeleteBroadcastTask(broadcastID string) error {
 	_, err := s.client.Projects.Locations.Queues.Tasks.Delete(s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID).Do()
-	return err
+	if err != nil {
+		s.zslog.Errorf("[DeleteBroadcastTask] error deleting broadcast task: %v", err)
+		return err
+	}
+	return nil
 }

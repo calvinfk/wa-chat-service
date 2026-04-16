@@ -3,7 +3,6 @@ package message_usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"wa_chat_service/pkg/utils"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type MessageUsecase struct {
@@ -28,6 +28,7 @@ type MessageUsecase struct {
 	tenantUsecase          usecase.Tenant
 	whatsappService        service.WhatsappBusiness
 	googleStorageService   service.GoogleStorage
+	zslog                  *zap.SugaredLogger
 }
 
 func NewMessageUsecase(
@@ -38,6 +39,7 @@ func NewMessageUsecase(
 	tenantUsecase usecase.Tenant,
 	whatsappService service.WhatsappBusiness,
 	googleStorageService service.GoogleStorage,
+	zslog *zap.SugaredLogger,
 ) *MessageUsecase {
 	return &MessageUsecase{
 		messageRepository:      messageRepository,
@@ -47,6 +49,7 @@ func NewMessageUsecase(
 		tenantUsecase:          tenantUsecase,
 		whatsappService:        whatsappService,
 		googleStorageService:   googleStorageService,
+		zslog:                  zslog,
 	}
 }
 
@@ -56,13 +59,13 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	if whatsappClient == nil {
 		whatsappClient, tenantID, err = u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get WhatsApp client:", err)
+			u.zslog.Errorf("[SendMessage] Failed to get WhatsApp client: %v", err)
 			return response, true, err
 		}
 	}
 	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate message component:", err)
+		u.zslog.Errorf("[SendMessage] Failed to validate message component: %v", err)
 		return response, false, err
 	}
 	// create chat header if not exist
@@ -78,7 +81,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	_, err = u.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to Upsert chat:", err)
+		u.zslog.Errorf("[SendMessage] Failed to Upsert chat: %v", err)
 		return response, true, err
 	}
 	var sto *model.StorageMedia
@@ -86,26 +89,26 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		if media.Link != nil {
 			isValid, err := u.googleStorageService.IsValidSignedURL(ctx, *media.Link)
 			if err != nil {
-				log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to validate media link:", err)
+				u.zslog.Errorf("[SendMessage] Failed to validate media link: %v", err)
 				return response, true, err
 			}
 			if isValid {
 				// get file URL from signed URL
 				fileURL, err := u.googleStorageService.ParseSignedURLToFileURL(ctx, *media.Link)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to parse signed URL to file URL:", err)
+					u.zslog.Errorf("[SendMessage] Failed to parse signed URL to file URL: %v", err)
 					return response, true, err
 				}
 				_, filePath, err := u.googleStorageService.ParseGoogleStorageURL(fileURL)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to parse file URL:", err)
+					u.zslog.Errorf("[SendMessage] Failed to parse file URL: %v", err)
 					return response, true, err
 				}
 				fileName := filePath[strings.LastIndex(filePath, "/")+1:]
 				fileNameWithoutExt := fileName[:strings.LastIndex(fileName, ".")]
 				storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, fileNameWithoutExt)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to get storage media by document ID:", err)
+					u.zslog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
 					return response, true, err
 				}
 				sto = &storageMedia
@@ -113,14 +116,14 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				// check if link is accessible
 				resp, err := http.Head(*media.Link)
 				if err != nil || resp.StatusCode != http.StatusOK {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Media link is not accessible:", err)
+					u.zslog.Errorf("[SendMessage] Media link is not accessible: %v", err)
 					return response, false, fmt.Errorf("media link is not accessible")
 				}
 				urlHeaders := resp.Header
 				mimeType := urlHeaders.Get("Content-Type")
 				extension := whatsapp_business.ParseMediaExtension(mimeType)
 				if extension == "" {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Unsupported media type:", mimeType)
+					u.zslog.Errorf("[SendMessage] Unsupported media type: %v", mimeType)
 					return response, true, fmt.Errorf("unsupported media type: %s", mimeType)
 				}
 				// TODO: check file size is allowed or not
@@ -136,7 +139,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				}
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to generate storage media ID:", err)
+					u.zslog.Errorf("[SendMessage] Failed to generate storage media ID: %v", err)
 					return response, true, err
 				}
 				if originalFileName == "" {
@@ -153,7 +156,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				}
 				_, err = u.storageMediaRepository.Insert(ctx, nil, storageMedia)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to create storage media:", err)
+					u.zslog.Errorf("[SendMessage] Failed to create storage media: %v", err)
 					return response, true, err
 				}
 				sto = &storageMedia
@@ -162,12 +165,12 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	sendResponse, httpCode, err := u.whatsappService.SendMessage(whatsappClient, inputData.RecipientID, component)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to send message:", err)
+		u.zslog.Errorf("[SendMessage] Failed to send message: %v", err)
 		return response, httpCode >= http.StatusInternalServerError, err
 	}
 	payloadData, err := utils.AnyToJsonString(component.GetPayload())
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to convert payload to JSON")
+		u.zslog.Errorf("[SendMessage] Failed to convert payload to JSON")
 	}
 	var storageMediaID *string
 	if sto != nil {
@@ -187,7 +190,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	response, err = u.messageRepository.Upsert(ctx, nil, message)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][SendMessage] Failed to upsert message:", err)
+		u.zslog.Errorf("[SendMessage] Failed to upsert message: %v", err)
 		return response, true, err
 	}
 	return response, false, nil
@@ -197,7 +200,7 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 	var response filter_request.FilterResponse[dto.MessageGetByChatIDResponse]
 	messages, err := u.messageRepository.GetMessageByChatID(ctx, requestData)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/message/message.go][GetMessagesByChatID] Failed to get messages by chat ID:", err)
+		u.zslog.Errorf("[GetMessagesByChatID] Failed to get messages by chat ID: %v", err)
 		return response, true, err
 	}
 	return messages, false, nil

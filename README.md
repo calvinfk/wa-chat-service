@@ -154,6 +154,27 @@ Optional/common variables:
 - `META_GRAPH_API_VERSION`
 - `GOOGLE_APPLICATION_CREDENTIALS` (recommended for local/dev if using ADC)
 
+## GRPC
+
+The service also exposes a GRPC server on the same port, with the following service definition:
+
+```protobuf
+service ChatService {
+  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
+}
+```
+## Proto Code Generation
+
+To regenerate proto files, install the required tools:
+
+```bash
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+```
+
+This project uses `protoc` version 25.9.
+
+
 ## Running Locally
 
 1. Create `.env` from `.env.example` and fill required values.

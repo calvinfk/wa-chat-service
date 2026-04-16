@@ -42,7 +42,6 @@ func (h *AuthHandler) login(ctx fiber.Ctx) error {
 		code, response := api_response.NewApiResponse(serverError, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
-	log.Println("[INFO][internal/handler/http/v1/auth.go][login] Login successful for tenantID:", requestData.TenantID)
 	ctx.Cookie(&fiber.Cookie{
 		Name:     "access_token",
 		Value:    encrypedToken,

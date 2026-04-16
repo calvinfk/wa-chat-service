@@ -6,6 +6,7 @@ import (
 	"wa_chat_service/internal/usecase"
 
 	"github.com/gofiber/fiber/v3"
+	"go.uber.org/zap"
 )
 
 type RouterHandlerV1 struct {
@@ -20,6 +21,7 @@ type RouterHandlerV1 struct {
 	EncryptService      service.Encrypt
 	JWTService          service.JWT
 	AccessTokenService  service.AccessToken
+	ZSLog               *zap.SugaredLogger
 }
 
 type HandlerV1 interface {
@@ -29,7 +31,7 @@ type HandlerV1 interface {
 func NewApiV1Routes(api fiber.Router, routerHandler RouterHandlerV1, config *config.Config) {
 	chatHandler := NewChatHandler(routerHandler.MessageUsecase, routerHandler.ChatUsecase)
 	chatHandler.RegisterRoute(api)
-	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase)
+	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase, routerHandler.ZSLog)
 	storageMediaHandler.RegisterRoutes(api)
 	templateHandler := NewTemplateHandler(routerHandler.TemplateUsecase)
 	templateHandler.RegisterRoute(api)

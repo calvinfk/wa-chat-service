@@ -83,7 +83,6 @@ type (
 	}
 
 	GoogleTask interface {
-		CreatePingTask() error
 		CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error
 		DeleteBroadcastTask(broadcastID string) error
 	}

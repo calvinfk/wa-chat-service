@@ -20,6 +20,7 @@ type (
 		Encrypt  Encrypt
 		GCP      GCP
 		JOSE     JOSE
+		GRPC     GRPC
 	}
 
 	// Application metadata and server configuration, such as name, version, environment, port, and URL.
@@ -62,6 +63,10 @@ type (
 	JOSE struct {
 		RSAPrivateKey     *rsa.PrivateKey
 		AccessTokenExpiry time.Duration
+	}
+
+	GRPC struct {
+		Port int `env:"GRPC_PORT,required"`
 	}
 )
 
@@ -314,4 +319,24 @@ func loadPrivateKey(keyPath string) (*rsa.PrivateKey, error) {
 		return nil, fmt.Errorf("unsupported key type %q", block.Type)
 	}
 	return privateKey, nil
+}
+
+func grpcENV() (GRPC, error) {
+	var errors []string
+	cfg := GRPC{
+		Port: 0,
+	}
+	if portStr := os.Getenv("GRPC_PORT"); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil {
+			cfg.Port = port
+		} else {
+			errors = append(errors, "GRPC_PORT must be a valid integer")
+		}
+	} else {
+		errors = append(errors, "GRPC_PORT is required")
+	}
+	if len(errors) > 0 {
+		return cfg, fmt.Errorf("missing required GRPC environment variables: %s", strings.Join(errors, ", "))
+	}
+	return cfg, nil
 }

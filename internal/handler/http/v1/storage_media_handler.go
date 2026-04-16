@@ -3,7 +3,6 @@ package http_v1
 import (
 	"fmt"
 	"io"
-	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/usecase"
@@ -11,15 +10,18 @@ import (
 	"wa_chat_service/pkg/filter_request"
 
 	"github.com/gofiber/fiber/v3"
+	"go.uber.org/zap"
 )
 
 type StorageMediaHandler struct {
 	storageMediaUsecase usecase.StorageMedia
+	zslog               *zap.SugaredLogger
 }
 
-func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia) *StorageMediaHandler {
+func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia, zslog *zap.SugaredLogger) *StorageMediaHandler {
 	return &StorageMediaHandler{
 		storageMediaUsecase: storageMediaUsecase,
+		zslog:               zslog,
 	}
 }
 
@@ -72,7 +74,7 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	ctx.Set("Content-Length", fmt.Sprintf("%d", mediaResponse.Size))
 
 	if _, err := io.Copy(ctx.Response().BodyWriter(), mediaResponse.Reader); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][getMedia] Failed to stream file to response:", err)
+		h.zslog.Error("[getMedia] Failed to stream file to response:", err)
 		return err
 	}
 	return nil
@@ -92,7 +94,6 @@ func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {
 func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaSaveMediaIDRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][saveMediaID] Failed to bind request data:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
@@ -104,7 +105,6 @@ func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 func (h *StorageMediaHandler) uploadResumableMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaResumableUploadRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][uploadResumableMedia] Failed to bind request data:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
@@ -116,7 +116,6 @@ func (h *StorageMediaHandler) uploadResumableMedia(ctx fiber.Ctx) error {
 func (h *StorageMediaHandler) uploadMediaMeta(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaUploadMetaRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/storage_media_handler.go][uploadMediaMeta] Failed to bind request data:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}

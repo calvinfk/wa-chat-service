@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -22,6 +21,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type BroadcastUsecase struct {
@@ -33,9 +33,10 @@ type BroadcastUsecase struct {
 	googleTaskService   service.GoogleTask
 	whatsappService     service.WhatsappBusiness
 	txManager           *utils.TxManager
+	zslog               *zap.SugaredLogger
 }
 
-func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *utils.TxManager) *BroadcastUsecase {
+func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *utils.TxManager, zslog *zap.SugaredLogger) *BroadcastUsecase {
 	return &BroadcastUsecase{
 		templateRepository:  templateRepository,
 		broadcastRepository: broadcastRepository,
@@ -45,22 +46,23 @@ func NewBroadcastUsecase(templateRepository repository.Template, broadcastReposi
 		googleTaskService:   googleTaskService,
 		whatsappService:     whatsappService,
 		txManager:           txManager,
+		zslog:               zslog,
 	}
 }
 
 func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get broadcast by ID: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
+		u.zslog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
 		return false, nil
 	}
 	template, err := u.templateRepository.GetByID(ctx, broadcast.TenantID, broadcast.TemplateID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
 		return true, err
 	}
 	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, tx *firestore.Transaction) (bool, error) {
@@ -72,7 +74,7 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		}
 		err = u.broadcastRepository.Update(ctx, tx, broadcast)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast status: ", err)
+			u.zslog.Errorf("[ScheduleBroadcast] failed to update broadcast status: %v", err)
 			return true, err
 		}
 		serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
@@ -88,12 +90,12 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	var broadcastPayload map[string]any
 	err := json.Unmarshal([]byte(broadcast.Payload), &broadcastPayload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to unmarshal template components: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to unmarshal template components: %v", err)
 		return true, err
 	}
 	templateSend, ok := broadcastPayload["template"].(map[string]any)
 	if !ok {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to parse template payload: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to parse template payload: %v", err)
 		return true, err
 	}
 	var templateSendComponents []map[string]any
@@ -106,7 +108,7 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	}
 	quickReplyPayload, err := u.injectQuickReplyPayload(broadcast.DocumentID, template)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to inject quick reply payload: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to inject quick reply payload: %v", err)
 		return true, err
 	}
 	for _, payload := range quickReplyPayload {
@@ -116,19 +118,19 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	broadcastPayload["template"] = templateSend
 	payloadBytes, err := json.Marshal(broadcastPayload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal broadcast payload with quick reply: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal broadcast payload with quick reply: %v", err)
 		return true, err
 	}
 	broadcast.Payload = string(payloadBytes)
 	err = u.broadcastRepository.Update(ctx, tx, broadcast)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to update broadcast with quick reply payload: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to update broadcast with quick reply payload: %v", err)
 		return true, err
 	}
 
 	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, broadcast.TenantID, broadcast.RecipientIDs)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get contacts by phone numbers: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get contacts by phone numbers: %v", err)
 		return true, err
 	}
 	for _, recipient := range broadcast.RecipientIDs {
@@ -150,14 +152,14 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 		}
 		err = u.broadcastRepository.InsertRecipient(ctx, tx, broadcastRecipient)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast recipient: ", err)
+			u.zslog.Errorf("[ScheduleBroadcast] failed to insert broadcast recipient: %v", err)
 			return true, err
 		}
 	}
 
 	err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, broadcast.SendAt)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create broadcast task: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to create broadcast task: %v", err)
 		return true, err
 	}
 	return false, nil
@@ -170,11 +172,11 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	if inputData.ID != nil {
 		broadcast, err = u.broadcastRepository.GetByID(ctx, *inputData.ID)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get broadcast by ID: ", err)
+			u.zslog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
 			return emptyResponse, true, err
 		}
 		if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-			log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
+			u.zslog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
 			return emptyResponse, false, fmt.Errorf("broadcast currently in %s status, only broadcast in draft status can be updated", broadcast.Status)
 		}
 	}
@@ -190,17 +192,17 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	inputData.Recipients = uniqueRecipientIDs
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get whatsapp client: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get whatsapp client: %v", err)
 		return emptyResponse, true, err
 	}
 	template, err := u.templateRepository.GetByID(ctx, tenantID, inputData.TemplateID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
 		return emptyResponse, true, err
 	}
 	broadcastID, err := uuid.NewV7()
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to generate broadcast ID: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to generate broadcast ID: %v", err)
 		return emptyResponse, true, err
 	}
 	payload := make(map[string]any)
@@ -211,22 +213,21 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
 		return emptyResponse, true, err
 	}
 	templateComponent, err := whatsapp_business.NewTemplateComponent(payloadBytes)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to create template component: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to create template component: %v", err)
 		return emptyResponse, true, err
 	}
 	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to validate template payload: ", err)
 		return emptyResponse, false, err
 	}
 	payloadString, err := json.Marshal(templateComponent.GetPayload())
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to marshal template payload: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
 		return emptyResponse, true, err
 	}
 	var sendingTime time.Time
@@ -255,13 +256,13 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 		broadcast.UpdatedAt = time.Now()
 		err = u.broadcastRepository.Insert(ctx, tx, broadcast)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to insert broadcast: ", err)
+			u.zslog.Errorf("[ScheduleBroadcast] failed to insert broadcast: %v", err)
 			return true, err
 		}
 		if broadcast.Status == string(dto.BroadcastScheduleScheduled) {
 			serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
 			if err != nil {
-				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to schedule broadcast: ", err)
+				u.zslog.Errorf("[ScheduleBroadcast] failed to schedule broadcast: %v", err)
 				broadcast.Status = string(dto.BroadcastScheduleDraft)
 				return serverError, err
 			}
@@ -278,7 +279,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 	var templateDBComponents []map[string]any
 	err := json.Unmarshal([]byte(template.Components), &templateDBComponents)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][ScheduleBroadcast] failed to get template components: ", err)
+		u.zslog.Errorf("[ScheduleBroadcast] failed to get template components: %v", err)
 		return nil, err
 	}
 	// broadcast_{{broadcast-id}}_{{contact-phone}}_{{text}}
@@ -288,7 +289,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 			for i, buttonComponent := range component["buttons"].([]any) {
 				button, err := whatsapp_business.NewTemplateCreateButton(buttonComponent)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][injectQuickReplyPayload] failed to create button component: ", err)
+					u.zslog.Errorf("[injectQuickReplyPayload] failed to create button component: %v", err)
 					return nil, err
 				}
 				iStr := strconv.Itoa(i)
@@ -314,7 +315,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, broadcastID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get broadcast by ID: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	var finalStatus dto.BroadcastScheduleStatus
@@ -326,17 +327,17 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcast.UpdatedAt = time.Now()
 		err = u.broadcastRepository.Update(ctx, nil, broadcast)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast status: ", err)
+			u.zslog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
 		}
 	}()
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, broadcast.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get whatsapp client: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to get whatsapp client: %v", err)
 		return true, err
 	}
 	broadcastRecipients, err := u.broadcastRepository.GetRecipientsByBroadcastID(ctx, broadcastID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to list broadcast recipients: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to list broadcast recipients: %v", err)
 		return true, err
 	}
 	// get tenant's template fields to validate the payload before sending messages
@@ -344,7 +345,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	err = json.Unmarshal([]byte(broadcast.Payload), &payload)
 	if err != nil {
 		finalStatus = dto.BroadcastScheduleFailed
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast payload: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
 		return true, err
 	}
 	sendComponents := make([]map[string]any, 0)
@@ -355,19 +356,19 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			}
 		}
 	} else {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to parse broadcast payload components: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to parse broadcast payload components: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
 	sendParameter, err := u.whatsappService.ExtractSendComponentParameterValues(*broadcast.ParameterFormat, sendComponents)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to extract parameter values from broadcast payload: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to extract parameter values from broadcast payload: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
 	templateFields, err := u.tenantRepository.GetTemplateFields(ctx, tenantID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get template fields: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to get template fields: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
@@ -391,7 +392,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		}
 		contacts, err = u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, phoneNumbers)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to get contacts by phone numbers: ", err)
+			u.zslog.Errorf("[SendBroadcast] failed to get contacts by phone numbers: %v", err)
 			finalStatus = dto.BroadcastScheduleFailed
 			return true, err
 		}
@@ -403,18 +404,18 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcastStatus = dto.BroadcastScheduleSending
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
+		u.zslog.Infof("[SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
 		return false, nil
 	}
 	broadcast.Status = string(broadcastStatus)
 	broadcast.UpdatedAt = time.Now()
 	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update broadcast status: ", err)
+		u.zslog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
 		return true, err
 	}
 	if broadcastStatus == dto.BroadcastScheduleCancelled {
-		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
+		u.zslog.Infof("[SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
 		return false, nil
 	}
 	type broadcastSend struct {
@@ -434,7 +435,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		for recipient := range recipientStatusUpdates {
 			err := u.broadcastRepository.UpdateRecipientStatus(ctx, nil, recipient)
 			if err != nil {
-				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to update recipient status: ", err)
+				u.zslog.Errorf("[SendBroadcast] failed to update recipient status: %v", err)
 			}
 		}
 	})
@@ -445,7 +446,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				payloadMap := make(map[string]any)
 				err := json.Unmarshal([]byte(req.Broadcast.Payload), &payloadMap)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast payload: ", err)
+					u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
 					continue
 				}
 				inputData := dto.MessageSendRequest{
@@ -458,7 +459,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				}
 				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, tenantID, inputData)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to send message to recipient: ", err)
+					u.zslog.Errorf("[SendBroadcast] failed to send message to recipient: %v", err)
 					errStr := err.Error()
 					req.Recipient.Status = string(dto.BroadcastScheduleFailed)
 					req.Recipient.Errors = &errStr
@@ -481,14 +482,14 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			broadcastPayload := make(map[string]any)
 			err := json.Unmarshal([]byte(broadcastCopy.Payload), &broadcastPayload)
 			if err != nil {
-				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast payload for recipient: ", err)
+				u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload for recipient: %v", err)
 				errStr = err.Error()
 				break
 			}
 			if templatePayload, ok := broadcastPayload["template"].(map[string]any); ok {
 				componentsBytes, err := json.Marshal(templatePayload["components"])
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to marshal broadcast components for recipient: ", err)
+					u.zslog.Errorf("[SendBroadcast] failed to marshal broadcast components for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
@@ -501,7 +502,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				var components []map[string]any
 				err = json.Unmarshal([]byte(componentsStr), &components)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to unmarshal broadcast components after replacement for recipient: ", err)
+					u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast components after replacement for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
@@ -509,13 +510,13 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				broadcastPayload["template"] = templatePayload
 				payloadBytes, err := json.Marshal(broadcastPayload)
 				if err != nil {
-					log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to marshal broadcast payload after replacement for recipient: ", err)
+					u.zslog.Errorf("[SendBroadcast] failed to marshal broadcast payload after replacement for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
 				broadcastCopy.Payload = string(payloadBytes)
 			} else {
-				log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][SendBroadcast] failed to parse broadcast payload for recipient: ", err)
+				u.zslog.Errorf("[SendBroadcast] failed to parse broadcast payload for recipient: %v", err)
 				errStr = "failed to parse broadcast payload for recipient"
 				break
 			}
@@ -552,23 +553,23 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, inputData dto.BroadcastCancelRequest) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][CancelBroadcast] failed to get broadcast by ID: ", err)
+		u.zslog.Errorf("[CancelBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		log.Printf("[INFO][internal/usecase/broadcast/broadcast.go][CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
+		u.zslog.Infof("[CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
 		return false, fmt.Errorf("broadcast currently in %s status, only broadcast in scheduled status can be cancelled", broadcast.Status)
 	}
 	err = u.googleTaskService.DeleteBroadcastTask(inputData.ID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][CancelBroadcast] failed to delete broadcast task: ", err)
+		u.zslog.Errorf("[CancelBroadcast] failed to delete broadcast task: %v", err)
 		return true, err
 	}
 	broadcast.Status = string(dto.BroadcastScheduleCancelled)
 	broadcast.UpdatedAt = time.Now()
 	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][CancelBroadcast] failed to update broadcast status: ", err)
+		u.zslog.Errorf("[CancelBroadcast] failed to update broadcast status: %v", err)
 		return true, err
 	}
 	return false, nil
@@ -578,7 +579,7 @@ func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, inputData f
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
 	broadcasts, err := u.broadcastRepository.GetFiltered(ctx, inputData)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcast] failed to get filtered broadcasts: ", err)
+		u.zslog.Errorf("[GetFilteredBroadcast] failed to get filtered broadcasts: %v", err)
 		return emptyResponse, true, err
 	}
 	return broadcasts, false, nil
@@ -588,7 +589,7 @@ func (u *BroadcastUsecase) GetFilteredBroadcastRecipients(ctx context.Context, i
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastRecipientResponse]
 	recipients, err := u.broadcastRepository.GetRecipientsFiltered(ctx, inputData)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/broadcast/broadcast.go][GetFilteredBroadcastRecipients] failed to get filtered broadcast recipients: ", err)
+		u.zslog.Errorf("[GetFilteredBroadcastRecipients] failed to get filtered broadcast recipients: %v", err)
 		return emptyResponse, true, err
 	}
 	return recipients, false, nil

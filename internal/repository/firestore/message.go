@@ -2,7 +2,6 @@ package repository_firestore
 
 import (
 	"context"
-	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/service"
@@ -70,15 +69,12 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			var storageMedia model.StorageMedia
 			storageMediaDoc, err := r.db.Collection(storageMedia.TableName()).Doc(*message.StorageMediaID).Get(ctx)
 			if err != nil || !storageMediaDoc.Exists() {
-				log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] No storage media found for ID:", *message.StorageMediaID, "err: ", err) // log if no storage media found
 			} else {
 				storageMediaData := storageMediaDoc.Data()
 				storageMediaData[firestore.DocumentID] = storageMediaDoc.Ref.ID
 				err := utils.MapToStruct(storageMediaData, &storageMedia)
 				if err != nil {
-					log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to map storage media data:", err)
-				} else {
-					message.StorageMedia = &storageMedia
+					return response, err
 				}
 			}
 		}
@@ -90,9 +86,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			if message.StorageMedia.IsURLFromStorage {
 				signedURL, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*message.StorageMedia.URL, 0)
 				if err != nil {
-					log.Println("[ERROR][internal/repository/firestore/message.go][GetMessageByChatID] Failed to generate signed URL for storage media:", err)
-					accessURL = nil
-					log.Println("[INFO][internal/repository/firestore/message.go][GetMessageByChatID] Storage media found for ID:", *message.StorageMediaID)
+					return response, err
 				}
 				accessURL = &signedURL
 			}

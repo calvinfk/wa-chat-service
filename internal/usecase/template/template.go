@@ -3,7 +3,6 @@ package template_usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +14,8 @@ import (
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
+
+	"go.uber.org/zap"
 )
 
 type TemplateUsecase struct {
@@ -22,32 +23,34 @@ type TemplateUsecase struct {
 	tenantUsecase      usecase.Tenant
 	whatsappService    service.WhatsappBusiness
 	txManager          *utils.TxManager
+	zslog              *zap.SugaredLogger
 }
 
-func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *utils.TxManager) *TemplateUsecase {
+func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *utils.TxManager, zslog *zap.SugaredLogger) *TemplateUsecase {
 	return &TemplateUsecase{
 		templateRepository: templateRepository,
 		tenantUsecase:      tenantUsecase,
 		whatsappService:    whatsappService,
 		txManager:          txManager,
+		zslog:              zslog,
 	}
 }
 
 func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error) {
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to get whatsapp client:", err)
+		u.zslog.Errorf("[CreateTemplate] failed to get whatsapp client: %v", err)
 		return nil, true, err
 	}
 	// log.Print(tenantID)
 	response, httpCode, err := u.whatsappService.CreateTemplate(whatsappClient, inputData)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to create template:", err)
+		u.zslog.Errorf("[CreateTemplate] failed to create template: %v", err)
 		return nil, httpCode >= http.StatusInternalServerError, err
 	}
 	componentsString, err := utils.AnyToJsonString(inputData.Components)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to marshal template components:", err)
+		u.zslog.Errorf("[CreateTemplate] failed to marshal template components: %v", err)
 		return nil, true, err
 	}
 	newTemplate := model.Template{
@@ -65,7 +68,7 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 	}
 
 	if _, err := u.templateRepository.Upsert(ctx, nil, newTemplate); err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][CreateTemplate] failed to upsert template:", err)
+		u.zslog.Errorf("[CreateTemplate] failed to upsert template: %v", err)
 		return nil, true, err
 	}
 	return response, false, nil
@@ -77,7 +80,7 @@ func (u *TemplateUsecase) GetFilteredByPhoneNumberID(ctx context.Context, inputD
 	var response filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
 	response, err = u.templateRepository.GetFilteredByPhoneNumberID(ctx, inputData.SpecificFilter.TenantID, inputData)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][GetFilteredByPhoneNumberID] failed to get templates by phone number id:", err)
+		u.zslog.Errorf("[GetFilteredByPhoneNumberID] failed to get templates by phone number id: %v", err)
 		return emptyResponse, true, err
 	}
 	return response, false, nil
@@ -86,12 +89,12 @@ func (u *TemplateUsecase) GetFilteredByPhoneNumberID(ctx context.Context, inputD
 func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error) {
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get whatsapp client:", err)
+		u.zslog.Errorf("[SyncTemplate] failed to get whatsapp client: %v", err)
 		return false, err
 	}
 	currentTemplates, err := u.templateRepository.GetAll(ctx, tenantID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get current templates from repository:", err)
+		u.zslog.Errorf("[SyncTemplate] failed to get current templates from repository: %v", err)
 		return false, err
 	}
 	currentTemplateMap := make(map[string]model.Template)
@@ -107,7 +110,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		}
 		response, paging, httpCode, err := whatsappClient.GetTemplateList("limit=100", queryParams)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to get template list:", err)
+			u.zslog.Errorf("[SyncTemplate] failed to get template list: %v", err)
 			return httpCode >= http.StatusInternalServerError, err
 		}
 		if len(response) == 0 {
@@ -123,7 +126,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			} else {
 				componentString, err := utils.AnyToJsonString(templateMeta.Components)
 				if err != nil {
-					log.Printf("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to marshal template components for template ID %s: %v", templateMeta.ID, err)
+					u.zslog.Errorf("[SyncTemplate] failed to marshal template components for template ID %s: %v", templateMeta.ID, err)
 					continue
 				}
 				template = model.Template{
@@ -145,7 +148,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			template.Category = templateMeta.Category
 			template.UpdatedAt = time.Now()
 			if _, err := u.templateRepository.Upsert(ctx, nil, template); err != nil {
-				log.Println("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to upsert template:", err)
+				u.zslog.Errorf("[SyncTemplate] failed to upsert template: %v", err)
 			}
 		}
 		if paging.Next == "" {
@@ -158,7 +161,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		if _, exists := savedTemplateIDs[templateID]; !exists {
 			err := u.templateRepository.DeleteByID(ctx, nil, tenantID, templateID)
 			if err != nil {
-				log.Printf("[ERROR][internal/usecase/template/template.go][SyncTemplate] failed to delete template with ID %s: %v", templateID, err)
+				u.zslog.Errorf("[SyncTemplate] failed to delete template with ID %s: %v", templateID, err)
 			}
 		}
 	}
@@ -168,24 +171,24 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error) {
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][DeleteTemplate] failed to get whatsapp client:", err)
+		u.zslog.Errorf("[DeleteTemplate] failed to get whatsapp client: %v", err)
 		return false, err
 	}
 	_, httpCode, err := whatsappClient.DeleteTemplate(inputData.ID, inputData.Name)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][DeleteTemplate] failed to delete template:", err)
+		u.zslog.Errorf("[DeleteTemplate] failed to delete template: %v", err)
 		return httpCode >= http.StatusInternalServerError, err
 	}
 	if inputData.ID != "" {
 		err = u.templateRepository.DeleteByID(ctx, nil, tenantID, inputData.ID)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/template/template.go][DeleteTemplate] failed to delete template from repository:", err)
+			u.zslog.Errorf("[DeleteTemplate] failed to delete template from repository: %v", err)
 			return true, err
 		}
 	} else if inputData.Name != "" {
 		err = u.templateRepository.DeleteByName(ctx, nil, tenantID, inputData.Name)
 		if err != nil {
-			log.Println("[ERROR][internal/usecase/template/template.go][DeleteTemplate] failed to delete template from repository:", err)
+			u.zslog.Errorf("[DeleteTemplate] failed to delete template from repository: %v", err)
 			return true, err
 		}
 	}
@@ -195,21 +198,21 @@ func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.Temp
 func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.TemplateUpdateRequest) (bool, error) {
 	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to get whatsapp client:", err)
+		u.zslog.Errorf("[UpdateTemplate] failed to get whatsapp client: %v", err)
 		return false, err
 	}
 	currentTemplate, err := u.templateRepository.GetByID(ctx, tenantID, inputData.ID)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to get current template from repository:", err)
+		u.zslog.Errorf("[UpdateTemplate] failed to get current template from repository: %v", err)
 		return false, err
 	}
 	if strings.ToUpper(currentTemplate.Status) != "REJECTED" {
-		log.Printf("[ERROR][internal/usecase/template/template.go][UpdateTemplate] cannot update template with status %s", currentTemplate.Status)
+		u.zslog.Errorf("[UpdateTemplate] cannot update template with status %s", currentTemplate.Status)
 		return false, fmt.Errorf("cannot update template with status %s", currentTemplate.Status)
 	}
 	componentsString, err := utils.AnyToJsonString(inputData.Components)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to marshal template components:", err)
+		u.zslog.Errorf("[UpdateTemplate] failed to marshal template components: %v", err)
 		return false, err
 	}
 	payload := whatsapp_business.TemplateCreateRequest{
@@ -221,7 +224,7 @@ func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.Temp
 	}
 	response, httpCode, err := whatsappClient.UpdateTemplate(inputData.ID, payload)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to update template:", err)
+		u.zslog.Errorf("[UpdateTemplate] failed to update template: %v", err)
 		return httpCode >= http.StatusInternalServerError, err
 	}
 	currentTemplate.Category = response.Category
@@ -233,7 +236,7 @@ func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.Temp
 	currentTemplate.UpdatedAt = time.Now()
 	_, err = u.templateRepository.Upsert(ctx, nil, currentTemplate)
 	if err != nil {
-		log.Println("[ERROR][internal/usecase/template/template.go][UpdateTemplate] failed to upsert template:", err)
+		u.zslog.Errorf("[UpdateTemplate] failed to upsert template: %v", err)
 		return false, err
 	}
 	return false, nil
