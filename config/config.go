@@ -110,6 +110,12 @@ func New() (*Config, error) {
 	}
 	config.JOSE = jose
 
+	grpc, err := grpcENV()
+	if err != nil {
+		return nil, err
+	}
+	config.GRPC = grpc
+
 	return config, nil
 }
 
