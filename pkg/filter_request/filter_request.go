@@ -167,16 +167,5 @@ func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []
 	if err != nil {
 		return nil, 0, err
 	}
-	// for _, doc := range docs {
-	// 	var data T
-	// 	docData := doc.Data()
-	// 	log.Println("[DEBUG][ApplyFilterFirestore] docData:", docData)
-	// 	docData[firestore.DocumentID] = doc.Ref.ID
-	// 	err := utils.MapToStruct(docData, &data)
-	// 	if err != nil {
-	// 		return nil, 0, err
-	// 	}
-	// 	*results = append(*results, data)
-	// }
 	return docs, totalData, nil
 }

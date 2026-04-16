@@ -1,19 +1,19 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"wa_chat_service/internal/service"
 
 	"github.com/gofiber/fiber/v3"
+	"go.uber.org/zap"
 )
 
-func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, pass bool) fiber.Handler {
+func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, pass bool, zsLog *zap.SugaredLogger) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		var err error
 		encryptedToken := ctx.Get("Authorization")
 		if encryptedToken == "" {
-			log.Println("[ERROR][internal/handler/http/middleware/Jwt] Authorization header or cookie is required: ", err)
+			zsLog.Errorf("[ERROR][internal/handler/http/middleware/Jwt] Authorization header or cookie is required: %v", err)
 			if pass {
 				return ctx.Next()
 			}
@@ -40,7 +40,7 @@ func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, p
 		}
 		tokenString, err := encryptService.Decrypt(encryptedToken)
 		if err != nil {
-			log.Println("[ERROR][internal/handler/http/middleware/Jwt] Failed to decrypt token: ", err)
+			zsLog.Errorf("[ERROR][internal/handler/http/middleware/Jwt] Failed to decrypt token: %v", err)
 			if pass {
 				return ctx.Next()
 			}

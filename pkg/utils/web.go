@@ -1,15 +1,12 @@
 package utils
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
 func GetURLHeaders(fileURL string) (http.Header, error) {
-	// Implementation for checking MIME type based on file URL
-	log.Println("[INFO][utils/utils.go][GetURLHeaders] Checking URL headers for:", fileURL)
 	client := http.Client{}
 	resp, err := client.Head(fileURL)
 	if err != nil {

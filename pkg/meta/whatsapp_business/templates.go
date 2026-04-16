@@ -3,7 +3,6 @@ package whatsapp_business
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"wa_chat_service/pkg/meta/whatsapp_business/template_components"
@@ -182,7 +181,6 @@ func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateR
 		return TemplateCreateResponse{}, httpCode, err
 	}
 	if httpCode != http.StatusOK && httpCode != http.StatusCreated {
-		log.Println("[ERROR][pkg/meta/whatsapp_business/templates.go][CreateTemplate] failed to create template, response body:", string(body))
 		return parseMetaErrorResponse(TemplateCreateResponse{}, body, httpCode)
 	}
 	var response TemplateCreateResponse

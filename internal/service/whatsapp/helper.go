@@ -3,7 +3,6 @@ package whatsapp_service
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -227,7 +226,7 @@ func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterF
 					}
 					err := validateMediaID(whatsappClient, mediaID, componentParameterType)
 					if err != nil {
-						return fmt.Errorf("failed to validate media ID in %s: %v", componentType, err)
+						return err
 					}
 				}
 			}
@@ -284,15 +283,9 @@ func extractSendTemplateComponents(templateSendPayload map[string]any) ([]map[st
 func validateMediaID(client *whatsapp_business.Client, mediaID string, mediaType string) error {
 	res, httpCode, err := client.GetMediaURL(mediaID)
 	if err != nil {
-		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
-			log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
-			return waErr
-		}
-		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] Failed to validate media ID %s: %v", mediaID, err)
 		return err
 	} else if httpCode != http.StatusOK {
-		log.Printf("[ERROR][internal/service/whatsapp/whatsapp.go][ValidateMediaID] Failed to validate media ID %s, unexpected HTTP code: %d", mediaID, httpCode)
-		return fmt.Errorf("failed to validate media ID %s, unexpected HTTP code: %d", mediaID, httpCode)
+		return fmt.Errorf("failed to validate media ID, status code: %d", httpCode)
 	}
 	isAllowed := whatsapp_business.IsMediaAllowed(mediaType, res.MimeType)
 	if !isAllowed {

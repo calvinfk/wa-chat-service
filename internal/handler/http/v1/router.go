@@ -35,7 +35,7 @@ func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
 	storageMediaHandler.RegisterRoutes(api)
 	templateHandler := NewTemplateHandler(routerHandler.TemplateUsecase)
 	templateHandler.RegisterRoute(api)
-	broadcastHandler := NewBroadcastHandler(routerHandler.BroadcastUsecase, routerHandler.EncryptService, routerHandler.JWTService)
+	broadcastHandler := NewBroadcastHandler(routerHandler.BroadcastUsecase, routerHandler.EncryptService, routerHandler.JWTService, routerHandler.ZSLog)
 	broadcastHandler.RegisterRoute(api)
 	tenantHandler := NewTenantHandler(routerHandler.TenantUsecase)
 	tenantHandler.RegisterRoute(api)

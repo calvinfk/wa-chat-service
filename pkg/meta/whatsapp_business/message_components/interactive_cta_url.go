@@ -1,7 +1,6 @@
 package message_components
 
 import (
-	"log"
 	"wa_chat_service/pkg/utils"
 )
 
@@ -46,7 +45,6 @@ func (c InteractiveCTAUrl) GetPayload() map[string]any {
 }
 
 func (c InteractiveCTAUrl) Validate() error {
-	log.Println("[DEBUG][pkg/meta/whatsapp_business/component/interactive_cta_url.go][Validate] Validating InteractiveCTAUrl component")
 	validator := utils.NewValidator()
 	data := struct {
 		Interactive InteractiveCTAUrl `json:"interactive" validate:"required"`

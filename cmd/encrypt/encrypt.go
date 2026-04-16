@@ -6,17 +6,15 @@ import (
 	"strings"
 	"wa_chat_service/config"
 	encrypt_service "wa_chat_service/internal/service/encrypt"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func main() {
 	args := os.Args
 	if len(args) == 1 {
-		log.Printf("[INFO][cmd/encrypt/encrypt.go][main] No command provided. Use 'encrypt' or 'decrypt'.")
-		return
+		log.Fatalf("[main] No command provided. Use 'encrypt' or 'decrypt'.")
 	}
 	err := godotenv.Load()
 	if err != nil {
@@ -28,35 +26,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error initializing config: %v", err)
 	}
-	zlogDevelopment := zap.NewDevelopmentConfig()
-	zlogDevelopment.DisableCaller = true
-	zlogDevelopment.DisableStacktrace = true
-	zlogDevelopment.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	zlogDevelopment.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05")
-	zlogDevelopment.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	zlog, err := zlogDevelopment.Build()
+	zlog, err := utils.NewZapLogger(config.App.Environment, nil)
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
 	}
-	encryptService := encrypt_service.NewEncryptService(&config.Encrypt, zlog.Sugar())
+	zslog := zlog.Sugar()
+	encryptService := encrypt_service.NewEncryptService(&config.Encrypt, zslog)
 	option := strings.Split(args[1], "=")
 	if len(option) != 2 {
-		log.Printf("[INFO][cmd/encrypt/encrypt.go][main] Invalid command format. Use 'encrypt' or 'decrypt'.")
-		return
+		log.Fatalf("[main] Invalid command format. Use 'encrypt' or 'decrypt'.")
 	}
 	switch option[0] {
 	case "encrypt":
 		encrypted, err := encryptService.Encrypt(option[1])
 		if err != nil {
-			log.Fatalf("Error encrypting: %v", err)
+			zslog.Fatalf("[main] Error encrypting: %v", err)
 		}
-		log.Printf("[INFO][cmd/encrypt/encrypt.go][main] Encrypted: %s", encrypted)
+		zslog.Infof("[main] Encrypted: %s", encrypted)
 	case "decrypt":
 		decrypted, err := encryptService.Decrypt(option[1])
 		if err != nil {
-			log.Fatalf("Error decrypting: %v", err)
+			zslog.Fatalf("[main] Error decrypting: %v", err)
 		}
-		log.Printf("[INFO][cmd/encrypt/encrypt.go][main] Decrypted: %s", decrypted)
+		zslog.Infof("[main] Decrypted: %s", decrypted)
 	}
 
 }

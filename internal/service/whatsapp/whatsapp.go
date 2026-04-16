@@ -130,6 +130,10 @@ func (s *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cli
 	}
 
 	if err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents); err != nil {
+		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
+			s.zslog.Errorf("[ValidateTemplatePayload] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
+			return waErr
+		}
 		s.zslog.Errorf("[ValidateTemplatePayload] Failed to validate send components: %v", err)
 		return err
 	}

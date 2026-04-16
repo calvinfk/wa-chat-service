@@ -14,11 +14,11 @@ func NewRouter(app *fiber.App, config *config.Config, handlerHTTPV1 http_v1.Hand
 	// Set up middleware
 	app.Use(
 		logger.New(),
-		middleware.Recover(),
+		middleware.Recover(handlerHTTPV1.ZSLog),
 		middleware.Cors(&config.CORS),
 		middleware.OptionsRoute(),
 		middleware.FileSizeLimit(16*1024*1024), // 16MB
-		middleware.AccessToken(handlerHTTPV1.AccessTokenService, handlerHTTPV1.EncryptService),
+		middleware.AccessToken(handlerHTTPV1.AccessTokenService, handlerHTTPV1.EncryptService, handlerHTTPV1.ZSLog),
 		// middleware.ActivityLog(handlerHTTPV1.ActivityLogUsecase),
 	)
 

@@ -42,7 +42,6 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 		u.zslog.Errorf("[CreateTemplate] failed to get whatsapp client: %v", err)
 		return nil, true, err
 	}
-	// log.Print(tenantID)
 	response, httpCode, err := u.whatsappService.CreateTemplate(whatsappClient, inputData)
 	if err != nil {
 		u.zslog.Errorf("[CreateTemplate] failed to create template: %v", err)

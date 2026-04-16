@@ -11,19 +11,22 @@ import (
 	"wa_chat_service/pkg/filter_request"
 
 	"github.com/gofiber/fiber/v3"
+	"go.uber.org/zap"
 )
 
 type BroadcastHandler struct {
 	broadcastUsecase usecase.Broadcast
 	encryptService   service.Encrypt
 	jwtService       service.JWT
+	ZSLog            *zap.SugaredLogger
 }
 
-func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService service.Encrypt, jwtService service.JWT) *BroadcastHandler {
+func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService service.Encrypt, jwtService service.JWT, zslog *zap.SugaredLogger) *BroadcastHandler {
 	return &BroadcastHandler{
 		broadcastUsecase: broadcastUsecase,
 		encryptService:   encryptService,
 		jwtService:       jwtService,
+		ZSLog:            zslog,
 	}
 }
 
@@ -32,7 +35,7 @@ func (h *BroadcastHandler) RegisterRoute(api fiber.Router) {
 	{
 		broadcastRoute.Post("/upsert", middleware.Protected(), h.upsertBroadcast)
 		broadcastRoute.Post("/schedule", middleware.Protected(), h.scheduleBroadcast)
-		broadcastRoute.Post("/send", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true), h.sendBroadcast)
+		broadcastRoute.Post("/send", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true, h.ZSLog), h.sendBroadcast)
 		broadcastRoute.Put("/cancel", middleware.Protected(), h.cancelBroadcast)
 		broadcastRoute.Get("/get-filtered", middleware.Protected(), h.getFilteredBroadcast)
 		broadcastRoute.Get("/get-recipients-filtered", middleware.Protected(), h.getFilteredBroadcastRecipients)

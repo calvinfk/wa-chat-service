@@ -1,7 +1,6 @@
 package http_v1
 
 import (
-	"log"
 	"time"
 	"wa_chat_service/config"
 	"wa_chat_service/internal/dto"
@@ -33,7 +32,6 @@ func (h *AuthHandler) RegisterRoutes(api fiber.Router) {
 func (h *AuthHandler) login(ctx fiber.Ctx) error {
 	var requestData dto.AuthLoginRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		log.Println("[ERROR][internal/handler/http/v1/auth.go][login] ctx.Bind().Body error:", err)
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
