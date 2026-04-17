@@ -22,9 +22,3 @@ func ServerOptions(opts ...pbgrpc.ServerOption) Option {
 		s.serverOpts = append(s.serverOpts, opts...)
 	}
 }
-
-func DisableRequestLogger() Option {
-	return func(s *Server) {
-		s.enableLog = false
-	}
-}
