@@ -50,10 +50,11 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 		opt(s)
 	}
 
-	serverOpts := append([]grpc.ServerOption{}, s.serverOpts...)
+	serverOpts := []grpc.ServerOption{}
 	if s.enableLog {
 		serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(s.unaryRequestLogger()))
 	}
+	serverOpts = append(serverOpts, s.serverOpts...)
 
 	s.App = grpc.NewServer(serverOpts...)
 

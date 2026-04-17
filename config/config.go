@@ -66,7 +66,8 @@ type (
 	}
 
 	GRPC struct {
-		Port int `env:"GRPC_PORT,required"`
+		Port   int    `env:"GRPC_PORT,required"`
+		Secret string `env:"GRPC_SECRET,required"`
 	}
 )
 
@@ -330,7 +331,8 @@ func loadPrivateKey(keyPath string) (*rsa.PrivateKey, error) {
 func grpcENV() (GRPC, error) {
 	var errors []string
 	cfg := GRPC{
-		Port: 0,
+		Port:   0,
+		Secret: os.Getenv("GRPC_SECRET"),
 	}
 	if portStr := os.Getenv("GRPC_PORT"); portStr != "" {
 		if port, err := strconv.Atoi(portStr); err == nil {
@@ -340,6 +342,9 @@ func grpcENV() (GRPC, error) {
 		}
 	} else {
 		errors = append(errors, "GRPC_PORT is required")
+	}
+	if cfg.Secret == "" {
+		errors = append(errors, "GRPC_SECRET is required")
 	}
 	if len(errors) > 0 {
 		return cfg, fmt.Errorf("missing required GRPC environment variables: %s", strings.Join(errors, ", "))

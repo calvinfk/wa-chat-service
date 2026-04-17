@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package grpc.v1;
 
 option go_package = "docs/proto/v1";
@@ -15,6 +17,7 @@ service StorageMedia {
 message SaveMediaIDRequest {
   string media_id = 1;
   string phone_number_id = 2;
+  google.protobuf.Timestamp grpc_created_at = 3;
 }
 
 // SaveMediaIDResponse indicates whether the media ID was saved successfully.

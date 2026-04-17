@@ -38,6 +38,7 @@ import (
 	firebase "firebase.google.com/go/v4"
 	"go.uber.org/zap"
 	"google.golang.org/api/cloudtasks/v2"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -200,6 +201,7 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 	grpcServer := server_grpc.New(
 		zslog.Desugar().Named("gRPC"),
 		server_grpc.Port(fmt.Sprintf("%d", config.GRPC.Port)),
+		server_grpc.ServerOptions(grpc.ChainUnaryInterceptor(server_grpc.HMACServerInterceptor(config.GRPC.Secret))),
 	)
 	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
 		StorageMedia: usecases.StorageMedia,
