@@ -52,7 +52,7 @@ func (r *StorageMediaRepository) GetByDocumentID(ctx context.Context, documentID
 	}
 	var media model.StorageMedia
 	docData := doc.Data()
-	docData[firestore.DocumentID] = doc.Ref.ID
+	docData["id"] = doc.Ref.ID
 	err = utils.MapToStruct(docData, &media)
 	if err != nil {
 		return r.storageMedia, err
@@ -71,7 +71,7 @@ func (r *StorageMediaRepository) GetByURL(ctx context.Context, url string) (mode
 	var media model.StorageMedia
 	for _, doc := range docs {
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
@@ -91,7 +91,7 @@ func (r *StorageMediaRepository) GetByAccessURL(ctx context.Context, accessURL s
 	var media model.StorageMedia
 	for _, doc := range docs {
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
@@ -111,7 +111,7 @@ func (r *StorageMediaRepository) GetByMediaID(ctx context.Context, mediaID strin
 	var media model.StorageMedia
 	for _, doc := range docs {
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return r.storageMedia, err
@@ -171,7 +171,7 @@ func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filt
 	for _, doc := range docs {
 		var media model.StorageMedia
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &media)
 		if err != nil {
 			return response, err

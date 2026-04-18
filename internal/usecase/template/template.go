@@ -19,20 +19,22 @@ import (
 )
 
 type TemplateUsecase struct {
-	templateRepository repository.Template
-	tenantUsecase      usecase.Tenant
-	whatsappService    service.WhatsappBusiness
-	txManager          *utils.TxManager
-	zslog              *zap.SugaredLogger
+	templateRepository      repository.Template
+	meiliTemplateRepository repository.MeiliTemplate
+	tenantUsecase           usecase.Tenant
+	whatsappService         service.WhatsappBusiness
+	txManager               *utils.TxManager
+	zslog                   *zap.SugaredLogger
 }
 
-func NewTemplateUsecase(templateRepository repository.Template, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *utils.TxManager, zslog *zap.SugaredLogger) *TemplateUsecase {
+func NewTemplateUsecase(templateRepository repository.Template, meiliTemplateRepository repository.MeiliTemplate, tenantUsecase usecase.Tenant, whatsappService service.WhatsappBusiness, txManager *utils.TxManager, zslog *zap.SugaredLogger) *TemplateUsecase {
 	return &TemplateUsecase{
-		templateRepository: templateRepository,
-		tenantUsecase:      tenantUsecase,
-		whatsappService:    whatsappService,
-		txManager:          txManager,
-		zslog:              zslog,
+		templateRepository:      templateRepository,
+		meiliTemplateRepository: meiliTemplateRepository,
+		tenantUsecase:           tenantUsecase,
+		whatsappService:         whatsappService,
+		txManager:               txManager,
+		zslog:                   zslog,
 	}
 }
 
@@ -69,6 +71,9 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 	if _, err := u.templateRepository.Upsert(ctx, nil, newTemplate); err != nil {
 		u.zslog.Errorf("[CreateTemplate] failed to upsert template: %v", err)
 		return nil, true, err
+	}
+	if _, err := u.meiliTemplateRepository.AddDocuments(ctx, []model.Template{newTemplate}); err != nil {
+		u.zslog.Errorf("[CreateTemplate] failed to add template document to meili repository: %v", err)
 	}
 	return response, false, nil
 }
@@ -115,6 +120,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 		if len(response) == 0 {
 			break
 		}
+		var templates []model.Template
 		for _, responseData := range response {
 			templateMeta := responseData.(whatsapp_business.TemplateResponse)
 			savedTemplateIDs[templateMeta.ID] = true
@@ -149,6 +155,10 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			if _, err := u.templateRepository.Upsert(ctx, nil, template); err != nil {
 				u.zslog.Errorf("[SyncTemplate] failed to upsert template: %v", err)
 			}
+			templates = append(templates, template)
+		}
+		if _, err := u.meiliTemplateRepository.AddDocuments(ctx, templates); err != nil {
+			u.zslog.Errorf("[SyncTemplate] failed to add template document to meili repository: %v", err)
 		}
 		if paging.Next == "" {
 			break
@@ -156,12 +166,19 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 			nextCursor = paging.Cursors.After
 		}
 	}
+	var deletedID []string
 	for templateID := range currentTemplateMap {
 		if _, exists := savedTemplateIDs[templateID]; !exists {
 			err := u.templateRepository.DeleteByID(ctx, nil, tenantID, templateID)
 			if err != nil {
 				u.zslog.Errorf("[SyncTemplate] failed to delete template with ID %s: %v", templateID, err)
 			}
+			deletedID = append(deletedID, templateID)
+		}
+	}
+	if len(deletedID) > 0 {
+		if _, err := u.meiliTemplateRepository.DeleteDocuments(ctx, deletedID); err != nil {
+			u.zslog.Errorf("[SyncTemplate] failed to delete template document from meili repository: %v", err)
 		}
 	}
 	return false, nil

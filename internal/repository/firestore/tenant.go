@@ -32,7 +32,7 @@ func (r *TenantRepository) GetByID(ctx context.Context, tenantID string) (model.
 	// Unmarshal the document into a Tenant model
 	var tenant model.Tenant
 	docData := doc.Data()
-	docData[firestore.DocumentID] = doc.Ref.ID
+	docData["id"] = doc.Ref.ID
 	err = utils.MapToStruct(docData, &tenant)
 	if err != nil {
 		return model.Tenant{}, err
@@ -51,7 +51,7 @@ func (r *TenantRepository) GetByPhoneNumberID(ctx context.Context, phoneNumberID
 	// Unmarshal the document into a Tenant model
 	var tenant model.Tenant
 	docData := doc.Data()
-	docData[firestore.DocumentID] = doc.Ref.ID
+	docData["id"] = doc.Ref.ID
 	err = utils.MapToStruct(docData, &tenant)
 	if err != nil {
 		return model.Tenant{}, err
@@ -81,7 +81,7 @@ func (r *TenantRepository) GetContactsFiltered(ctx context.Context, tenantID str
 	for _, doc := range docs {
 		var contact model.Contact
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
 		err = utils.MapToStruct(docData, &contact)
 		if err != nil {
@@ -102,7 +102,7 @@ func (r *TenantRepository) GetContactByPhoneNumbers(ctx context.Context, tenantI
 	contacts := make(map[string]map[string]string)
 	for _, doc := range docs {
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
 		docDataCopy := make(map[string]string)
 		for key, value := range docData {
@@ -120,7 +120,7 @@ func (r *TenantRepository) GetContactByID(ctx context.Context, tenantID string, 
 	}
 	var contact model.Contact
 	docData := docRef.Data()
-	docData[firestore.DocumentID] = docRef.Ref.ID
+	docData["id"] = docRef.Ref.ID
 	docData["tenant_id"] = tenantID
 	err = utils.MapToStruct(docData, &contact)
 	if err != nil {
@@ -146,7 +146,7 @@ func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID strin
 	for _, doc := range docs {
 		var templateField model.TemplateField
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
 		err = utils.MapToStruct(docData, &templateField)
 		if err != nil {

@@ -5,7 +5,7 @@ PORT ?= 8121
 VER ?=
 ARGS ?=
 
-.PHONY: run build clean test-integration save
+.PHONY: run build clean test-integration save meili-up
 
 # 1. Build and Run the App
 run:
@@ -33,6 +33,11 @@ clean:
 
 proto:
 	protoc --go_out=. --go-grpc_out=. --proto_path=./docs/proto/ ./docs/proto/**/*.proto
+
+meili-up:
+	docker compose -f docker-compose.meili.yml up -d
+meili-down:
+	docker compose -f docker-compose.meili.yml down
 
 save:
 ifeq ($(VER),)

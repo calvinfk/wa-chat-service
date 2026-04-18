@@ -9,7 +9,12 @@ services:
       - .env
     volumes:
       - app_log:/app.log
-
+  meili-search:
+    image: getmeili/meilisearch:latest
+    container_name: meili-search
+    ports:
+      - "7700:7700"
+    restart: unless-stopped
 volumes:
   app_log:
     driver: local

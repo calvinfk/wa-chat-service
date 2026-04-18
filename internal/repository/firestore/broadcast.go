@@ -38,7 +38,7 @@ func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (
 	}
 	var broadcast model.Broadcast
 	docData := docRef.Data()
-	docData[firestore.DocumentID] = docRef.Ref.ID
+	docData["id"] = docRef.Ref.ID
 	err = utils.MapToStruct(docData, &broadcast)
 	if err != nil {
 		return r.broadcast, err
@@ -86,7 +86,7 @@ func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, br
 	for _, docRef := range docs {
 		var recipient model.BroadcastRecipient
 		docData := docRef.Data()
-		docData[firestore.DocumentID] = docRef.Ref.ID
+		docData["id"] = docRef.Ref.ID
 		docData["broadcast_id"] = broadcastID
 		err = utils.MapToStruct(docData, &recipient)
 		if err != nil {
@@ -132,7 +132,7 @@ func (r *BroadcastRepository) GetFiltered(ctx context.Context, inputData filter_
 	for _, doc := range docRef {
 		var broadcast model.Broadcast
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &broadcast)
 		if err != nil {
 			return emptyResponse, err
@@ -159,7 +159,7 @@ func (r *BroadcastRepository) GetRecipientsFiltered(ctx context.Context, inputDa
 	for _, doc := range docRef {
 		var broadcast model.BroadcastRecipient
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["broadcast_id"] = inputData.SpecificFilter.BroadcastID
 		err = utils.MapToStruct(docData, &broadcast)
 		if err != nil {

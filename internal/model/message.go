@@ -3,7 +3,7 @@ package model
 import "time"
 
 type Message struct {
-	DocumentID      string        `json:"__name__" firestore:"-"`                                  // id from whatsapp
+	DocumentID      string        `json:"id" firestore:"-"`                                        // id from whatsapp
 	ChatID          string        `json:"chat_id" firestore:"-"`                                   // reference to chat document
 	MessageType     string        `json:"message_type" firestore:"message_type"`                   // text, image, video, etc
 	MessageCategory string        `json:"message_category" firestore:"message_category"`           // marketing, authentication, utility, service

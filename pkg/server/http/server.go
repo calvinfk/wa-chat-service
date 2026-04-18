@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -63,6 +64,7 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 	for _, opt := range opts {
 		opt(s)
 	}
+	fmt.Println(s.validator)
 
 	app := fiber.New(fiber.Config{
 		StructValidator: s.validator,

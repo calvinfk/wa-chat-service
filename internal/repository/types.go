@@ -7,6 +7,7 @@ import (
 	"wa_chat_service/pkg/filter_request"
 
 	"cloud.google.com/go/firestore"
+	"github.com/meilisearch/meilisearch-go"
 )
 
 type (
@@ -75,5 +76,11 @@ type (
 		UpdateRecipientStatus(ctx context.Context, tx *firestore.Transaction, data model.BroadcastRecipient) error
 		GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error)
 		GetRecipientsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], error)
+	}
+
+	MeiliTemplate interface {
+		CreateIndex(ctx context.Context) (*meilisearch.TaskInfo, error)
+		AddDocuments(ctx context.Context, document []model.Template) (*meilisearch.TaskInfo, error)
+		DeleteDocuments(ctx context.Context, documentIDs []string) (*meilisearch.TaskInfo, error)
 	}
 )

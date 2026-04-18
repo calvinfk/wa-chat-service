@@ -1,0 +1,16 @@
+services:
+  meili-search:
+    image: getmeili/meilisearch:v1.42.1
+    container_name: meili-search
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - MEILI_ENVIRONMENT=${APP_ENVIRONMENT}
+
+volumes:
+  meili_data:
+    driver: local

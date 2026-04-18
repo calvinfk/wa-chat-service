@@ -3,7 +3,7 @@ package model
 import "time"
 
 type Contact struct {
-	DocumentID  string    `json:"__name__" firestore:"-"`  // uuid v7
+	DocumentID  string    `json:"id" firestore:"-"`        // uuid v7
 	TenantID    string    `json:"tenant_id" firestore:"-"` // reference to tenant id from tenant collection
 	PhoneNumber string    `json:"phone_number" firestore:"phone_number"`
 	Name        string    `json:"name" firestore:"name"`

@@ -21,6 +21,7 @@ type (
 		GCP      GCP
 		JOSE     JOSE
 		GRPC     GRPC
+		Meili    Meili
 	}
 
 	// Application metadata and server configuration, such as name, version, environment, port, and URL.
@@ -68,6 +69,11 @@ type (
 	GRPC struct {
 		Port   int    `env:"GRPC_PORT,required"`
 		Secret string `env:"GRPC_SECRET,required"`
+	}
+
+	Meili struct {
+		URL    string `env:"MEILI_URL,required"`
+		APIKey string `env:"MEILI_API_KEY,required"`
 	}
 )
 
@@ -117,6 +123,11 @@ func New() (*Config, error) {
 	}
 	config.GRPC = grpc
 
+	meili, err := meiliEnv()
+	if err != nil {
+		return nil, err
+	}
+	config.Meili = meili
 	return config, nil
 }
 
@@ -348,6 +359,24 @@ func grpcENV() (GRPC, error) {
 	}
 	if len(errors) > 0 {
 		return cfg, fmt.Errorf("missing required GRPC environment variables: %s", strings.Join(errors, ", "))
+	}
+	return cfg, nil
+}
+
+func meiliEnv() (Meili, error) {
+	var errors []string
+	cfg := Meili{
+		URL:    os.Getenv("MEILI_URL"),
+		APIKey: os.Getenv("MEILI_API_KEY"),
+	}
+	if cfg.URL == "" {
+		errors = append(errors, "MEILI_URL is required")
+	}
+	if cfg.APIKey == "" {
+		errors = append(errors, "MEILI_API_KEY is required")
+	}
+	if len(errors) > 0 {
+		return cfg, fmt.Errorf("missing required Meili environment variables: %s", strings.Join(errors, ", "))
 	}
 	return cfg, nil
 }

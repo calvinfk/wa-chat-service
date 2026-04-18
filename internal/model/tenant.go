@@ -5,7 +5,7 @@ import (
 )
 
 type Tenant struct {
-	DocumentID    string    `json:"__name__" firestore:"-"`
+	DocumentID    string    `json:"id" firestore:"-"`
 	WabaID        string    `json:"waba_id" firestore:"waba_id"`
 	AccessToken   string    `json:"access_token" firestore:"access_token"` // encrypted
 	PhoneNumberID string    `json:"phone_number_id" firestore:"phone_number_id"`

@@ -10,7 +10,7 @@ type (
 	// The ID is generated as a UUID.
 	// The CreatedAt field is automatically managed by GORM to track when record is created.
 	ActivityLog struct {
-		ID          string    `json:"__name__" firestore:"id"`
+		ID          string    `json:"id" firestore:"-"`
 		UserID      *string   `json:"user_id" firestore:"user_id"`
 		Type        string    `json:"type" firestore:"type"`
 		Description string    `json:"description" firestore:"description"`

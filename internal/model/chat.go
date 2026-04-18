@@ -6,7 +6,7 @@ import (
 )
 
 type Chat struct {
-	DocumentID    string    `json:"__name__" firestore:"-"` // {recipient_id}-{phone_number_id}
+	DocumentID    string    `json:"id" firestore:"-"` // {recipient_id}-{phone_number_id}
 	PhoneNumberID string    `json:"phone_number_id" firestore:"phone_number_id"`
 	RecipientID   string    `json:"recipient_id" firestore:"recipient_id"`
 	ChatType      string    `json:"chat_type" firestore:"chat_type"` // individual or group

@@ -58,7 +58,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 	for _, doc := range docs {
 		var message model.Message
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["chat_id"] = doc.Ref.Parent.Parent.ID
 		err := utils.MapToStruct(docData, &message)
 		if err != nil {
@@ -71,7 +71,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			if err != nil || !storageMediaDoc.Exists() {
 			} else {
 				storageMediaData := storageMediaDoc.Data()
-				storageMediaData[firestore.DocumentID] = storageMediaDoc.Ref.ID
+				storageMediaData["id"] = storageMediaDoc.Ref.ID
 				err := utils.MapToStruct(storageMediaData, &storageMedia)
 				if err != nil {
 					return response, err

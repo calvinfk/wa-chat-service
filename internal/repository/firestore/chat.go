@@ -75,7 +75,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 	for _, doc := range docs {
 		var chat model.Chat
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		err := utils.MapToStruct(docData, &chat)
 		if err != nil {
 			return response, err

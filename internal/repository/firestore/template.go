@@ -39,7 +39,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 	for _, doc := range docs {
 		var template model.Template
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
 		err := utils.MapToStruct(docData, &template)
 		if err != nil {
@@ -62,7 +62,7 @@ func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]mod
 	for _, doc := range docs {
 		var template model.Template
 		docData := doc.Data()
-		docData[firestore.DocumentID] = doc.Ref.ID
+		docData["id"] = doc.Ref.ID
 		docData["tenant_id"] = tenantID
 		err := utils.MapToStruct(docData, &template)
 		if err != nil {
@@ -85,7 +85,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 		return template, err
 	}
 	docData := doc.Data()
-	docData[firestore.DocumentID] = doc.Ref.ID
+	docData["id"] = doc.Ref.ID
 	docData["tenant_id"] = tenantID
 	err = utils.MapToStruct(docData, &template)
 	if err != nil {

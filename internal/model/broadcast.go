@@ -4,7 +4,7 @@ import "time"
 
 type (
 	Broadcast struct {
-		DocumentID      string    `json:"__name__" firestore:"-"` // uuid v7
+		DocumentID      string    `json:"id" firestore:"-"` // uuid v7
 		Name            string    `json:"name" firestore:"name"`
 		TemplateID      string    `json:"template_id" firestore:"template_id"`
 		TenantID        string    `json:"tenant_id" firestore:"tenant_id"`

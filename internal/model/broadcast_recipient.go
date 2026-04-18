@@ -3,7 +3,7 @@ package model
 import "time"
 
 type BroadcastRecipient struct {
-	DocumentID    string    `json:"__name__" firestore:"-"`     // uuid v7
+	DocumentID    string    `json:"id" firestore:"-"`           // uuid v7
 	BroadcastID   string    `json:"broadcast_id" firestore:"-"` // reference to broadcast document
 	WamID         string    `json:"wam_id" firestore:"wam_id"`
 	RecipientID   string    `json:"recipient_id" firestore:"recipient_id"`

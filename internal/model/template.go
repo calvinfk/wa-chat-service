@@ -3,7 +3,7 @@ package model
 import "time"
 
 type Template struct {
-	DocumentID                  string    `json:"__name__" firestore:"-"` // id from whatsapp
+	DocumentID                  string    `json:"id" firestore:"-"` // id from whatsapp
 	TenantID                    string    `json:"tenant_id" firestore:"-"`
 	Name                        string    `json:"name" firestore:"name"`
 	Category                    string    `json:"category" firestore:"category"` // marketing, utility, authentication
@@ -17,8 +17,12 @@ type Template struct {
 	UpdatedAt                   time.Time `json:"updated_at" firestore:"updated_at"`
 }
 
-func (t Template) TableName() string {
+func (Template) TableName() string {
 	return "templates"
+}
+
+func (Template) PrimaryKey() string {
+	return "id"
 }
 
 func (Template) AllowedFilterFields() []string {
