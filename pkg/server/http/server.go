@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -36,8 +35,9 @@ type Server struct {
 	writeTimeout    time.Duration
 	shutdownTimeout time.Duration
 
-	zlog      *zap.Logger
-	validator fiber.StructValidator
+	zlog       *zap.Logger
+	validator  fiber.StructValidator
+	middleware []fiber.Handler
 }
 
 // New -.
@@ -58,13 +58,13 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 		shutdownTimeout: _defaultShutdownTimeout,
 		zlog:            zlog,
 		validator:       nil,
+		middleware:      nil,
 	}
 
 	// Custom options
 	for _, opt := range opts {
 		opt(s)
 	}
-	fmt.Println(s.validator)
 
 	app := fiber.New(fiber.Config{
 		StructValidator: s.validator,
@@ -77,6 +77,14 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 
 	s.App = app
 
+	// Register middleware
+	if len(s.middleware) > 0 {
+		middlewareArgs := make([]any, len(s.middleware))
+		for i, m := range s.middleware {
+			middlewareArgs[i] = m
+		}
+		s.App.Use(middlewareArgs...)
+	}
 	return s
 }
 

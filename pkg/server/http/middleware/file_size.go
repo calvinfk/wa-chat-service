@@ -1,4 +1,4 @@
-package middleware
+package http_middleware
 
 import "github.com/gofiber/fiber/v3"
 

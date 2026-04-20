@@ -57,3 +57,9 @@ func StructValidator(validator fiber.StructValidator) Option {
 		s.validator = validator
 	}
 }
+
+func Middleware(middleware ...fiber.Handler) Option {
+	return func(s *Server) {
+		s.middleware = append(s.middleware, middleware...)
+	}
+}

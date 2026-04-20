@@ -32,7 +32,9 @@ import (
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
 	server_grpc "wa_chat_service/pkg/server/grpc"
+	grpc_middleware "wa_chat_service/pkg/server/grpc/middleware"
 	server_http "wa_chat_service/pkg/server/http"
+	http_middleware "wa_chat_service/pkg/server/http/middleware"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
@@ -212,9 +214,9 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		server_grpc.Port(fmt.Sprintf("%d", config.GRPC.Port)),
 		server_grpc.ServerOptions(
 			grpc.ChainUnaryInterceptor(
-				server_grpc.UnaryRequestLogger(),
-				server_grpc.TimingServerInterceptor(30*time.Second),
-				server_grpc.HMACServerInterceptor(config.GRPC.Secret),
+				grpc_middleware.UnaryRequestLogger(),
+				grpc_middleware.TimingServerInterceptor(30*time.Second),
+				grpc_middleware.HMACServerInterceptor(config.GRPC.Secret),
 			),
 		),
 	)
@@ -231,6 +233,11 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		zslog.Desugar().Named("HTTP"),
 		server_http.StructValidator(utils.NewStructValidator()),
 		server_http.Port(fmt.Sprintf("%d", config.App.Port)),
+		server_http.Middleware(
+			http_middleware.Recover(zslog),
+			http_middleware.OptionsRoute(),
+			http_middleware.FileSizeLimit(16*1024*1024), // 16MB
+		),
 	)
 	// Router Handler
 	handlerHTTPV1 := http_v1.HandlerHTTPV1{
