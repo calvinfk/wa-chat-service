@@ -11,8 +11,11 @@ import (
 
 type (
 	StorageMediaUploadRequest struct {
+		PhoneNumberID string                  `query:"phone_number_id" validate:"required"`
+		SaveResumable bool                    `query:"save_resumable" validate:"required_without_all=SaveMeta SaveStorage"`
+		SaveMeta      bool                    `query:"save_meta" validate:"required_without_all=SaveResumable SaveStorage"`
+		SaveStorage   bool                    `query:"save_storage" validate:"required_without_all=SaveResumable SaveMeta"`
 		File          []*multipart.FileHeader `form:"file" validate:"min_files=1,max_files=1"`
-		PhoneNumberID string                  `form:"phone_number_id" validate:"required"`
 	}
 
 	StorageMediaResponse struct {
@@ -48,24 +51,6 @@ type (
 
 	StorageMediaSaveMediaIDResponse struct {
 		ID string `json:"id"`
-	}
-
-	StorageMediaResumableUploadRequest struct {
-		StorageMediaID string `json:"storage_media_id" validate:"required,uuid"`
-		PhoneNumberID  string `json:"phone_number_id" validate:"required"`
-	}
-
-	StorageMediaResumableUploadResponse struct {
-		H string `json:"h"`
-	}
-
-	StorageMediaUploadMetaRequest struct {
-		PhoneNumberID string `json:"phone_number_id" validate:"required"`
-		ID            string `json:"id" validate:"required,uuid"`
-	}
-
-	StorageMediaUploadMetaResponse struct {
-		MediaID string `json:"media_id"`
 	}
 
 	StorageMediaGetListRequest struct {

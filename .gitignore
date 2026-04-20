@@ -19,5 +19,6 @@ docker-compose.local.yml
 **.log
 /testdata
 /bin
+*.txt
 
 service-accounts

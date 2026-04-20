@@ -14,4 +14,4 @@ Makefile
 **.log
 /testdata
 **_test.go
-/pkg/postgres/databaseContainer.go
+*.txt

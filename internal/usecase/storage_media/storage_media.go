@@ -3,11 +3,9 @@ package storage_media_usecase
 import (
 	"context"
 	"fmt"
-	"io"
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -44,7 +42,7 @@ func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, tena
 
 func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaResponse, bool, error) {
 	var response dto.StorageMediaResponse
-	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[UploadMedia] Failed to get tenant data from repository: %v", err)
 		if err == errs.ErrGenericNotFound {
@@ -60,7 +58,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	files := inputData.File
 	if len(files) == 0 {
 		u.zslog.Errorf("[UploadMedia] No file provided in the request")
-		return response, true, fmt.Errorf("no file provided")
+		return response, false, fmt.Errorf("no file provided")
 	}
 	originalFileName := files[0].Filename
 	filePath := "whatsapp-media/" + documentID.String() + filepath.Ext(files[0].Filename)
@@ -70,7 +68,8 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		return response, true, err
 	}
 	defer file.Close()
-	fileData := make([]byte, files[0].Size)
+	fileSize := files[0].Size
+	fileData := make([]byte, fileSize)
 
 	// read the whole file into fileData
 	_, err = file.Read(fileData)
@@ -78,34 +77,59 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 		u.zslog.Errorf("[UploadMedia] Failed to read file data: %v", err)
 		return response, true, err
 	}
-
-	// upload to firebase storage
-	fileURL := u.googleStorageService.GetDefaultFileURL(filePath)
-	_, err = u.googleStorageService.UploadFile(ctx, fileData, fileURL)
-	if err != nil {
-		u.zslog.Errorf("[UploadMedia] Failed to upload file: %v", err)
-		return response, true, err
-	}
-	url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(fileURL, 0)
-	if err != nil {
-		u.zslog.Errorf("[UploadMedia] Failed to generate attachment URL: %v", err)
-		return response, true, err
-	}
 	media := model.StorageMedia{
-		DocumentID:       documentID.String(),
-		TenantID:         tenant.DocumentID,
-		URL:              &fileURL,
-		OriginalName:     originalFileName,
-		IsURLFromStorage: true,
-		MimeType:         files[0].Header.Get("Content-Type"),
-		CreatedAt:        time.Now(),
+		DocumentID:   documentID.String(),
+		TenantID:     tenantID,
+		OriginalName: originalFileName,
+		MimeType:     files[0].Header.Get("Content-Type"),
+		CreatedAt:    time.Now(),
+	}
+	var accessURL *string
+
+	if inputData.SaveMeta {
+		mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileData, media.OriginalName, media.MimeType)
+		if err != nil {
+			u.zslog.Errorf("[UploadMedia] Failed to upload media to WhatsApp Business API: %v", err)
+			return response, httpCode >= http.StatusInternalServerError, err
+		}
+		media.MediaID = &mediaID
+	}
+	if inputData.SaveResumable {
+		uploadSession, httpCode, err := whatsappClient.StartResumableUploadSession(media.OriginalName, fileSize, media.MimeType)
+		if err != nil {
+			u.zslog.Errorf("[UploadMedia] Failed to upload media resumably: %v", err)
+			return response, httpCode >= http.StatusInternalServerError, err
+		}
+		assetHandle, httpCode, err := whatsappClient.StartResumableUpload(uploadSession.ID, uploadSession.FileOffset, fileData)
+		if err != nil {
+			u.zslog.Errorf("[UploadMedia] Failed to upload media to resumable session: %v", err)
+			return response, httpCode >= http.StatusInternalServerError, err
+		}
+		media.AssetHandle = &assetHandle.H
+	}
+	if inputData.SaveStorage {
+		// upload to firebase storage
+		fileURL := u.googleStorageService.GetDefaultFileURL(filePath)
+		_, err = u.googleStorageService.UploadFile(ctx, fileData, fileURL)
+		if err != nil {
+			u.zslog.Errorf("[UploadMedia] Failed to upload file: %v", err)
+			return response, true, err
+		}
+		url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(fileURL, 0)
+		if err != nil {
+			u.zslog.Errorf("[UploadMedia] Failed to generate attachment URL: %v", err)
+			return response, true, err
+		}
+		media.IsURLFromStorage = true
+		media.URL = &fileURL
+		accessURL = &url
 	}
 	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
 	if err != nil {
 		u.zslog.Errorf("[UploadMedia] Failed to insert media data to repository: %v", err)
 		return response, true, err
 	}
-	response = response.FromModel(media, &url)
+	response = response.FromModel(media, accessURL)
 	return response, false, nil
 }
 
@@ -242,160 +266,6 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 		return emptyResponse, true, err
 	}
 	return dto.StorageMediaSaveMediaIDResponse{}.FromModel(media), false, nil
-}
-
-func (u *StorageMediaUsecase) UploadResumableMedia(ctx context.Context, inputData dto.StorageMediaResumableUploadRequest) (dto.StorageMediaResumableUploadResponse, bool, error) {
-	var response dto.StorageMediaResumableUploadResponse
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to get WhatsApp client: %v", err)
-		return response, true, err
-	}
-	storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.StorageMediaID)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to get media data from repository: %v", err)
-		return response, true, err
-	}
-	if storageMedia.AssetHandle != nil {
-		response.H = *storageMedia.AssetHandle
-		return response, false, nil
-	}
-	// TODO: if the file is too large, we should read and upload it in chunks instead of reading the whole file into memory
-	fileBytes, fileSize, err := u.downloadMedia(ctx, whatsappClient, storageMedia)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to download media: %v", err)
-		return response, true, err
-	}
-	uploadSession, httpCode, err := whatsappClient.StartResumableUploadSession(storageMedia.OriginalName, fileSize, storageMedia.MimeType)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to upload media resumably: %v", err)
-		return response, httpCode >= http.StatusInternalServerError, err
-	}
-	u.zslog.Infof("[UploadResumableMedia] Started resumable upload session: %+v", uploadSession)
-	assetHandle, httpCode, err := whatsappClient.StartResumableUpload(uploadSession.ID, uploadSession.FileOffset, fileBytes)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to upload media to resumable session: %v", err)
-		return response, httpCode >= http.StatusInternalServerError, err
-	}
-	u.zslog.Infof("[UploadResumableMedia] Completed resumable upload, got asset handle: %v", assetHandle.H)
-	storageMedia.AssetHandle = &assetHandle.H
-	err = u.storageMediaRepository.Update(ctx, nil, storageMedia)
-	if err != nil {
-		u.zslog.Errorf("[UploadResumableMedia] Failed to update media record in repository with MediaID: %v", err)
-		return response, true, err
-	}
-	response.H = assetHandle.H
-	return response, false, nil
-}
-
-func (u *StorageMediaUsecase) downloadMedia(ctx context.Context, whatsappClient *whatsapp_business.Client, media model.StorageMedia) ([]byte, int64, error) {
-	if media.URL != nil {
-		if media.IsURLFromStorage {
-			rc, attrs, err := u.googleStorageService.GetFile(ctx, *media.URL)
-			if err != nil {
-				return nil, 0, err
-			}
-			defer rc.Close()
-			fileByte, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, 0, err
-			}
-			return fileByte, attrs.Size, nil
-		} else {
-			resp, err := http.Get(*media.URL)
-			if err != nil {
-				u.zslog.Errorf("[downloadMedia] Failed to download media from URL: %v", err)
-				return nil, 0, err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				u.zslog.Errorf("[downloadMedia] Failed to download media, HTTP status code: %d", resp.StatusCode)
-				return nil, 0, fmt.Errorf("failed to download media, HTTP status code: %d", resp.StatusCode)
-			}
-			fileByte, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, 0, err
-			}
-			return fileByte, resp.ContentLength, nil
-		}
-	} else if media.MediaID != nil {
-		fileBody, header, _, err := u.whatsappService.DownloadMedia(whatsappClient, *media.MediaID)
-		if err != nil {
-			u.zslog.Errorf("[downloadMedia] Failed to get media URL from WhatsApp Business API: %v", err)
-			return nil, 0, fmt.Errorf("failed to get media URL from WhatsApp Business API: %w", err)
-		}
-		contentLength, err := strconv.ParseInt(header.Get("Content-Length"), 10, 64)
-		if err != nil {
-			u.zslog.Errorf("[downloadMedia] Failed to parse Content-Length header: %v", err)
-			return nil, 0, fmt.Errorf("failed to parse Content-Length header: %w", err)
-		}
-		return fileBody, contentLength, nil
-	}
-	return nil, 0, fmt.Errorf("media not found or inaccessible")
-}
-
-func (u *StorageMediaUsecase) UploadMediaMeta(ctx context.Context, inputData dto.StorageMediaUploadMetaRequest) (dto.StorageMediaUploadMetaResponse, bool, error) {
-	whatsappClient, _, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
-	if err != nil {
-		u.zslog.Errorf("[UploadMediaMeta] Failed to get WhatsApp client: %v", err)
-		return dto.StorageMediaUploadMetaResponse{}, true, err
-	}
-	media, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
-	if err != nil {
-		u.zslog.Errorf("[UploadMediaMeta] Failed to get media data from repository: %v", err)
-		return dto.StorageMediaUploadMetaResponse{}, true, err
-	}
-	if media.MediaID != nil {
-		// check if its still exists in WhatsApp Business API
-		_, httpCode, err := u.whatsappService.GetMediaURL(whatsappClient, *media.MediaID)
-		if err == nil {
-			return dto.StorageMediaUploadMetaResponse{MediaID: *media.MediaID}, false, nil
-		} else if httpCode >= http.StatusInternalServerError {
-			u.zslog.Errorf("[UploadMediaMeta] Failed to get media URL from WhatsApp Business API: %v", err)
-			return dto.StorageMediaUploadMetaResponse{}, true, err
-		} else {
-			// if the media is not found in WhatsApp Business API, we will upload it again
-			fileBytes, _, err := u.downloadMedia(ctx, whatsappClient, media)
-			if err != nil {
-				u.zslog.Errorf("[UploadMediaMeta] Failed to download media for re-uploading: %v", err)
-				return dto.StorageMediaUploadMetaResponse{}, true, err
-			}
-			mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileBytes, media.OriginalName, media.MimeType)
-			if err != nil {
-				u.zslog.Errorf("[UploadMediaMeta] Failed to upload media to WhatsApp Business API: %v", err)
-				return dto.StorageMediaUploadMetaResponse{}, httpCode >= http.StatusInternalServerError, err
-			}
-			// Update media record in repository with new MediaID
-			media.MediaID = &mediaID
-			err = u.storageMediaRepository.Update(ctx, nil, media)
-			if err != nil {
-				u.zslog.Errorf("[UploadMediaMeta] Failed to update media record in repository with new MediaID: %v", err)
-				return dto.StorageMediaUploadMetaResponse{}, true, err
-			}
-			return dto.StorageMediaUploadMetaResponse{MediaID: mediaID}, false, nil
-		}
-	} else if media.URL != nil {
-		// upload to WhatsApp Business API
-		fileBytes, _, err := u.downloadMedia(ctx, whatsappClient, media)
-		if err != nil {
-			u.zslog.Errorf("[UploadMediaMeta] Failed to download media for uploading: %v", err)
-			return dto.StorageMediaUploadMetaResponse{}, true, err
-		}
-		mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileBytes, media.OriginalName, media.MimeType)
-		if err != nil {
-			u.zslog.Errorf("[UploadMediaMeta] Failed to upload media to WhatsApp Business API: %v", err)
-			return dto.StorageMediaUploadMetaResponse{}, httpCode >= http.StatusInternalServerError, err
-		}
-		// Update media record in repository with new MediaID
-		media.MediaID = &mediaID
-		err = u.storageMediaRepository.Update(ctx, nil, media)
-		if err != nil {
-			u.zslog.Errorf("[UploadMediaMeta] Failed to update media record in repository with new MediaID: %v", err)
-			return dto.StorageMediaUploadMetaResponse{}, true, err
-		}
-		return dto.StorageMediaUploadMetaResponse{MediaID: mediaID}, false, nil
-	}
-	return dto.StorageMediaUploadMetaResponse{}, true, fmt.Errorf("media not found or inaccessible")
 }
 
 func (u *StorageMediaUsecase) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], bool, error) {

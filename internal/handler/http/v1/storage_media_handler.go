@@ -31,16 +31,16 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 		storageMediaRouter.Post("/upload", middleware.Protected(), h.uploadMedia)
 		storageMediaRouter.Get("/get", middleware.Protected(), h.getMedia)
 		storageMediaRouter.Delete("/delete", middleware.Protected(), h.deleteMedia)
-		storageMediaRouter.Post("/save-media-id", middleware.Protected(), h.saveMediaID)
-		storageMediaRouter.Post("/resumable", middleware.Protected(), h.uploadResumableMedia)
-		storageMediaRouter.Post("/upload-meta", middleware.Protected(), h.uploadMediaMeta)
+		// storageMediaRouter.Post("/save-media-id", middleware.Protected(), h.saveMediaID)
+		// storageMediaRouter.Post("/resumable", middleware.Protected(), h.uploadResumableMedia)
+		// storageMediaRouter.Post("/upload-meta", middleware.Protected(), h.uploadMediaMeta)
 		storageMediaRouter.Get("/list", middleware.Protected(), h.getMediaList)
 	}
 }
 
 func (h *StorageMediaHandler) uploadMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaUploadRequest
-	if err := ctx.Bind().Form(&requestData); err != nil {
+	if err := ctx.Bind().All(&requestData); err != nil {
 		code, response := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(code).JSON(response)
 	}
@@ -100,28 +100,6 @@ func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx.Context(), requestData)
 	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", data)
 	return ctx.Status(code).JSON(response)
-}
-
-func (h *StorageMediaHandler) uploadResumableMedia(ctx fiber.Ctx) error {
-	var requestData dto.StorageMediaResumableUploadRequest
-	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(code).JSON(response)
-	}
-	response, serverError, err := h.storageMediaUsecase.UploadResumableMedia(ctx.Context(), requestData)
-	code, apiResponse := api_response.NewApiResponse(serverError, err, "Resumable media upload initiated successfully", response)
-	return ctx.Status(code).JSON(apiResponse)
-}
-
-func (h *StorageMediaHandler) uploadMediaMeta(ctx fiber.Ctx) error {
-	var requestData dto.StorageMediaUploadMetaRequest
-	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
-		return ctx.Status(code).JSON(response)
-	}
-	response, serverError, err := h.storageMediaUsecase.UploadMediaMeta(ctx.Context(), requestData)
-	code, apiResponse := api_response.NewApiResponse(serverError, err, "Media metadata uploaded successfully", response)
-	return ctx.Status(code).JSON(apiResponse)
 }
 
 func (h *StorageMediaHandler) getMediaList(ctx fiber.Ctx) error {
