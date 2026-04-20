@@ -80,6 +80,7 @@ type repositories struct {
 	Template       repository.Template
 	Broadcast      repository.Broadcast
 	SearchTemplate repository.SearchTemplate
+	SearchMessage  repository.SearchMessage
 }
 
 type usecases struct {
@@ -174,6 +175,7 @@ func newDefaultRepositories(clients clients, services services) repositories {
 	templateRepository := repository_firestore.NewTemplateRepository(clients.firestoreClient)
 	broadcastRepository := repository_firestore.NewBroadcastRepository(clients.firestoreClient)
 	meiliTemplateRepository := repository_meili.NewMeiliTemplateRepository(clients.meiliClient)
+	meiliMessageRepository := repository_meili.NewMeiliMessageRepository(clients.meiliClient)
 	return repositories{
 		ActivityLog:    activityLogRepository,
 		Chat:           chatRepository,
@@ -183,6 +185,7 @@ func newDefaultRepositories(clients clients, services services) repositories {
 		Tenant:         tenantRepository,
 		Broadcast:      broadcastRepository,
 		SearchTemplate: meiliTemplateRepository,
+		SearchMessage:  meiliMessageRepository,
 	}
 }
 
@@ -191,7 +194,7 @@ func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories 
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zslog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zslog)
 	authUsecase := auth_usecase.NewAuthUsecase(repositories.Tenant, services.AccessToken, services.Encrypt, zslog)

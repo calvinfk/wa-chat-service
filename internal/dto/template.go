@@ -40,8 +40,7 @@ type (
 
 	TemplateDeleteRequest struct {
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
-		ID            string `query:"id" validate:"required_without=Name"`
-		Name          string `query:"name" validate:"required_without=ID"`
+		ID            string `query:"id" validate:"required"`
 	}
 
 	TemplateUpdateRequest struct {

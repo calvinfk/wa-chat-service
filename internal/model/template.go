@@ -3,8 +3,9 @@ package model
 import "time"
 
 type Template struct {
-	DocumentID                  string    `json:"id" firestore:"-"` // id from whatsapp
+	DocumentID                  string    `json:"id" firestore:"-"` // uuid v7
 	TenantID                    string    `json:"tenant_id" firestore:"-"`
+	WaTemplateID                string    `json:"wa_template_id" firestore:"wa_template_id"` // id from whatsapp
 	Name                        string    `json:"name" firestore:"name"`
 	Category                    string    `json:"category" firestore:"category"` // marketing, utility, authentication
 	IsPrimaryDeviceDeliveryOnly bool      `json:"is_primary_device_delivery_only" firestore:"is_primary_device_delivery_only"`
@@ -21,7 +22,7 @@ func (Template) TableName() string {
 	return "templates"
 }
 
-func (Template) PrimaryKey() string {
+func (Template) PKName() string {
 	return "id"
 }
 

@@ -191,3 +191,22 @@ func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filt
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil
 }
+
+func (r *StorageMediaRepository) GetByDocumentIDs(ctx context.Context, documentIDs []string) (map[string]model.StorageMedia, error) {
+	docs, err := r.db.Collection(r.storageMedia.TableName()).Where(firestore.DocumentID, "in", documentIDs).Documents(ctx).GetAll() // to ensure the documentIDs are valid and not exceeding Firestore limits
+	if err != nil {
+		return nil, err
+	}
+	mediaMap := make(map[string]model.StorageMedia)
+	for _, doc := range docs {
+		var media model.StorageMedia
+		docData := doc.Data()
+		docData["id"] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &media)
+		if err != nil {
+			return nil, err
+		}
+		mediaMap[doc.Ref.ID] = media
+	}
+	return mediaMap, nil
+}

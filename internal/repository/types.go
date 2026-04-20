@@ -7,7 +7,6 @@ import (
 	"wa_chat_service/pkg/filter_request"
 
 	"cloud.google.com/go/firestore"
-	"github.com/meilisearch/meilisearch-go"
 )
 
 type (
@@ -28,7 +27,7 @@ type (
 		// Inserts or updates a message entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
 		// Gets message entries by filter.
-		GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], error)
+		GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error)
 	}
 
 	StorageMedia interface {
@@ -36,6 +35,7 @@ type (
 		Insert(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) (model.StorageMedia, error)
 		// Gets media entry by document ID.
 		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
+		GetByDocumentIDs(ctx context.Context, documentIDs []string) (map[string]model.StorageMedia, error)
 		// Gets media entry by URL.
 		GetByURL(ctx context.Context, url string) (model.StorageMedia, error)
 		// Gets media entry by media ID.
@@ -78,9 +78,12 @@ type (
 		GetRecipientsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], error)
 	}
 
-	MeiliTemplate interface {
-		CreateIndex(ctx context.Context) (*meilisearch.TaskInfo, error)
-		AddDocuments(ctx context.Context, document []model.Template) (*meilisearch.TaskInfo, error)
-		DeleteDocuments(ctx context.Context, documentIDs []string) (*meilisearch.TaskInfo, error)
+	SearchTemplate interface {
+		AddDocuments(ctx context.Context, document []model.Template) error
+		DeleteDocuments(ctx context.Context, documentIDs []string) error
+	}
+	SearchMessage interface {
+		AddDocuments(ctx context.Context, document []model.Message) error
+		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, error)
 	}
 )

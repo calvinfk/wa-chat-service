@@ -21,8 +21,9 @@ type (
 
 	MessageGetByChatIDRequest struct {
 		ChatID string `query:"chat_id" validate:"required"`
+		Search string `query:"search"`
 	}
-	MessageGetByChatIDResponse struct {
+	MessageResponse struct {
 		ID              string                `json:"id"`               // id from whatsapp
 		ChatID          string                `json:"chat_id"`          // reference to chat document
 		StorageMediaID  *string               `json:"storage_media_id"` // reference to media document if message has media
@@ -49,8 +50,8 @@ func (r MessageGetByChatIDRequest) Validate() map[string]string {
 	return nil
 }
 
-func (MessageGetByChatIDResponse) FromModel(data model.Message, storageMedia *StorageMediaResponse) MessageGetByChatIDResponse {
-	return MessageGetByChatIDResponse{
+func (MessageResponse) FromModel(data model.Message, storageMedia *StorageMediaResponse) MessageResponse {
+	return MessageResponse{
 		ID:              data.DocumentID,
 		ChatID:          data.ChatID,
 		StorageMediaID:  data.StorageMediaID,

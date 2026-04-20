@@ -42,8 +42,8 @@ func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transactio
 	return message, err
 }
 
-func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageGetByChatIDResponse], error) {
-	var response filter_request.FilterResponse[dto.MessageGetByChatIDResponse]
+func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error) {
+	var response filter_request.FilterResponse[dto.MessageResponse]
 	filters, sort, paginate, err := filter_request.InitializeFilter(requestData, r.message.AllowedFilterFields(), r.message.AllowedSortFields())
 	if err != nil {
 		return response, err
@@ -54,7 +54,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 	if err != nil {
 		return response, err
 	}
-	var result []dto.MessageGetByChatIDResponse
+	var result []dto.MessageResponse
 	for _, doc := range docs {
 		var message model.Message
 		docData := doc.Data()
@@ -93,7 +93,7 @@ func (r *MessageRepository) GetMessageByChatID(ctx context.Context, requestData 
 			storageMediaResponse := dto.StorageMediaResponse{}.FromModel(*message.StorageMedia, accessURL)
 			sto = &storageMediaResponse
 		}
-		result = append(result, dto.MessageGetByChatIDResponse{}.FromModel(message, sto))
+		result = append(result, dto.MessageResponse{}.FromModel(message, sto))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

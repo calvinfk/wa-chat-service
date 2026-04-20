@@ -35,7 +35,7 @@ type (
 		Results    []T   `json:"results"`
 		Page       int   `json:"page"`
 		PageSize   int   `json:"page_size"`
-		TotalPages int   `json:"total_pages"`
+		TotalPages int64 `json:"total_pages"`
 		TotalItems int64 `json:"total_items"`
 	}
 )
@@ -69,7 +69,7 @@ func NewFilterResponse[T any](results []T, paginate Paginate, totalItems int64) 
 		r.Results = results
 	}
 	if r.PageSize > 0 {
-		r.TotalPages = int((totalItems + int64(r.PageSize) - 1) / int64(r.PageSize))
+		r.TotalPages = (totalItems + int64(r.PageSize) - 1) / int64(r.PageSize)
 	}
 	return r
 }

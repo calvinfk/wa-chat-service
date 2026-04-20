@@ -3,7 +3,8 @@ package model
 import "time"
 
 type Message struct {
-	DocumentID      string        `json:"id" firestore:"-"`                                        // id from whatsapp
+	DocumentID      string        `json:"id" firestore:"-"`                                        // uuid v7
+	Wamid           string        `json:"wamid" firestore:"wamid"`                                 // id from whatsapp
 	ChatID          string        `json:"chat_id" firestore:"-"`                                   // reference to chat document
 	MessageType     string        `json:"message_type" firestore:"message_type"`                   // text, image, video, etc
 	MessageCategory string        `json:"message_category" firestore:"message_category"`           // marketing, authentication, utility, service
@@ -21,6 +22,10 @@ type Message struct {
 
 func (m Message) TableName() string {
 	return "messages"
+}
+
+func (m Message) PKName() string {
+	return "id"
 }
 
 func (m Message) AllowedFilterFields() []string {
