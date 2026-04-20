@@ -22,17 +22,15 @@ import (
 
 type StorageMediaUsecase struct {
 	storageMediaRepository repository.StorageMedia
-	tenantRepository       repository.Tenant
 	tenantUsecase          usecase.Tenant
 	googleStorageService   service.GoogleStorage
 	whatsappService        service.WhatsappBusiness
 	zslog                  *zap.SugaredLogger
 }
 
-func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, tenantRepository repository.Tenant, tenantUsecase usecase.Tenant, googleStorageService service.GoogleStorage, whatsappService service.WhatsappBusiness, zslog *zap.SugaredLogger) *StorageMediaUsecase {
+func NewStorageMediaUsecase(storageMediaRepository repository.StorageMedia, tenantUsecase usecase.Tenant, googleStorageService service.GoogleStorage, whatsappService service.WhatsappBusiness, zslog *zap.SugaredLogger) *StorageMediaUsecase {
 	return &StorageMediaUsecase{
 		storageMediaRepository: storageMediaRepository,
-		tenantRepository:       tenantRepository,
 		tenantUsecase:          tenantUsecase,
 		googleStorageService:   googleStorageService,
 		whatsappService:        whatsappService,

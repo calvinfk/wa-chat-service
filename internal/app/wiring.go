@@ -191,7 +191,7 @@ func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories 
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog, zslog)
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.MeiliTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, repositories.Tenant, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zslog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zslog)
