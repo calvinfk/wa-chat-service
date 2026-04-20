@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -73,14 +72,14 @@ type services struct {
 }
 
 type repositories struct {
-	ActivityLog   repository.ActivityLog
-	Chat          repository.Chat
-	Message       repository.Message
-	StorageMedia  repository.StorageMedia
-	Tenant        repository.Tenant
-	Template      repository.Template
-	Broadcast     repository.Broadcast
-	MeiliTemplate repository.MeiliTemplate
+	ActivityLog    repository.ActivityLog
+	Chat           repository.Chat
+	Message        repository.Message
+	StorageMedia   repository.StorageMedia
+	Tenant         repository.Tenant
+	Template       repository.Template
+	Broadcast      repository.Broadcast
+	SearchTemplate repository.SearchTemplate
 }
 
 type usecases struct {
@@ -95,7 +94,7 @@ type usecases struct {
 }
 
 func NewDefaultWiring(zslog *zap.SugaredLogger, config *config.Config) servers {
-	clients := newDefaultClients(config)
+	clients := newDefaultClients(config, zslog)
 	services := newDefaultServices(config, zslog, clients)
 	repositories := newDefaultRepositories(clients, services)
 	usecases := newDefaultUsecases(zslog, clients, repositories, services)
@@ -103,37 +102,37 @@ func NewDefaultWiring(zslog *zap.SugaredLogger, config *config.Config) servers {
 	return servers
 }
 
-func newDefaultClients(config *config.Config) clients {
+func newDefaultClients(config *config.Config, zsLog *zap.SugaredLogger) clients {
 	ctx := context.Background()
 	// dbPostgres, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{})
 	// if err != nil {
 	// 	panic("failed to open database: " + err.Error())
 	// }
+	gcpStorageClient, err := storage.NewClient(ctx)
+	if err != nil {
+		zsLog.Fatalf("Failed to create Google Storage client: " + err.Error())
+	}
 	conf := &firebase.Config{ProjectID: config.GCP.ProjectID, StorageBucket: config.GCP.ProjectID + ".firebasestorage.app"}
 	firebaseClient, err := firebase.NewApp(ctx, conf)
 	if err != nil {
-		panic("Failed to create Firebase app: " + err.Error())
+		zsLog.Fatalf("Failed to create Firebase app: " + err.Error())
 	}
-	gcpStorageClient, err := storage.NewClient(ctx)
+	firestoreClient, err := firebaseClient.Firestore(ctx)
 	if err != nil {
-		panic("Failed to create Google Storage client: " + err.Error())
-	}
-	firestoreClient, err := firebaseClient.Firestore(context.Background())
-	if err != nil {
-		log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firestore client: %v", err)
+		zsLog.Fatalf("Failed to create Firestore client: %v", err)
 	}
 	// firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
 	// if err != nil {
-	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
+	// 	zsLog.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
 	// }
 	// firebaseStorageClient, err := firebaseClient.Storage(context.Background())
 	// if err != nil {
-	// 	log.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
+	// 	zsLog.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
 	// }
 	txManager := utils.NewTxManager(nil, firestoreClient)
 	gcpTaskClient, err := cloudtasks.NewService(context.Background())
 	if err != nil {
-		panic("Failed to create Cloud Tasks client: " + err.Error())
+		zsLog.Fatalf("Failed to create Cloud Tasks client: " + err.Error())
 	}
 	meiliClient := meilisearch.New(config.Meili.URL, meilisearch.WithAPIKey(config.Meili.APIKey))
 	return clients{
@@ -176,21 +175,21 @@ func newDefaultRepositories(clients clients, services services) repositories {
 	broadcastRepository := repository_firestore.NewBroadcastRepository(clients.firestoreClient)
 	meiliTemplateRepository := repository_meili.NewMeiliTemplateRepository(clients.meiliClient)
 	return repositories{
-		ActivityLog:   activityLogRepository,
-		Chat:          chatRepository,
-		Message:       messageRepository,
-		StorageMedia:  storageMediaRepository,
-		Template:      templateRepository,
-		Tenant:        tenantRepository,
-		Broadcast:     broadcastRepository,
-		MeiliTemplate: meiliTemplateRepository,
+		ActivityLog:    activityLogRepository,
+		Chat:           chatRepository,
+		Message:        messageRepository,
+		StorageMedia:   storageMediaRepository,
+		Template:       templateRepository,
+		Tenant:         tenantRepository,
+		Broadcast:      broadcastRepository,
+		SearchTemplate: meiliTemplateRepository,
 	}
 }
 
 func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
 	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog, zslog)
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
-	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.MeiliTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
+	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zslog)

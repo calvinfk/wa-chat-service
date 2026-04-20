@@ -63,18 +63,18 @@ func GetMedia(component MessageComponent) *message_components.Media {
 }
 
 func NewTemplateComponent(payloadBytes []byte) (message_components.Template, error) {
+	var templateStruct message_components.Template
 	var payloadMap map[string]any
 	if err := json.Unmarshal(payloadBytes, &payloadMap); err != nil {
-		return message_components.Template{}, fmt.Errorf("failed to unmarshal template payload: %v", err)
+		return templateStruct, fmt.Errorf("failed to unmarshal template payload: %v", err)
 	}
 	if payloadMap["template"] == nil {
-		return message_components.Template{}, fmt.Errorf("invalid template payload: missing 'template' field")
+		return templateStruct, fmt.Errorf("invalid template payload: missing 'template' field")
 	}
 	templateBytes, err := json.Marshal(payloadMap["template"])
 	if err != nil {
-		return message_components.Template{}, fmt.Errorf("failed to marshal template component: %v", err)
+		return templateStruct, fmt.Errorf("failed to marshal template component: %v", err)
 	}
-	var templateStruct message_components.Template
 	if err := json.Unmarshal(templateBytes, &templateStruct); err != nil {
 		return templateStruct, err
 	}

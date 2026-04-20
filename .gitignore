@@ -20,5 +20,6 @@ docker-compose.local.yml
 /testdata
 /bin
 *.txt
+*.json
 
 service-accounts

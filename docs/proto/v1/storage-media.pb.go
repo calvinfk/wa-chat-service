@@ -9,7 +9,6 @@ package v1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -27,7 +26,6 @@ type SaveMediaIDRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MediaId       string                 `protobuf:"bytes,1,opt,name=media_id,json=mediaId,proto3" json:"media_id,omitempty"`
 	PhoneNumberId string                 `protobuf:"bytes,2,opt,name=phone_number_id,json=phoneNumberId,proto3" json:"phone_number_id,omitempty"`
-	GrpcCreatedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=grpc_created_at,json=grpcCreatedAt,proto3" json:"grpc_created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -74,13 +72,6 @@ func (x *SaveMediaIDRequest) GetPhoneNumberId() string {
 		return x.PhoneNumberId
 	}
 	return ""
-}
-
-func (x *SaveMediaIDRequest) GetGrpcCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.GrpcCreatedAt
-	}
-	return nil
 }
 
 // SaveMediaIDResponse indicates whether the media ID was saved successfully.
@@ -132,11 +123,10 @@ var File_v1_storage_media_proto protoreflect.FileDescriptor
 
 const file_v1_storage_media_proto_rawDesc = "" +
 	"\n" +
-	"\x16v1/storage-media.proto\x12\agrpc.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\x01\n" +
+	"\x16v1/storage-media.proto\x12\agrpc.v1\"W\n" +
 	"\x12SaveMediaIDRequest\x12\x19\n" +
 	"\bmedia_id\x18\x01 \x01(\tR\amediaId\x12&\n" +
-	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId\x12B\n" +
-	"\x0fgrpc_created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rgrpcCreatedAt\"%\n" +
+	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId\"%\n" +
 	"\x13SaveMediaIDResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id2X\n" +
 	"\fStorageMedia\x12H\n" +
@@ -156,19 +146,17 @@ func file_v1_storage_media_proto_rawDescGZIP() []byte {
 
 var file_v1_storage_media_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_v1_storage_media_proto_goTypes = []any{
-	(*SaveMediaIDRequest)(nil),    // 0: grpc.v1.SaveMediaIDRequest
-	(*SaveMediaIDResponse)(nil),   // 1: grpc.v1.SaveMediaIDResponse
-	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
+	(*SaveMediaIDRequest)(nil),  // 0: grpc.v1.SaveMediaIDRequest
+	(*SaveMediaIDResponse)(nil), // 1: grpc.v1.SaveMediaIDResponse
 }
 var file_v1_storage_media_proto_depIdxs = []int32{
-	2, // 0: grpc.v1.SaveMediaIDRequest.grpc_created_at:type_name -> google.protobuf.Timestamp
-	0, // 1: grpc.v1.StorageMedia.SaveMediaID:input_type -> grpc.v1.SaveMediaIDRequest
-	1, // 2: grpc.v1.StorageMedia.SaveMediaID:output_type -> grpc.v1.SaveMediaIDResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: grpc.v1.StorageMedia.SaveMediaID:input_type -> grpc.v1.SaveMediaIDRequest
+	1, // 1: grpc.v1.StorageMedia.SaveMediaID:output_type -> grpc.v1.SaveMediaIDResponse
+	1, // [1:2] is the sub-list for method output_type
+	0, // [0:1] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_v1_storage_media_proto_init() }

@@ -5,13 +5,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"errors"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,13 +24,21 @@ func (c staticHeaderCreds) GetRequestMetadata(ctx context.Context, uri ...string
 
 func (c staticHeaderCreds) RequireTransportSecurity() bool { return true }
 
-func createHMACSignature(secret string, fullMethod string, payloadMessage proto.Message) string {
+func createHMACSignature(secret, fullMethod string, msg proto.Message) (string, error) {
+	if msg == nil {
+		return "", errors.New("nil proto message")
+	}
+
+	b, err := (proto.MarshalOptions{Deterministic: true}).Marshal(msg)
+	if err != nil {
+		return "", err
+	}
+
 	h := hmac.New(sha256.New, []byte(secret))
-	options := protojson.MarshalOptions{EmitUnpopulated: true, UseProtoNames: true, Indent: " "}
-	payloadBytes, _ := options.Marshal(payloadMessage)
-	payloadStr := fmt.Sprintf("%s | %s", fullMethod, string(payloadBytes))
-	h.Write([]byte(payloadStr))
-	return hex.EncodeToString(h.Sum(nil))
+	h.Write([]byte(fullMethod))
+	h.Write([]byte{0}) // stable delimiter
+	h.Write(b)
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func HMACClientInterceptor(secret string) grpc.UnaryClientInterceptor {
@@ -40,7 +47,10 @@ func HMACClientInterceptor(secret string) grpc.UnaryClientInterceptor {
 		if !ok {
 			return invoker(ctx, method, req, reply, cc, opts...)
 		}
-		signature := createHMACSignature(secret, method, m)
+		signature, err := createHMACSignature(secret, method, m)
+		if err != nil {
+			return status.Error(codes.Internal, "failed to create HMAC signature")
+		}
 		ctx = metadata.AppendToOutgoingContext(ctx, "x-signature", signature)
 
 		return invoker(ctx, method, req, reply, cc, opts...)
@@ -59,7 +69,10 @@ func HMACServerInterceptor(secret string) grpc.UnaryServerInterceptor {
 			return nil, status.Error(codes.Unauthenticated, "missing signature")
 		}
 		// re-calculate HMAC
-		expectedSig := createHMACSignature(secret, info.FullMethod, m)
+		expectedSig, err := createHMACSignature(secret, info.FullMethod, m)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to create HMAC signature")
+		}
 		if !hmac.Equal([]byte(clientSig[0]), []byte(expectedSig)) {
 			return nil, status.Error(codes.Unauthenticated, "invalid signature")
 		}
