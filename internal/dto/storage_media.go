@@ -39,8 +39,7 @@ type (
 	}
 
 	StorageMediaDeleteRequest struct {
-		ID            string `query:"id" validate:"required_without=MediaID,omitempty,uuid"`
-		MediaID       string `query:"media_id" validate:"required_without=ID"`
+		ID            string `query:"id" validate:"required,uuid"`
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`
 	}
 

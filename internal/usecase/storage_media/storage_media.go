@@ -167,28 +167,13 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 		u.zslog.Errorf("[DeleteMedia] Failed to get WhatsApp client: %v", err)
 		return true, err
 	}
-	var media *model.StorageMedia
-	if inputData.MediaID != "" {
-		mediaData, err := u.storageMediaRepository.GetByMediaID(ctx, inputData.MediaID)
-		if err == nil {
-			media = &mediaData
-		} else if err != errs.ErrGenericNotFound {
-			u.zslog.Errorf("[DeleteMedia] Failed to get media data from repository: %v", err)
-			return true, err
+	media, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
+	if err != nil {
+		u.zslog.Errorf("[DeleteMedia] Failed to get media data from repository: %v", err)
+		if err == errs.ErrGenericNotFound {
+			return false, err
 		}
-	}
-	if inputData.ID != "" {
-		mediaData, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
-		if err == nil {
-			media = &mediaData
-		} else if err != errs.ErrGenericNotFound {
-			u.zslog.Errorf("[DeleteMedia] Failed to get media data from repository: %v", err)
-			return true, err
-		}
-	}
-	if media == nil {
-		u.zslog.Errorf("[DeleteMedia] Media not found with provided ID or MediaID")
-		return true, errs.ErrGenericNotFound
+		return true, err
 	}
 	if media.MediaID != nil {
 		httpCode, err := u.whatsappService.DeleteMedia(whatsappClient, *media.MediaID)
