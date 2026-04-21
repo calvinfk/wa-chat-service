@@ -116,7 +116,9 @@ func parseOperatorToMeiliCondition(op Operator) string {
 	case OpLte:
 		return "<="
 	case OpIn:
-		return "in"
+		return "IN"
+	case OpLike, OpIlike:
+		return "CONTAINS"
 	default:
 		return ""
 	}

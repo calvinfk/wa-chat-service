@@ -225,41 +225,37 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 	var results []dto.MessageResponse
 	if len(messages) != 0 {
 		// get storage media for messages
-		storageMediaMap := make(map[string]model.StorageMedia)
+		var storageMediaIds []string
+		var storageMediaMap map[string]model.StorageMedia
 		for _, message := range messages {
 			if message.StorageMediaID != nil {
-				storageMediaMap[*message.StorageMediaID] = model.StorageMedia{}
+				storageMediaIds = append(storageMediaIds, *message.StorageMediaID)
 			}
 		}
-		if len(storageMediaMap) > 0 {
-			storageMediaIDs := make([]string, 0, len(storageMediaMap))
-			for id := range storageMediaMap {
-				storageMediaIDs = append(storageMediaIDs, id)
-			}
-			storageMedias, err := u.storageMediaRepository.GetByDocumentIDs(ctx, storageMediaIDs)
+		if len(storageMediaIds) > 0 {
+			storageMediaMap, err = u.storageMediaRepository.GetByDocumentIDs(ctx, storageMediaIds)
 			if err != nil {
 				u.zslog.Errorf("[GetMessagesByChatID] Failed to get storage medias by IDs: %v", err)
 				return response, true, err
-			}
-			for _, media := range storageMedias {
-				storageMediaMap[media.DocumentID] = media
 			}
 		}
 		for _, message := range messages {
 			var storageMediaResponse *dto.StorageMediaResponse
 			if message.StorageMediaID != nil {
-				storageMedia := storageMediaMap[*message.StorageMediaID]
-				var accessURL *string
-				if storageMedia.IsURLFromStorage {
-					url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(*storageMedia.URL, 0)
-					if err != nil {
-						u.zslog.Errorf("[GetMessagesByChatID] Failed to generate signed URL: %v", err)
-					} else {
-						accessURL = &url
+				storageMedia, ok := storageMediaMap[*message.StorageMediaID]
+				if ok {
+					var accessURL *string
+					if storageMedia.IsURLFromStorage {
+						url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(*storageMedia.URL, 0)
+						if err != nil {
+							u.zslog.Errorf("[GetMessagesByChatID] Failed to generate signed URL: %v", err)
+						} else {
+							accessURL = &url
+						}
 					}
+					media := dto.StorageMediaResponse{}.FromModel(storageMedia, accessURL)
+					storageMediaResponse = &media
 				}
-				media := dto.StorageMediaResponse{}.FromModel(storageMedia, accessURL)
-				storageMediaResponse = &media
 			}
 			results = append(results, dto.MessageResponse{}.FromModel(message, storageMediaResponse))
 		}

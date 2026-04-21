@@ -193,20 +193,37 @@ func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filt
 }
 
 func (r *StorageMediaRepository) GetByDocumentIDs(ctx context.Context, documentIDs []string) (map[string]model.StorageMedia, error) {
-	docs, err := r.db.Collection(r.storageMedia.TableName()).Where(firestore.DocumentID, "in", documentIDs).Documents(ctx).GetAll() // to ensure the documentIDs are valid and not exceeding Firestore limits
-	if err != nil {
-		return nil, err
-	}
 	mediaMap := make(map[string]model.StorageMedia)
-	for _, doc := range docs {
-		var media model.StorageMedia
-		docData := doc.Data()
-		docData["id"] = doc.Ref.ID
-		err = utils.MapToStruct(docData, &media)
+	if len(documentIDs) == 0 {
+		return mediaMap, nil
+	}
+
+	// avoid firestore in query limit
+	const maxInValues = 30
+	collection := r.db.Collection(r.storageMedia.TableName())
+	for i := 0; i < len(documentIDs); i += maxInValues {
+		end := min(i+maxInValues, len(documentIDs))
+
+		docRefs := make([]*firestore.DocumentRef, 0, end-i)
+		for _, id := range documentIDs[i:end] {
+			docRefs = append(docRefs, collection.Doc(id))
+		}
+
+		docs, err := collection.Where(firestore.DocumentID, "in", docRefs).Documents(ctx).GetAll()
 		if err != nil {
 			return nil, err
 		}
-		mediaMap[doc.Ref.ID] = media
+
+		for _, doc := range docs {
+			var media model.StorageMedia
+			docData := doc.Data()
+			docData["id"] = doc.Ref.ID
+			err = utils.MapToStruct(docData, &media)
+			if err != nil {
+				return nil, err
+			}
+			mediaMap[doc.Ref.ID] = media
+		}
 	}
 	return mediaMap, nil
 }
