@@ -20,7 +20,7 @@ type (
 		Search   string  `json:"-" query:"search"`
 		Name     *string `json:"name,omitempty" query:"name" validate:"omitempty,min=1"`
 		Status   *string `json:"status,omitempty" query:"status" validate:"omitempty,filter_options=APPROVED REJECTED PENDING"`
-		Category *string `json:"category,omitempty" query:"category" validate:"omitempty,oneof=MARKETING UTILITY AUTHENTICATION"`
+		Category *string `json:"category,omitempty" query:"category" validate:"omitempty,filter_options=MARKETING UTILITY AUTHENTICATION"`
 	}
 	TemplateResponse struct {
 		ID                          string    `json:"id"`

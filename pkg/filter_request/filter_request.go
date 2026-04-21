@@ -172,17 +172,21 @@ func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []
 	return docs, totalData, nil
 }
 
-func ApplyFilterMeili(filters []Filter, sort Sort, paginate Paginate) *meilisearch.SearchRequest {
+func ApplyFilterMeili(filters []Filter, sort Sort, paginate Paginate) (*meilisearch.SearchRequest, error) {
 	var filterStr []string
 	for _, filter := range filters {
 		var str string
-		if filter.Operator == "in" {
-			values := strings.Split(fmt.Sprintf("%v", filter.Value), ",")
-			var quotedValues []string
-			for _, v := range values {
-				quotedValues = append(quotedValues, fmt.Sprintf("\"%s\"", strings.TrimSpace(v)))
+		if filter.Operator == OpIn {
+			var inValues []string
+			values, err := utils.AnySliceToStringSlice(filter.Value)
+			if err != nil {
+				return nil, err
 			}
-			str = fmt.Sprintf("%s IN [%s]", filter.Field, strings.Join(quotedValues, ","))
+			for _, v := range values {
+				escaped := strings.ReplaceAll(v, `"`, `\"`)
+				inValues = append(inValues, fmt.Sprintf(`"%s"`, escaped))
+			}
+			str = fmt.Sprintf("%s IN [%s]", filter.Field, strings.Join(inValues, ", "))
 		} else {
 			op := parseOperatorToMeiliCondition(filter.Operator)
 			str = formatFilterValue(filter.Field, op, filter.Value)
@@ -197,7 +201,7 @@ func ApplyFilterMeili(filters []Filter, sort Sort, paginate Paginate) *meilisear
 		Page:        int64(paginate.Page),
 		Filter:      filterJoined,
 		Sort:        []string{sortQuery},
-	}
+	}, nil
 }
 
 func formatFilterValue(field, op string, value any) string {

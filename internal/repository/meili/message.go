@@ -55,7 +55,10 @@ func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest 
 		Operator: filter_request.OpEq,
 		Value:    filterRequest.SpecificFilter.ChatID,
 	})
-	searchRequest := filter_request.ApplyFilterMeili(filters, sort, paginate)
+	searchRequest, err := filter_request.ApplyFilterMeili(filters, sort, paginate)
+	if err != nil {
+		return messages, 0, paginate, err
+	}
 	searched, err := r.db.Index(r.message.TableName()).Search(filterRequest.SpecificFilter.Search, searchRequest)
 	if err != nil {
 		return messages, 0, paginate, err

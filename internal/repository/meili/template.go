@@ -74,7 +74,10 @@ func (r *MeiliTemplateRepository) GetFiltered(ctx context.Context, filterRequest
 		Operator: filter_request.OpEq,
 		Value:    filterRequest.SpecificFilter.TenantID,
 	})
-	searchRequest := filter_request.ApplyFilterMeili(filters, sort, paginate)
+	searchRequest, err := filter_request.ApplyFilterMeili(filters, sort, paginate)
+	if err != nil {
+		return templates, 0, paginate, err
+	}
 	searched, err := r.db.Index(r.template.TableName()).Search(filterRequest.SpecificFilter.Search, searchRequest)
 	if err != nil {
 		return templates, 0, paginate, err

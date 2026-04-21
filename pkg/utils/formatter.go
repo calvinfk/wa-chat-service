@@ -27,3 +27,22 @@ func AnyToBytes(data any) ([]byte, error) {
 	}
 	return bytes, nil
 }
+
+func AnySliceToStringSlice(data any) ([]string, error) {
+	if data == nil {
+		return nil, fmt.Errorf("data is nil")
+	}
+	if slice, ok := data.([]string); ok {
+		return slice, nil
+	}
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data to bytes: %v", err)
+	}
+	var stringSlice []string
+	err = json.Unmarshal(bytes, &stringSlice)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal bytes to []string: %v", err)
+	}
+	return stringSlice, nil
+}
