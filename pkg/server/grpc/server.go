@@ -29,6 +29,7 @@ type Server struct {
 
 // New -.
 func New(zlog *zap.Logger, opts ...Option) *Server {
+	// Stop the server if any of the goroutines returns an error, or if the context is canceled.
 	group, ctx := errgroup.WithContext(context.Background())
 	group.SetLimit(1)
 	s := &Server{

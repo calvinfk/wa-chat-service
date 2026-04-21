@@ -10,13 +10,6 @@ import (
 )
 
 type (
-	ActivityLog interface {
-		// Inserts an activity log entry.
-		Insert(ctx context.Context, tx *firestore.Transaction, data model.ActivityLog) (model.ActivityLog, error)
-		// Gets activity log entries by filter.
-		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.ActivityLogFilterRequest]) (filter_request.FilterResponse[dto.ActivityLogResponse], error)
-	}
-
 	Chat interface {
 		// Inserts or updates a chat entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)

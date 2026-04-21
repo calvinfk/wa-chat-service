@@ -18,18 +18,12 @@ func main() {
 		}
 	}
 
-	file, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("Failed to open log file: %v", err)
-	}
-	defer file.Close()
-
 	config, err := config.New()
 	if err != nil {
 		log.Fatalf("Error initializing config: %v", err)
 	}
 
-	zlog, err := utils.NewZapLogger(config.App.Environment, file)
+	zlog, err := utils.NewZapLogger(config.App.Environment)
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
 	}

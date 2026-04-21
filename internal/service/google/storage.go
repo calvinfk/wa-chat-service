@@ -134,18 +134,18 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 	return bucketName, filePath, nil
 }
 
-func (s *GoogleStorageService) IsSignedURL(url string) (bool, error) {
+func (s *GoogleStorageService) isSignedURL(url string) (bool, error) {
 	if !strings.HasPrefix(url, "https://storage.googleapis.com/") {
 		return false, nil
 	}
 	parts := strings.Split(strings.TrimPrefix(url, "https://storage.googleapis.com/"), "/")
 	if len(parts) < 2 {
-		s.zslog.Errorf("[IsSignedURL] invalid signed URL: %s", url)
+		s.zslog.Errorf("[isSignedURL] invalid signed URL: %s", url)
 		return false, fmt.Errorf("invalid signed URL: %s", url)
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		s.zslog.Errorf("[IsSignedURL] error creating HTTP request: %v", err)
+		s.zslog.Errorf("[isSignedURL] error creating HTTP request: %v", err)
 		return false, err
 	}
 	queries := req.URL.Query()
@@ -166,7 +166,7 @@ func (s *GoogleStorageService) IsSignedURL(url string) (bool, error) {
 }
 
 func (s *GoogleStorageService) IsValidSignedURL(ctx context.Context, url string) (bool, error) {
-	if isSigned, err := s.IsSignedURL(url); err != nil {
+	if isSigned, err := s.isSignedURL(url); err != nil {
 		s.zslog.Errorf("[IsValidSignedURL] error validating signed URL: %v", err)
 		return false, err
 	} else if !isSigned {
@@ -218,10 +218,6 @@ func (s *GoogleStorageService) IsValidSignedURL(ctx context.Context, url string)
 
 func (s *GoogleStorageService) GetDefaultFileURL(filePath string) string {
 	return fmt.Sprintf("gs://%s/%s", s.config.DefaultBucket, filePath)
-}
-
-func (s *GoogleStorageService) GetFileURL(ctx context.Context, bucketName, filePath string) string {
-	return fmt.Sprintf("gs://%s/%s", bucketName, filePath)
 }
 
 func (s *GoogleStorageService) ParseSignedURLToFileURL(ctx context.Context, signedURL string) (string, error) {

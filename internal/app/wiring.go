@@ -22,7 +22,6 @@ import (
 	jose_service "wa_chat_service/internal/service/jose"
 	whatsapp_service "wa_chat_service/internal/service/whatsapp"
 	"wa_chat_service/internal/usecase"
-	activity_log_usecase "wa_chat_service/internal/usecase/activity_log"
 	auth_usecase "wa_chat_service/internal/usecase/auth"
 	broadcast_usecase "wa_chat_service/internal/usecase/broadcast"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
@@ -52,7 +51,6 @@ type servers struct {
 }
 
 type clients struct {
-	// DbPostgres *gorm.DB
 	firebaseClient   *firebase.App
 	firestoreClient  *firestore.Client
 	gcpStorageClient *storage.Client
@@ -62,17 +60,15 @@ type clients struct {
 }
 
 type services struct {
-	AccessToken   service.AccessToken
-	Encrypt       service.Encrypt
-	GoogleStorage service.GoogleStorage
-	// GoogleFirebase *service.GoogleFirebase
+	AccessToken      service.AccessToken
+	Encrypt          service.Encrypt
+	GoogleStorage    service.GoogleStorage
 	WhatsappBusiness service.WhatsappBusiness
 	GoogleTask       service.GoogleTask
 	JWT              service.JWT
 }
 
 type repositories struct {
-	ActivityLog    repository.ActivityLog
 	Chat           repository.Chat
 	Message        repository.Message
 	StorageMedia   repository.StorageMedia
@@ -84,7 +80,6 @@ type repositories struct {
 }
 
 type usecases struct {
-	ActivityLog  usecase.ActivityLog
 	Chat         usecase.Chat
 	Message      usecase.Message
 	StorageMedia usecase.StorageMedia
@@ -103,17 +98,14 @@ func NewDefaultWiring(zslog *zap.SugaredLogger, config *config.Config) servers {
 	return servers
 }
 
-func newDefaultClients(config *config.Config, zsLog *zap.SugaredLogger) clients {
-	ctx := context.Background()
-	// dbPostgres, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{})
-	// if err != nil {
-	// 	panic("failed to open database: " + err.Error())
-	// }
+func newDefaultClients(cfg *config.Config, zsLog *zap.SugaredLogger) clients {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	gcpStorageClient, err := storage.NewClient(ctx)
 	if err != nil {
 		zsLog.Fatalf("Failed to create Google Storage client: " + err.Error())
 	}
-	conf := &firebase.Config{ProjectID: config.GCP.ProjectID, StorageBucket: config.GCP.ProjectID + ".firebasestorage.app"}
+	conf := &firebase.Config{ProjectID: cfg.GCP.ProjectID, StorageBucket: cfg.GCP.ProjectID + ".firebasestorage.app"}
 	firebaseClient, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		zsLog.Fatalf("Failed to create Firebase app: " + err.Error())
@@ -122,22 +114,13 @@ func newDefaultClients(config *config.Config, zsLog *zap.SugaredLogger) clients 
 	if err != nil {
 		zsLog.Fatalf("Failed to create Firestore client: %v", err)
 	}
-	// firebaseMessagingClient, err := firebaseClient.Messaging(context.Background())
-	// if err != nil {
-	// 	zsLog.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Messaging client: %v", err)
-	// }
-	// firebaseStorageClient, err := firebaseClient.Storage(context.Background())
-	// if err != nil {
-	// 	zsLog.Fatalf("[ERROR][internal/app/app.go][Run] Failed to create Firebase Storage client: %v", err)
-	// }
 	txManager := utils.NewTxManager(nil, firestoreClient)
-	gcpTaskClient, err := cloudtasks.NewService(context.Background())
+	gcpTaskClient, err := cloudtasks.NewService(ctx)
 	if err != nil {
 		zsLog.Fatalf("Failed to create Cloud Tasks client: " + err.Error())
 	}
-	meiliClient := meilisearch.New(config.Meili.URL, meilisearch.WithAPIKey(config.Meili.APIKey))
+	meiliClient := meilisearch.New(cfg.Meili.URL, meilisearch.WithAPIKey(cfg.Meili.APIKey))
 	return clients{
-		// DbPostgres: dbPostgres,
 		firebaseClient:   firebaseClient,
 		firestoreClient:  firestoreClient,
 		gcpStorageClient: gcpStorageClient,
@@ -151,15 +134,13 @@ func newDefaultServices(config *config.Config, zslog *zap.SugaredLogger, clients
 	accessTokenService := access_token_service.NewAccessTokenService(config, zslog)
 	encryptService := encrypt_service.NewEncryptService(&config.Encrypt, zslog)
 	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &config.GCP, zslog)
-	// googleFirebaseService := google_service.NewGoogleFirebaseService(&config.GCP, clients.firebaseMessagingClient, clients.firebaseStorageClient)
 	whatsappService := whatsapp_service.NewWhatsappService(zslog)
 	jwtService := jose_service.NewJWTService(&config.JOSE, zslog)
 	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &config.GCP, jwtService, encryptService, zslog)
 	return services{
-		AccessToken:   accessTokenService,
-		Encrypt:       encryptService,
-		GoogleStorage: googleStorageService,
-		// GoogleFirebase: googleFirebaseService,
+		AccessToken:      accessTokenService,
+		Encrypt:          encryptService,
+		GoogleStorage:    googleStorageService,
 		WhatsappBusiness: whatsappService,
 		GoogleTask:       googleTaskService,
 		JWT:              jwtService,
@@ -167,7 +148,6 @@ func newDefaultServices(config *config.Config, zslog *zap.SugaredLogger, clients
 }
 
 func newDefaultRepositories(clients clients, services services) repositories {
-	activityLogRepository := repository_firestore.NewActivityLogRepository(clients.firestoreClient)
 	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
 	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient, services.GoogleStorage)
@@ -177,7 +157,6 @@ func newDefaultRepositories(clients clients, services services) repositories {
 	meiliTemplateRepository := repository_meili.NewMeiliTemplateRepository(clients.meiliClient)
 	meiliMessageRepository := repository_meili.NewMeiliMessageRepository(clients.meiliClient)
 	return repositories{
-		ActivityLog:    activityLogRepository,
 		Chat:           chatRepository,
 		Message:        messageRepository,
 		StorageMedia:   storageMediaRepository,
@@ -190,7 +169,6 @@ func newDefaultRepositories(clients clients, services services) repositories {
 }
 
 func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
-	activityLogUsecase := activity_log_usecase.NewActivityLogUsecase(repositories.ActivityLog, zslog)
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
@@ -199,7 +177,6 @@ func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories 
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zslog)
 	authUsecase := auth_usecase.NewAuthUsecase(repositories.Tenant, services.AccessToken, services.Encrypt, zslog)
 	return usecases{
-		ActivityLog:  activityLogUsecase,
 		Template:     templateUsecase,
 		Message:      messageUsecase,
 		StorageMedia: storageMediaUsecase,
@@ -223,11 +200,12 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		),
 	)
 	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
+		App:          grpcServer.App,
 		StorageMedia: usecases.StorageMedia,
 		Message:      usecases.Message,
 		ZSLog:        zslog,
 	}
-	handler_grpc.NewRouter(grpcServer.App, handlerGRPCV1)
+	handler_grpc.NewRouter(handlerGRPCV1)
 	if config.App.Environment != "production" {
 		reflection.Register(grpcServer.App)
 	}
@@ -244,7 +222,6 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 	)
 	// Router Handler
 	handlerHTTPV1 := http_v1.HandlerHTTPV1{
-		ActivityLogUsecase:  usecases.ActivityLog,
 		MessageUsecase:      usecases.Message,
 		StorageMediaUsecase: usecases.StorageMedia,
 		ChatUsecase:         usecases.Chat,

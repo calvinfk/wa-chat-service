@@ -13,7 +13,7 @@ func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, p
 		var err error
 		encryptedToken := ctx.Get("Authorization")
 		if encryptedToken == "" {
-			zsLog.Errorf("[ERROR][internal/handler/http/middleware/Jwt] Authorization header or cookie is required: %v", err)
+			zsLog.Errorf("[Jwt] Authorization header or cookie is required: %v", err)
 			if pass {
 				return ctx.Next()
 			}
@@ -40,7 +40,7 @@ func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, p
 		}
 		tokenString, err := encryptService.Decrypt(encryptedToken)
 		if err != nil {
-			zsLog.Errorf("[ERROR][internal/handler/http/middleware/Jwt] Failed to decrypt token: %v", err)
+			zsLog.Errorf("[Jwt] Failed to decrypt token: %v", err)
 			if pass {
 				return ctx.Next()
 			}
@@ -53,6 +53,7 @@ func Jwt(encryptService service.Encrypt, jwtService service.JWT, failCode int, p
 		}
 		sub, err := jwtService.ParseJWT(tokenString)
 		if err != nil {
+			zsLog.Errorf("[Jwt] Failed to parse JWT: %v", err)
 			if pass {
 				return ctx.Next()
 			}

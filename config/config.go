@@ -302,28 +302,29 @@ func joseEnv() (JOSE, error) {
 }
 
 func loadPrivateKey(keyPath string) (*rsa.PrivateKey, error) {
+	// 600 permissions mean read/write for owner only
+	// ensuring they are not accessible by other users on the system.
 	file, err := os.OpenFile(keyPath, os.O_RDONLY, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open private key file: %w", err)
 	}
 	defer file.Close()
-	data := make([]byte, 2048) // Read up to 2KB, adjust if needed
-	_, err = file.Read(data)
+
+	data, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key file: %w", err)
 	}
 
 	var privateKey *rsa.PrivateKey
 	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block")
+	}
 	switch block.Type {
-	case "RSA PRIVATE KEY":
-		// PKCS#1
-		privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse PKCS1 private key: %w", err)
-		}
 	case "PRIVATE KEY":
-		// PKCS#8
+		// Public Key Cryptography Standards (PKCS) #8 defines a standard syntax for storing private key information
+		// including a private key for any public key algorithm and a set of attributes.
+		// It is more flexible and can accommodate various types of private keys, including RSA, DSA, and EC keys.
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse PKCS8 private key: %w", err)

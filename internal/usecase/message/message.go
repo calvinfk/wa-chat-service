@@ -166,7 +166,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 			}
 		}
 	}
-	sendResponse, httpCode, err := u.whatsappService.SendMessage(whatsappClient, inputData.RecipientID, component)
+	sendResponse, httpCode, err := whatsappClient.SendMessage(inputData.RecipientID, "individual", component)
 	if err != nil {
 		u.zslog.Errorf("[SendMessage] Failed to send message: %v", err)
 		return response, httpCode >= http.StatusInternalServerError, err

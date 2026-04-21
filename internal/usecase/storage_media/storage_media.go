@@ -85,12 +85,12 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	var accessURL *string
 
 	if inputData.SaveMeta {
-		mediaID, httpCode, err := u.whatsappService.UploadMedia(whatsappClient, fileData, media.OriginalName, media.MimeType)
+		mediaResponse, httpCode, err := whatsappClient.UploadMedia(fileData, media.OriginalName, media.MimeType)
 		if err != nil {
 			u.zslog.Errorf("[UploadMedia] Failed to upload media to WhatsApp Business API: %v", err)
 			return response, httpCode >= http.StatusInternalServerError, err
 		}
-		media.MediaID = &mediaID
+		media.MediaID = &mediaResponse.ID
 	}
 	if inputData.SaveResumable {
 		uploadSession, httpCode, err := whatsappClient.StartResumableUploadSession(media.OriginalName, fileSize, media.MimeType)
@@ -174,7 +174,7 @@ func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, inputData dto.Sto
 		return true, err
 	}
 	if media.MediaID != nil {
-		httpCode, err := u.whatsappService.DeleteMedia(whatsappClient, *media.MediaID)
+		_, httpCode, err := whatsappClient.DeleteMedia(*media.MediaID)
 		if err != nil {
 			u.zslog.Errorf("[DeleteMedia] Failed to delete media from WhatsApp Business API (HTTP code: %d): %v", httpCode, err)
 			return httpCode >= http.StatusInternalServerError, err
@@ -205,14 +205,14 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 		}
 		return emptyResponse, true, err
 	}
-	url, httpCode, err := u.whatsappService.GetMediaURL(whatsappClient, inputData.MediaID)
+	url, httpCode, err := whatsappClient.GetMediaURL(inputData.MediaID)
 	if err != nil {
 		u.zslog.Errorf("[UploadMediaUsingMediaID] Failed to get media URL from WhatsApp Business API: %v", err)
 		return emptyResponse, httpCode >= http.StatusInternalServerError, err
 	}
 	// download the file to get the mime type and original filename
 	var originalFileName string
-	urlHeaders, err := whatsappClient.GetHeaders(url)
+	urlHeaders, err := whatsappClient.GetHeaders(url.URL)
 	if err != nil {
 		u.zslog.Errorf("[UploadMediaUsingMediaID] Failed to get media headers: %v", err)
 		return emptyResponse, true, err

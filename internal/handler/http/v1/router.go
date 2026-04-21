@@ -10,7 +10,6 @@ import (
 )
 
 type HandlerHTTPV1 struct {
-	ActivityLogUsecase  usecase.ActivityLog
 	MessageUsecase      usecase.Message
 	StorageMediaUsecase usecase.StorageMedia
 	ChatUsecase         usecase.Chat

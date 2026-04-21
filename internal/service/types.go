@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"net/http"
 	"time"
-	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
@@ -14,6 +12,8 @@ import (
 type (
 	// AccessToken is an interface that defines methods for generating and parsing access tokens.
 	AccessToken interface {
+		// GenerateAccessToken generates an access token string for a given subject (sub).
+		// It returns the generated access token string or an error if there is an issue during token generation.
 		GenerateAccessToken(sub string) (string, error)
 		// ParseAccessToken parses a AccessToken access token string and extracts the user ID (subject) from the token claims.
 		// It validates the token using the configured JWK and returns the user ID as a UUID if the token is valid.
@@ -44,51 +44,48 @@ type (
 		// ParseGoogleStorageURL parses a Google Cloud Storage URL and returns the bucket name and object name.
 		// It returns bucket name, object name, and an error if the URL is invalid.
 		ParseGoogleStorageURL(fileURL string) (bucketName, filePath string, err error)
-		// IsSignedURL checks if the provided file URL is a signed URL for a file in Google Cloud Storage. It takes the file URL as a parameter
-		// It returns true if the URL is a signed URL, or false and an error if the URL is invalid.
-		IsSignedURL(url string) (bool, error)
 		// IsValidSignedURL checks if the provided file URL is a valid signed URL for a file in the project's Google Cloud Storage and haven't expired. It takes the file URL as a parameter
 		// It returns true if the URL is a valid signed URL, or false and an error if the URL is invalid.
 		IsValidSignedURL(ctx context.Context, url string) (bool, error)
 		// GetDefaultFileURL generates a default file URL for accessing a file in Google Cloud Storage. It takes the file path as a parameter and returns the generated file URL.
 		// This method is used to generate a default file URL to access files using this service.
 		GetDefaultFileURL(filePath string) string
-		// GetFileURL generates a file URL for accessing a file in Google Cloud Storage. It takes the file URL as a parameter and returns the generated file URL.
-		// This method is used to generate a file URL to access files using this service. It can be used to generate a signed URL or a default URL based on the implementation.
-		GetFileURL(ctx context.Context, bucketName, filePath string) string
+		// ParseSignedURLToFileURL parses a signed URL and creates a google storage file URL
+		// It takes the signed URL as a parameter and returns the original file URL if the parsing is successful, or an error if there is an issue during the parsing process.
 		ParseSignedURLToFileURL(ctx context.Context, signedURL string) (string, error)
 	}
 
-	GoogleFirebase interface {
-		// SendNotification sends a notification to the specified device tokens using Firebase Cloud Messaging. It takes the notification title, body, and a slice of device tokens as parameters. It returns an error if there is an issue during the sending process.
-		SendNotification(ctx context.Context, title string, body string, tokens []string) error
-		// SubscribeToTopic subscribes the specified device tokens to topics in Firebase Cloud Messaging. It takes the topic names and a slice of device tokens as parameters. It returns an error if there is an issue during the subscription process.
-		SubscribeToTopic(ctx context.Context, topics []string, tokens []string) error
-		// UnsubscribeFromTopic unsubscribes the specified device tokens from topics in Firebase Cloud Messaging. It takes the topic names and a slice of device tokens as parameters. It returns an error if there is an issue during the unsubscription process.
-		UnsubscribeFromTopic(ctx context.Context, topics []string, tokens []string) error
-		// SendNotificationToTopic sends a notification to the specified topic in Firebase Cloud Messaging. It takes the notification title, body, and the topic name as parameters. It returns an error if there is an issue during the sending process.
-		SendNotificationToTopic(ctx context.Context, title string, body string, topic string) error
-	}
-
+	// WhatsappBusiness is an interface that defines methods for helping with whatsapp business operations.
 	WhatsappBusiness interface {
-		SendMessage(client *whatsapp_business.Client, to string, payload whatsapp_business.MessageComponent) (whatsapp_business.MessageResponse, int, error)
-		UploadMedia(client *whatsapp_business.Client, fileBytes []byte, filename, mimeType string) (string, int, error)
-		GetMediaURL(client *whatsapp_business.Client, mediaID string) (string, int, error)
-		DownloadMedia(client *whatsapp_business.Client, mediaID string) ([]byte, http.Header, int, error)
-		DeleteMedia(client *whatsapp_business.Client, mediaID string) (int, error)
-		CreateTemplate(client *whatsapp_business.Client, inputData dto.TemplateCreateRequest) (whatsapp_business.TemplateCreateResponse, int, error)
+		// ValidateTemplatePayload validates the payload of a WhatsApp Business message template against the template definition stored in the database.
+		// It takes a WhatsApp Business client, a template definition from the database, and the message components to be sent as parameters.
+		// It returns an error if the payload is invalid according to the template definition, or nil if the payload is valid.
 		ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error
+		// ExtractSendComponentParameterValues extracts the parameter values from the message components to be sent based on the parameter format defined in the template.
+		// It takes the parameter format defined in the template and the message components to be sent as parameters.
+		// It returns a map of parameter names to their corresponding values extracted from the message components, or an error if there is an issue during the extraction process.
 		ExtractSendComponentParameterValues(parameterFormat string, sendComponents []map[string]any) (map[string]map[string]string, error)
+		// ParseTemplateComponentParameter parses a template component parameter value based on the parameter format defined in the template.
+		// It takes a parameter value as a string and returns the parsed parameter value as a string. The parsing logic is based on the parameter format defined in the template.
 		ParseTemplateComponentParameter(value string) string
 	}
 
+	// GoogleTask is an interface that defines methods for managing Google Cloud Tasks.
 	GoogleTask interface {
+		// CreateBroadcastTask creates a new broadcast task in Google Cloud Tasks.
 		CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error
+		// DeleteBroadcastTask deletes a broadcast task from Google Cloud Tasks based on the provided broadcast ID.
 		DeleteBroadcastTask(broadcastID string) error
 	}
 
+	// JWT is an interface that defines methods for generating and parsing JSON Web Tokens.
 	JWT interface {
+		// GenerateJWT generates a JWT token string for a given subject (sub) and expiration time (expiredAt).
+		// It returns the generated JWT token string or an error if there is an issue during token generation.
 		GenerateJWT(sub any, expiredAt int64) (string, error)
+		// ParseJWT parses a JWT token string and extracts the claims from the token. It validates the token using the configured JWK and returns the claims if the token is valid.
+		// If the token is expired, it returns an error indicating that the token has expired and the claims.
+		// If the token is invalid for any other reason, it returns only the error indicating that the token is invalid.
 		ParseJWT(tokenString string) (any, error)
 	}
 )
