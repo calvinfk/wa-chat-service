@@ -87,6 +87,49 @@ All routes are mounted under:
 - `GET /list`
   - Optional query: filter/pagination params
 
+## Authentication Notes
+
+- Token parsing middleware exists and expects an AES-encrypted token in cookie `access_token`.
+- `AccessToken` middleware is enabled globally in router wiring.
+- The protected guard (`/api/ping-protected` and most `/api/v1/*` routes) checks:
+  - `token_error_message` request header (if provided)
+  - `token_sub` context value
+- If `token_sub` is missing, protected routes return `401 Unauthorized`.
+
+## Global Middleware
+
+- Request logger
+- Panic recovery
+- CORS (config-driven)
+- OPTIONS preflight short-circuit
+- Request body/file-size guard at 16 MB (`413` when exceeded)
+- Access token parsing and validation
+- Protected route authorization
+
+## gRPC Infrastructure
+
+The service exposes a gRPC server on the same port as the HTTP (Fiber) server with the following services:
+
+### gRPC Services
+
+#### Message Service
+- `SendMessage` - Send WhatsApp messages via gRPC
+- Proto definition: `docs/proto/v1/message.proto`
+
+#### Storage Media Service
+- Media asset management via gRPC
+- Proto definition: `docs/proto/v1/storage-media.proto`
+
+### HMAC gRPC Interceptor
+
+The gRPC interceptor implements custom HMAC-based authentication:
+- Expects clients to include an `x-signature` metadata containing an HMAC signature of the request payload
+- Body is JSON-marshaled with 1 space indentation
+- Checks for a timestamp in `x-timestamp` metadata to prevent replay attacks ([replay prevention reference](https://webhooks.fyi/security/replay-prevention))
+- Uses SHA256 as the hashing algorithm for good balance between security and performance
+- Signature generated from URI + content ([reference](https://learn.microsoft.com/en-us/azure/communication-services/tutorials/hmac-header-tutorial?pivots=programming-language-csharp))
+- Uses shared secret configured via `HMAC_SECRET`
+
 ## Standard JSON Response Shape
 
 Most JSON endpoints return:
@@ -105,22 +148,7 @@ Notes:
 - Validation and business errors are normalized into `errors` and `message`.
 - `GET /api/v1/storage-media/get` is a file stream endpoint and does not return this JSON envelope on success.
 
-## Authentication Notes
 
-- Token parsing middleware exists and expects an AES-encrypted token in cookie `access_token`.
-- `AccessToken` middleware is enabled globally in router wiring.
-- The protected guard (`/api/ping-protected` and most `/api/v1/*` routes) checks:
-  - `token_error_message` request header (if provided)
-  - `token_sub` context value
-- If `token_sub` is missing, protected routes return `401 Unauthorized`.
-
-## Global Middleware
-
-- Request logger
-- Panic recovery
-- CORS (config-driven)
-- OPTIONS preflight short-circuit
-- Request body/file-size guard at 16 MB (`413` when exceeded)
 
 ## Configuration
 
@@ -134,13 +162,14 @@ Required variables:
 - `APP_PORT`
 - `APP_URL`
 - `DATABASE_URL`
-- `AES_ENCRYPTION_KEY`
+- `AES_ENCRYPTION_KEY` - Token encryption key
 - `GCP_PROJECT_ID`
 - `GCP_APP_BASE_URL`
 - `GCP_TASK_BROADCAST_PARENT`
-- `JOSE_RSA_PRIVATE_KEY` (path to RSA private key file)
-- `JOSE_ACCESS_TOKEN_EXPIRY` (Go duration format, for example `24h`)
+- `JOSE_RSA_PRIVATE_KEY` - Path to RSA private key file
+- `JOSE_ACCESS_TOKEN_EXPIRY` - Go duration format (e.g., `24h`)
 - `CORS_ENABLED`
+- `HMAC_SECRET` - Shared secret for gRPC HMAC authentication
 
 Optional/common variables:
 
@@ -152,17 +181,10 @@ Optional/common variables:
 - `CORS_ALLOW_CREDENTIALS`
 - `META_APP_ID`
 - `META_GRAPH_API_VERSION`
-- `GOOGLE_APPLICATION_CREDENTIALS` (recommended for local/dev if using ADC)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Recommended for local/dev if using Application Default Credentials
+- `MEILISEARCH_HOST` - Meilisearch server URL
+- `MEILISEARCH_API_KEY` - Meilisearch API key
 
-## GRPC
-
-The service also exposes a GRPC server on the same port, with the following service definition:
-
-```protobuf
-service ChatService {
-  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
-}
-```
 ## Proto Code Generation
 
 To regenerate proto files, install the required tools:
@@ -174,6 +196,25 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
 This project uses `protoc` version 25.9.
 
+To regenerate:
+
+```bash
+make proto
+```
+
+Proto files are located in `docs/proto/v1/` with generated code in the same directory.
+
+
+## Runtime Behavior
+
+At startup, the service initializes:
+
+- Firebase app
+- Firestore client
+- Google Cloud Storage client
+- Google Cloud Tasks client
+- PostgreSQL database connection
+- Meilisearch search index
 
 ## Running Locally
 
@@ -195,6 +236,73 @@ Alternative:
 go run ./cmd/app/main.go
 ```
 
+## Utilities & Libraries
+
+### `pkg/api_response/`
+- Standardized JSON envelope (code, message, data, errors)
+- HTTP status code mapping
+- gRPC response builder for error conversion
+
+### `pkg/errs/`
+- Authentication-specific errors (invalid credentials, expired tokens)
+- Database-specific errors
+- Generic errors (forbidden, not found, already exists)
+- Validation error handling
+- Error classifier for auth detection
+
+### `pkg/filter_request/`
+- Operator-based query filtering (eq, ne, lt, gt, etc.)
+- Type-specific filters: string, number, email, UUID
+- Pagination and sorting helpers
+
+### `pkg/meta/`
+- WhatsApp Business API metadata structures
+- Webhook payload parsing and marshaling
+- Media metadata handling
+
+### `pkg/server/`
+- HTTP server setup (Fiber) with configurable body limits and timeouts
+- gRPC server setup with HMAC authentication interceptor
+- Graceful shutdown support
+- Middleware initialization and composition
+
+### `pkg/service-accounts/`
+- Firebase service account key storage
+- GCP credentials management
+
+### `pkg/utils/`
+- **Logger** - Dual output (stdout + `app.log`), environment-aware formatting (ANSI colors in development, plain text in production), structured logging with Zap
+- **Validator** - Custom validators for file extensions and file counts, filter option validation, tag-based validation with custom error formatting
+- **Transaction Manager** - Unified interface for mixed-database transactions: `Do()` (combined Firestore + GORM), `DoFirestore()`, `DoGorm()`
+- **Web Utilities** - HTTP HEAD requests for header fetching, file download functionality, URL filename extraction with query parameter cleanup
+- **JSON/Map Utilities** - Bidirectional struct ↔ map conversion, null value omission, JSON string serialization
+- **Formatter** - Data formatting utilities
+
+### CLI Tools
+
+#### Encryption Utility (`cmd/encrypt/encrypt.go`)
+Utility for AES encryption and decryption:
+
+```bash
+make encrypt
+make decrypt
+```
+
+Useful for managing encrypted tokens and secrets.
+
+## Make Targets
+
+- `make run` - Start development server
+- `make encrypt` - Run AES encryption utility
+- `make decrypt` - Run AES decryption utility
+- `make build` - Build `wa-chat-service.exe`
+- `make clean` - Remove built executable
+- `make proto` - Generate gRPC code from `.proto` files
+- `make meili-up` - Start Meilisearch container
+- `make meili-down` - Stop Meilisearch container
+- `make save` - Build Docker image
+- `make docker` - Build image and run docker compose
+
 ## Running with Docker
 
 ```bash
@@ -207,30 +315,61 @@ Or:
 make docker
 ```
 
-## Bootstrap Behavior
+Default compose services:
 
-At startup, the service initializes:
+- `wa-chat-service` on `8120`
+- `Meilisearch` (optional search backend)
 
-- Firebase app
-- Firestore client
-- Google Cloud Storage client
-- Google Cloud Tasks client
+## Project Structure
 
-PostgreSQL connection bootstrap is currently not active in wiring (the connection code is present but commented out).
+```text
+.
+|-- cmd/
+|   |-- app/          # Main HTTP/gRPC service
+|   `-- encrypt/      # AES encryption/decryption utility
+|-- config/           # Configuration loading
+|-- internal/
+|   |-- app/          # Application wiring and dependency injection
+|   |-- dto/          # Data transfer objects with validation
+|   |-- handler/
+|   |   |-- http/     # HTTP handlers (Fiber)
+|   |   |   |-- middleware/  # HTTP middleware (access_token, jwt, etc.)
+|   |   |   `-- v1/   # API v1 handlers
+|   |   `-- grpc/     # gRPC service handlers
+|   |-- model/        # Domain models (Chat, Message, Broadcast, etc.)
+|   |-- repository/   # Data access layer
+|   |   |-- firestore/# Firestore-specific implementation
+|   |   `-- meilisearch/ # Meilisearch search implementation
+|   |-- service/      # Business logic services
+|   |   |-- access_token/  # Token management
+|   |   |-- encrypt/       # Encryption/decryption
+|   |   |-- google/        # Google Cloud services
+|   |   |-- jose/          # JWT signing
+|   |   `-- whatsapp/      # WhatsApp API integration
+|   `-- usecase/      # Use case orchestration
+|-- pkg/              # Shared utilities
+|   |-- api_response/ # Standard response envelopes
+|   |-- errs/         # Error handling and types
+|   |-- filter_request/ # Query filtering and pagination
+|   |-- meta/         # WhatsApp metadata structures
+|   |-- server/       # HTTP/gRPC server setup
+|   |-- service-accounts/ # Firebase service account keys
+|   `-- utils/        # Helper functions (logger, validator, etc.)
+|-- docs/
+|   `-- proto/v1/     # gRPC proto definitions and generated code
+|-- Dockerfile
+|-- docker-compose.yml
+`-- Makefile
+```
 
-## Notes
+## Important Notes
+
 ### Template
--  When creating templates, if there's no parameter in the components, the `parameter_format` can be filled or left null, both are valid. If there's parameter(s) in the components, the `parameter_format` must be filled with either "NAMED" or "POSITIONAL".
+- When creating templates, if there's no parameter in the components, the `parameter_format` can be filled or left null, both are valid.
+- If there's parameter(s) in the components, the `parameter_format` must be filled with either "NAMED" or "POSITIONAL".
 
 ### Broadcast
-- Currently does not support Button for multi product message, one time password, voice call, single product message
+- Currently does not support Button for multi-product message, one-time password, voice call, or single product message.
 
 ### Media
-- Resumable api is for creating template and profile picture.
-
-### HMAC GRPC Interceptor
-- The GRPC interceptor implements a custom HMAC-based authentication mechanism. It expects clients to include an `x-signature` metadata containing an HMAC signature of the request payload, the body is JSON-marshaled with 1 space indentation, which is verified on the server side.
-- The interceptor also checks for a timestamp in the `x-timestamp` metadata to prevent replay attacks [Link](https://webhooks.fyi/security/replay-prevention).
-- It uses SHA256 as the hashing algorithm, because of good balance between security and performance, and wide support in libraries. [[Link](https://www.authgear.com/post/generate-verify-hmac-signatures)]
-- Signature generated from uri + content[[Link](https://learn.microsoft.com/en-us/azure/communication-services/tutorials/hmac-header-tutorial?pivots=programming-language-csharp)]
-- The interceptor uses a shared secret (configured via `HMAC_SECRET`) to compute the HMAC signature of the incoming request's JSON-marshaled payload and compares it against the signature provided in the header.
+- Resumable API is for creating template and profile picture.
