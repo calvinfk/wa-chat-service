@@ -17,11 +17,12 @@ type (
 	Message interface {
 		SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error)
 		GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error)
+		SaveMessage(ctx context.Context, inputData dto.MessageSaveRequest) (bool, error)
 	}
 
 	Template interface {
 		CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error)
-		GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error)
+		GetFilteredByTenantID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], bool, error)
 		SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error)
 		DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error)
 		UpdateTemplate(ctx context.Context, inputData dto.TemplateUpdateRequest) (bool, error)

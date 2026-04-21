@@ -15,13 +15,14 @@ type (
 		ParameterFormat *string          `json:"parameter_format,omitempty"`
 		Components      []map[string]any `json:"components" validate:"required"`
 	}
-	TemplateGetByPhoneNumberID struct {
+	TemplateGetByTenantID struct {
 		TenantID string  `json:"-" query:"tenant_id" validate:"required"`
+		Search   string  `json:"-" query:"search"`
 		Name     *string `json:"name,omitempty" query:"name" validate:"omitempty,min=1"`
-		Status   *string `json:"status,omitempty" query:"status" validate:"omitempty,oneof=APPROVED REJECTED PENDING"`
+		Status   *string `json:"status,omitempty" query:"status" validate:"omitempty,filter_options=APPROVED REJECTED PENDING"`
 		Category *string `json:"category,omitempty" query:"category" validate:"omitempty,oneof=MARKETING UTILITY AUTHENTICATION"`
 	}
-	TemplateGetByPhoneNumberIDResponse struct {
+	TemplateResponse struct {
 		ID                          string    `json:"id"`
 		Name                        string    `json:"name"`
 		Category                    string    `json:"category"`
@@ -54,14 +55,14 @@ type (
 	}
 )
 
-func (r TemplateGetByPhoneNumberID) Validate() map[string]string {
+func (r TemplateGetByTenantID) Validate() map[string]string {
 	validator := utils.NewValidator()
 	err := validator.Struct(r)
 	return utils.GetValidatorErrorMessages(err)
 }
 
-func (TemplateGetByPhoneNumberIDResponse) FromModel(data model.Template) TemplateGetByPhoneNumberIDResponse {
-	return TemplateGetByPhoneNumberIDResponse{
+func (TemplateResponse) FromModel(data model.Template) TemplateResponse {
+	return TemplateResponse{
 		ID:                          data.DocumentID,
 		Category:                    data.Category,
 		Components:                  data.Components,

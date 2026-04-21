@@ -2,6 +2,7 @@ package repository_meili
 
 import (
 	"context"
+	"log"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
@@ -15,6 +16,21 @@ type MeiliMessageRepository struct {
 }
 
 func NewMeiliMessageRepository(db meilisearch.ServiceManager) *MeiliMessageRepository {
+	var message model.Message
+	var filterableAttributes []any
+	for _, field := range message.AllowedFilterFields() {
+		filterableAttributes = append(filterableAttributes, field)
+	}
+	// db.Index(message.TableName()).GetFilterableAttributes()
+	_, err := db.Index(message.TableName()).UpdateFilterableAttributes(&filterableAttributes)
+	if err != nil {
+		log.Fatalf("failed to update filterable attributes: %v", err)
+	}
+	sortableAttributes := message.AllowedSortFields()
+	_, err = db.Index(message.TableName()).UpdateSortableAttributes(&sortableAttributes)
+	if err != nil {
+		log.Fatalf("failed to update sortable attributes: %v", err)
+	}
 	return &MeiliMessageRepository{
 		db: db,
 	}
@@ -28,24 +44,29 @@ func (r *MeiliMessageRepository) AddDocuments(ctx context.Context, messages []mo
 	return err
 }
 
-func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, error) {
+func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error) {
 	var messages []model.Message
-	searched, err := r.db.Index(r.message.TableName()).Search(filter.SpecificFilter.Search, &meilisearch.SearchRequest{
-		Limit:  int64(filter.PageSize),
-		Offset: int64((filter.Page - 1) * filter.PageSize),
-		Filter: "chat_id = " + filter.SpecificFilter.ChatID,
-		Sort:   []string{"created_at:desc"},
-	})
+	filters, sort, paginate, err := filter_request.InitializeFilter(filterRequest, r.message.AllowedFilterFields(), r.message.AllowedSortFields())
 	if err != nil {
-		return messages, 0, err
+		return messages, 0, paginate, err
+	}
+	filters = append(filters, filter_request.Filter{
+		Field:    "chat_id",
+		Operator: filter_request.OpEq,
+		Value:    filterRequest.SpecificFilter.ChatID,
+	})
+	searchRequest := filter_request.ApplyFilterMeili(filters, sort, paginate)
+	searched, err := r.db.Index(r.message.TableName()).Search(filterRequest.SpecificFilter.Search, searchRequest)
+	if err != nil {
+		return messages, 0, paginate, err
 	}
 	for _, hit := range searched.Hits {
 		var message model.Message
 		err := hit.DecodeInto(&message)
 		if err != nil {
-			return messages, 0, err
+			return messages, 0, paginate, err
 		}
 		messages = append(messages, message)
 	}
-	return messages, searched.TotalHits, err
+	return messages, searched.TotalHits, paginate, err
 }

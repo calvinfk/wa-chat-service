@@ -58,7 +58,7 @@ type (
 	}
 
 	Template interface {
-		GetFilteredByPhoneNumberID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], error)
+		GetFilteredByTenantID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], error)
 		GetAll(ctx context.Context, tenantID string) ([]model.Template, error)
 		GetByID(ctx context.Context, tenantID string, documentID string) (model.Template, error)
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Template) (model.Template, error)
@@ -81,9 +81,10 @@ type (
 	SearchTemplate interface {
 		AddDocuments(ctx context.Context, document []model.Template) error
 		DeleteDocuments(ctx context.Context, documentIDs []string) error
+		GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.TemplateGetByTenantID]) ([]model.Template, int64, filter_request.Paginate, error)
 	}
 	SearchMessage interface {
 		AddDocuments(ctx context.Context, document []model.Message) error
-		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, error)
+		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
 	}
 )

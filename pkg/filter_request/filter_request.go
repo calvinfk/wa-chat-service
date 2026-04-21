@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"github.com/google/uuid"
+	"github.com/meilisearch/meilisearch-go"
 	"gorm.io/gorm"
 )
 
@@ -168,4 +170,51 @@ func ApplyFilterFirestore(ctx context.Context, query firestore.Query, filters []
 		return nil, 0, err
 	}
 	return docs, totalData, nil
+}
+
+func ApplyFilterMeili(filters []Filter, sort Sort, paginate Paginate) *meilisearch.SearchRequest {
+	var filterStr []string
+	for _, filter := range filters {
+		var str string
+		if filter.Operator == "in" {
+			values := strings.Split(fmt.Sprintf("%v", filter.Value), ",")
+			var quotedValues []string
+			for _, v := range values {
+				quotedValues = append(quotedValues, fmt.Sprintf("\"%s\"", strings.TrimSpace(v)))
+			}
+			str = fmt.Sprintf("%s IN [%s]", filter.Field, strings.Join(quotedValues, ","))
+		} else {
+			op := parseOperatorToMeiliCondition(filter.Operator)
+			str = formatFilterValue(filter.Field, op, filter.Value)
+		}
+		filterStr = append(filterStr, str)
+	}
+
+	sortQuery := sort.SortBy + ":" + string(sort.SortOrder)
+	filterJoined := strings.Join(filterStr, " AND ")
+	return &meilisearch.SearchRequest{
+		HitsPerPage: int64(paginate.PageSize),
+		Page:        int64(paginate.Page),
+		Filter:      filterJoined,
+		Sort:        []string{sortQuery},
+	}
+}
+
+func formatFilterValue(field, op string, value any) string {
+	switch v := value.(type) {
+	case string:
+		// Escape any inner quotes to prevent injection
+		escaped := strings.ReplaceAll(v, `"`, `\"`)
+		return fmt.Sprintf(`%s %s "%s"`, field, op, escaped)
+	case bool:
+		return fmt.Sprintf("%s %s %t", field, op, v)
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return fmt.Sprintf("%s %s %v", field, op, v)
+	default:
+		// Fallback: treat as string
+		escaped := strings.ReplaceAll(fmt.Sprintf("%v", v), `"`, `\"`)
+		return fmt.Sprintf(`%s %s "%s"`, field, op, escaped)
+	}
 }

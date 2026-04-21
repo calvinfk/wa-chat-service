@@ -85,15 +85,20 @@ func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.Temp
 	return response, false, nil
 }
 
-func (u *TemplateUsecase) GetFilteredByPhoneNumberID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], bool, error) {
-	var emptyResponse filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
+func (u *TemplateUsecase) GetFilteredByTenantID(ctx context.Context, inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], bool, error) {
+	var emptyResponse filter_request.FilterResponse[dto.TemplateResponse]
 	var err error
-	var response filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
-	response, err = u.templateRepository.GetFilteredByPhoneNumberID(ctx, inputData.SpecificFilter.TenantID, inputData)
+	var response filter_request.FilterResponse[dto.TemplateResponse]
+	data, totalItems, paginate, err := u.searchTemplateRepository.GetFiltered(ctx, inputData)
 	if err != nil {
-		u.zslog.Errorf("[GetFilteredByPhoneNumberID] failed to get templates by phone number id: %v", err)
+		u.zslog.Errorf("[GetFilteredByTenantID] failed to get templates by tenant id: %v", err)
 		return emptyResponse, true, err
 	}
+	var dataResponse []dto.TemplateResponse
+	for _, template := range data {
+		dataResponse = append(dataResponse, dto.TemplateResponse{}.FromModel(template))
+	}
+	response = filter_request.NewFilterResponse(dataResponse, paginate, totalItems)
 	return response, false, nil
 }
 

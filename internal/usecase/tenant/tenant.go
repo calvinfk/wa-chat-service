@@ -105,7 +105,6 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.Contact
 		u.zslog.Errorf("[UpdateContact] Failed to get contacts by phone number: %v", err)
 		return true, err
 	}
-	fmt.Print(contacts)
 	if len(contacts) > 0 && contacts[inputData.PhoneNumber]["__name__"] != inputData.ID {
 		u.zslog.Errorf("[UpdateContact] Contact with the same phone number already exists")
 		return false, fmt.Errorf("contact with the same phone number already exists")

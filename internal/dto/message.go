@@ -15,13 +15,10 @@ type (
 		Type          string `json:"type" validate:"required"` // text, image, video, etc
 		Payload       any
 	}
-	TemplateListRequest struct {
-		PhoneNumberID string `query:"phone_number_id" validate:"required"`
-	}
 
 	MessageGetByChatIDRequest struct {
 		ChatID string `query:"chat_id" validate:"required"`
-		Search string `query:"search"`
+		Search string `json:"-" query:"search"`
 	}
 	MessageResponse struct {
 		ID              string                `json:"id"`               // id from whatsapp
@@ -38,6 +35,22 @@ type (
 		DeliveredAt     *time.Time            `json:"delivered_at,omitempty"`
 		ReadAt          *time.Time            `json:"read_at,omitempty"`
 		Error           *string               `json:"error,omitempty"` // error message if failed to send, json stringified from whatsapp error response
+	}
+	MessageSaveRequest struct {
+		ID              *string    `json:"id"`
+		Wamid           string     `json:"wamid" validate:"required"`
+		ChatID          string     `json:"chat_id" validate:"required"`
+		MessageType     string     `json:"message_type" validate:"required"`
+		MessageCategory string     `json:"message_category" validate:"required"`
+		SenderName      string     `json:"sender_name" validate:"required"`
+		Payload         string     `json:"payload" validate:"required"`
+		StorageMediaID  *string    `json:"storage_media_id"`
+		Status          string     `json:"status" validate:"required"`
+		CreatedAt       time.Time  `json:"created_at" validate:"required"`
+		SentAt          *time.Time `json:"sent_at"`
+		DeliveredAt     *time.Time `json:"delivered_at"`
+		ReadAt          *time.Time `json:"read_at"`
+		Error           *string    `json:"error"`
 	}
 )
 

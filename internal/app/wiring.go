@@ -224,6 +224,7 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 	)
 	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
 		StorageMedia: usecases.StorageMedia,
+		Message:      usecases.Message,
 		ZSLog:        zslog,
 	}
 	handler_grpc.NewRouter(grpcServer.App, handlerGRPCV1)

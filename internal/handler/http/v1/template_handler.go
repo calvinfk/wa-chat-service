@@ -43,7 +43,7 @@ func (h *TemplateHandler) createTemplate(ctx fiber.Ctx) error {
 }
 
 func (h *TemplateHandler) getTemplates(ctx fiber.Ctx) error {
-	var inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]
+	var inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]
 	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
 		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -52,7 +52,7 @@ func (h *TemplateHandler) getTemplates(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.templateUsecase.GetFilteredByPhoneNumberID(ctx, inputData)
+	data, serverError, err := h.templateUsecase.GetFilteredByTenantID(ctx, inputData)
 	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get templates", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }

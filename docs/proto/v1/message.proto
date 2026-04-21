@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+package v1;
+
+option go_package = "docs/proto/v1";
+
+// Message defines the gRPC service for managing messages.
+service Message {
+  // SaveMessage saves a message
+  rpc SaveMessage(SaveMessageRequest) returns (google.protobuf.Empty);
+}
+
+// Message represents the structure of a message in the system.
+message MessageModel {
+  string id               = 1;
+  string wamid            = 2;
+  string chat_id          = 3;
+  string message_type     = 4;
+  string message_category = 5;
+  string sender_name      = 6;
+  string payload          = 7;
+  optional string storage_media_id = 8;
+  string status           = 9;
+  google.protobuf.Timestamp created_at = 10;
+  optional google.protobuf.Timestamp sent_at = 11;
+  optional google.protobuf.Timestamp delivered_at = 12;
+  optional google.protobuf.Timestamp read_at = 13;
+  optional string error = 14;
+}
+
+// SaveMessageRequest contains the message details to be saved and the associated phone number ID.
+message SaveMessageRequest {
+  MessageModel message = 1;
+}

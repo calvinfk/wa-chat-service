@@ -23,8 +23,8 @@ func NewTemplateRepository(db *firestore.Client) *TemplateRepository {
 	}
 }
 
-func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.TemplateGetByPhoneNumberID]) (filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse], error) {
-	var response filter_request.FilterResponse[dto.TemplateGetByPhoneNumberIDResponse]
+func (r *TemplateRepository) GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], error) {
+	var response filter_request.FilterResponse[dto.TemplateResponse]
 	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.template.AllowedFilterFields(), r.template.AllowedSortFields())
 	if err != nil {
 		return response, err
@@ -35,7 +35,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 	if err != nil {
 		return response, err
 	}
-	var result []dto.TemplateGetByPhoneNumberIDResponse
+	var result []dto.TemplateResponse
 	for _, doc := range docs {
 		var template model.Template
 		docData := doc.Data()
@@ -45,7 +45,7 @@ func (r *TemplateRepository) GetFilteredByPhoneNumberID(ctx context.Context, ten
 		if err != nil {
 			return response, err
 		}
-		result = append(result, dto.TemplateGetByPhoneNumberIDResponse{}.FromModel(template))
+		result = append(result, dto.TemplateResponse{}.FromModel(template))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil

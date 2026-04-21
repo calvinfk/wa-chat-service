@@ -212,16 +212,17 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 
 func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
 	var response filter_request.FilterResponse[dto.MessageResponse]
-	messages, totalItems, err := u.searchMessageRepository.GetFiltered(ctx, requestData)
+	messages, totalItems, paginate, err := u.searchMessageRepository.GetFiltered(ctx, requestData)
 	if err != nil {
 		u.zslog.Errorf("[GetMessagesByChatID] Failed to get messages by chat ID: %v", err)
 		return response, true, err
 	}
-	response.Page = requestData.Page
-	response.PageSize = requestData.PageSize
+	response.Page = paginate.Page
+	response.PageSize = paginate.PageSize
 	response.TotalItems = totalItems
-	response.TotalPages = (totalItems + int64(requestData.PageSize) - 1) / int64(requestData.PageSize)
+	response.TotalPages = (totalItems + int64(paginate.PageSize) - 1) / int64(paginate.PageSize)
 
+	var results []dto.MessageResponse
 	if len(messages) != 0 {
 		// get storage media for messages
 		storageMediaMap := make(map[string]model.StorageMedia)
@@ -244,7 +245,6 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 				storageMediaMap[media.DocumentID] = media
 			}
 		}
-		var results []dto.MessageResponse
 		for _, message := range messages {
 			var storageMediaResponse *dto.StorageMediaResponse
 			if message.StorageMediaID != nil {
@@ -264,5 +264,37 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 			results = append(results, dto.MessageResponse{}.FromModel(message, storageMediaResponse))
 		}
 	}
+	response.Results = results
 	return response, false, nil
+}
+
+func (u *MessageUsecase) SaveMessage(ctx context.Context, inputData dto.MessageSaveRequest) (bool, error) {
+	message := model.Message{
+		Wamid:           inputData.Wamid,
+		ChatID:          inputData.ChatID,
+		MessageType:     inputData.MessageType,
+		MessageCategory: inputData.MessageCategory,
+		SenderName:      inputData.SenderName,
+		Payload:         inputData.Payload,
+		StorageMediaID:  inputData.StorageMediaID,
+		Status:          inputData.Status,
+		Error:           inputData.Error,
+		CreatedAt:       inputData.CreatedAt,
+		SentAt:          inputData.SentAt,
+		DeliveredAt:     inputData.DeliveredAt,
+		ReadAt:          inputData.ReadAt,
+	}
+	if inputData.ID != nil {
+		message.DocumentID = *inputData.ID
+	}
+	_, err := u.messageRepository.Upsert(ctx, nil, message)
+	if err != nil {
+		u.zslog.Errorf("[SaveMessage] Failed to save message: %v", err)
+		return true, err
+	}
+	err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
+	if err != nil {
+		u.zslog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
+	}
+	return false, nil
 }

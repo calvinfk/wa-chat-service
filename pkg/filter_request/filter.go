@@ -101,6 +101,27 @@ func parseOperatorToFirestoreCondition(op Operator) string {
 	}
 }
 
+func parseOperatorToMeiliCondition(op Operator) string {
+	switch op {
+	case OpEq:
+		return "="
+	case OpNeq:
+		return "!="
+	case OpGt:
+		return ">"
+	case OpGte:
+		return ">="
+	case OpLt:
+		return "<"
+	case OpLte:
+		return "<="
+	case OpIn:
+		return "in"
+	default:
+		return ""
+	}
+}
+
 func parseSortOrder(order string) firestore.Direction {
 	if strings.ToLower(order) == "desc" {
 		return firestore.Desc
