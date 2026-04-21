@@ -33,6 +33,9 @@ meili-up:
 meili-down:
 	docker compose -f docker-compose.meili.yml down
 
+sync:
+	go run ./cmd/sync/main.go $(ARGS)
+
 save:
 ifeq ($(VER),)
 	docker build -t $(APP_NAME):latest .
