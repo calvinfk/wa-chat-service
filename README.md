@@ -278,29 +278,16 @@ go run ./cmd/app/main.go
 - **JSON/Map Utilities** - Bidirectional struct ↔ map conversion, null value omission, JSON string serialization
 - **Formatter** - Data formatting utilities
 
-### CLI Tools
 
-#### Encryption Utility (`cmd/encrypt/encrypt.go`)
-Utility for AES encryption and decryption:
-
-```bash
-make encrypt
-make decrypt
-```
-
-Useful for managing encrypted tokens and secrets.
 
 ## Make Targets
 
 - `make run` - Start development server
-- `make encrypt` - Run AES encryption utility
-- `make decrypt` - Run AES decryption utility
 - `make build` - Build `wa-chat-service.exe`
 - `make clean` - Remove built executable
 - `make proto` - Generate gRPC code from `.proto` files
 - `make meili-up` - Start Meilisearch container
 - `make meili-down` - Stop Meilisearch container
-- `make save` - Build Docker image
 - `make docker` - Build image and run docker compose
 
 ## Running with Docker
@@ -325,21 +312,23 @@ Default compose services:
 ```text
 .
 |-- cmd/
-|   |-- app/          # Main HTTP/gRPC service
-|   `-- encrypt/      # AES encryption/decryption utility
+|   `-- app/          # Main HTTP/gRPC service
 |-- config/           # Configuration loading
+|-- docs/
+|   `-- proto/v1/     # gRPC proto definitions and generated code
 |-- internal/
 |   |-- app/          # Application wiring and dependency injection
 |   |-- dto/          # Data transfer objects with validation
 |   |-- handler/
-|   |   |-- http/     # HTTP handlers (Fiber)
-|   |   |   |-- middleware/  # HTTP middleware (access_token, jwt, etc.)
-|   |   |   `-- v1/   # API v1 handlers
-|   |   `-- grpc/     # gRPC service handlers
+|   |   |-- grpc/     # gRPC service handlers
+|   |   `-- http/     # HTTP handlers (Fiber)
+|   |       |-- middleware/  # HTTP middleware (access_token, jwt, etc.)
+|   |       `-- v1/   # API v1 handlers
 |   |-- model/        # Domain models (Chat, Message, Broadcast, etc.)
 |   |-- repository/   # Data access layer
-|   |   |-- firestore/# Firestore-specific implementation
-|   |   `-- meilisearch/ # Meilisearch search implementation
+|   |   |-- firestore/ # Firestore-specific implementation
+|   |   |-- meili/     # Meilisearch implementation
+|   |   `-- types.go   # Repository interfaces
 |   |-- service/      # Business logic services
 |   |   |-- access_token/  # Token management
 |   |   |-- encrypt/       # Encryption/decryption
@@ -353,12 +342,10 @@ Default compose services:
 |   |-- filter_request/ # Query filtering and pagination
 |   |-- meta/         # WhatsApp metadata structures
 |   |-- server/       # HTTP/gRPC server setup
-|   |-- service-accounts/ # Firebase service account keys
 |   `-- utils/        # Helper functions (logger, validator, etc.)
-|-- docs/
-|   `-- proto/v1/     # gRPC proto definitions and generated code
 |-- Dockerfile
 |-- docker-compose.yml
+|-- docker-compose.meili.yml
 `-- Makefile
 ```
 
