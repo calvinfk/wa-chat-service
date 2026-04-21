@@ -6,6 +6,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/meilisearch/meilisearch-go"
 )
@@ -17,22 +18,54 @@ type MeiliMessageRepository struct {
 
 func NewMeiliMessageRepository(db meilisearch.ServiceManager) *MeiliMessageRepository {
 	var message model.Message
-	var filterableAttributes []any
-	for _, field := range message.AllowedFilterFields() {
-		filterableAttributes = append(filterableAttributes, field)
-	}
-	// db.Index(message.TableName()).GetFilterableAttributes()
-	_, err := db.Index(message.TableName()).UpdateFilterableAttributes(&filterableAttributes)
+
+	// Update filterable attributes only when different
+	// Assume the fillterable uses a string slice
+	desiredFilterable := message.AllowedFilterFields()
+	currentFilterable, err := db.Index(message.TableName()).GetFilterableAttributes()
 	if err != nil {
-		log.Fatalf("failed to update filterable attributes: %v", err)
+		log.Fatalf("failed to get filterable attributes: %v", err)
 	}
-	sortableAttributes := message.AllowedSortFields()
-	_, err = db.Index(message.TableName()).UpdateSortableAttributes(&sortableAttributes)
+	currentFilterableSlice := []string{}
+	if currentFilterable != nil {
+		currentFilterableSlice, err = utils.AnySliceToStringSlice(*currentFilterable)
+		if err != nil {
+			log.Fatalf("failed to convert filterable attributes: %v", err)
+		}
+	}
+	if currentFilterable == nil || !utils.SameStringSet(currentFilterableSlice, desiredFilterable) {
+		filterableAttributes := make([]any, 0, len(desiredFilterable))
+		for _, field := range desiredFilterable {
+			filterableAttributes = append(filterableAttributes, field)
+		}
+		if _, err := db.Index(message.TableName()).UpdateFilterableAttributes(&filterableAttributes); err != nil {
+			log.Fatalf("failed to update filterable attributes: %v", err)
+		}
+	}
+
+	// Update sortable attributes only when different
+	desiredSortable := message.AllowedSortFields()
+	currentSortable, err := db.Index(message.TableName()).GetSortableAttributes()
 	if err != nil {
-		log.Fatalf("failed to update sortable attributes: %v", err)
+		log.Fatalf("failed to get sortable attributes: %v", err)
 	}
+	currentSortableSlice := []string{}
+	if currentSortable != nil {
+		currentSortableSlice, err = utils.AnySliceToStringSlice(*currentSortable)
+		if err != nil {
+			log.Fatalf("failed to convert sortable attributes: %v", err)
+		}
+	}
+	if currentSortable == nil || !utils.SameStringSet(currentSortableSlice, desiredSortable) {
+		sortableAttributes := desiredSortable
+		if _, err := db.Index(message.TableName()).UpdateSortableAttributes(&sortableAttributes); err != nil {
+			log.Fatalf("failed to update sortable attributes: %v", err)
+		}
+	}
+
 	return &MeiliMessageRepository{
-		db: db,
+		message: message,
+		db:      db,
 	}
 }
 

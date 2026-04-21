@@ -6,6 +6,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/meilisearch/meilisearch-go"
 )
@@ -17,25 +18,50 @@ type MeiliTemplateRepository struct {
 
 func NewMeiliTemplateRepository(db meilisearch.ServiceManager) *MeiliTemplateRepository {
 	var template model.Template
-	var filterableAttributes []any
-	for _, field := range template.AllowedFilterFields() {
-		filterableAttributes = append(filterableAttributes, field)
-	}
-	index := db.Index(template.TableName())
-	_, err := index.UpdateFilterableAttributes(&filterableAttributes)
+
+	// Update filterable attributes only when different
+	desiredFilterable := template.AllowedFilterFields()
+	currentFilterable, err := db.Index(template.TableName()).GetFilterableAttributes()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to get filterable attributes: %v", err)
 	}
-	sortableAttributes := template.AllowedSortFields()
-	_, err = index.UpdateSortableAttributes(&sortableAttributes)
+	currentFilterableSlice := []string{}
+	if currentFilterable != nil {
+		currentFilterableSlice, err = utils.AnySliceToStringSlice(*currentFilterable)
+		if err != nil {
+			log.Fatalf("failed to convert filterable attributes: %v", err)
+		}
+	}
+	if currentFilterable == nil || !utils.SameStringSet(currentFilterableSlice, desiredFilterable) {
+		filterableAttributes := make([]any, 0, len(desiredFilterable))
+		for _, field := range desiredFilterable {
+			filterableAttributes = append(filterableAttributes, field)
+		}
+		if _, err := db.Index(template.TableName()).UpdateFilterableAttributes(&filterableAttributes); err != nil {
+			log.Fatalf("failed to update filterable attributes: %v", err)
+		}
+	}
+
+	// Update sortable attributes only when different
+	desiredSortable := template.AllowedSortFields()
+	currentSortable, err := db.Index(template.TableName()).GetSortableAttributes()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to get sortable attributes: %v", err)
 	}
-	settings, err := index.GetFilterableAttributes()
-	if err != nil {
-		log.Fatalf("failed to get settings: %v", err)
+	currentSortableSlice := []string{}
+	if currentSortable != nil {
+		currentSortableSlice, err = utils.AnySliceToStringSlice(*currentSortable)
+		if err != nil {
+			log.Fatalf("failed to convert sortable attributes: %v", err)
+		}
 	}
-	log.Printf("filterable attributes: %+v", settings)
+	if currentSortable == nil || !utils.SameStringSet(currentSortableSlice, desiredSortable) {
+		sortableAttributes := desiredSortable
+		if _, err := db.Index(template.TableName()).UpdateSortableAttributes(&sortableAttributes); err != nil {
+			log.Fatalf("failed to update sortable attributes: %v", err)
+		}
+	}
+
 	return &MeiliTemplateRepository{
 		db: db,
 	}
@@ -94,3 +120,5 @@ func (r *MeiliTemplateRepository) GetFiltered(ctx context.Context, filterRequest
 	}
 	return templates, searched.TotalHits, paginate, nil
 }
+
+// updated by assistant
