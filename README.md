@@ -229,8 +229,8 @@ PostgreSQL connection bootstrap is currently not active in wiring (the connectio
 - Resumable api is for creating template and profile picture.
 
 ### HMAC GRPC Interceptor
-- The GRPC interceptor implements a custom HMAC-based authentication mechanism. It expects clients to include an `x-signature` header containing an HMAC signature of the request payload, the body is JSON-marshaled with 1 space indentation, which is verified on the server side.
+- The GRPC interceptor implements a custom HMAC-based authentication mechanism. It expects clients to include an `x-signature` metadata containing an HMAC signature of the request payload, the body is JSON-marshaled with 1 space indentation, which is verified on the server side.
+- The interceptor also checks for a timestamp in the `x-timestamp` metadata to prevent replay attacks [Link](https://webhooks.fyi/security/replay-prevention).
 - It uses SHA256 as the hashing algorithm, because of good balance between security and performance, and wide support in libraries. [[Link](https://www.authgear.com/post/generate-verify-hmac-signatures)]
 - Signature generated from uri + content[[Link](https://learn.microsoft.com/en-us/azure/communication-services/tutorials/hmac-header-tutorial?pivots=programming-language-csharp)]
 - The interceptor uses a shared secret (configured via `HMAC_SECRET`) to compute the HMAC signature of the incoming request's JSON-marshaled payload and compares it against the signature provided in the header.
-- The interceptor also checks for a timestamp in the request payload to prevent replay attacks, ensuring thatrequests are recent
