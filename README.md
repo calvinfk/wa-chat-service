@@ -74,16 +74,12 @@ All routes are mounted under:
 - `POST /upload`
   - Multipart form-data: `file` (single file), `phone_number_id`
 - `GET /get`
-  - Query: `id`
+  - Query: `media` (encrypted media token)
+  - Optional header: `Range: bytes=...` for browser/video playback and seek support
   - Returns streamed media bytes (`Content-Type` from stored object metadata)
+  - Supports `206 Partial Content` when a valid range is requested
 - `DELETE /delete`
-  - Query: `phone_number_id` and one of `id` or `media_id`
-- `POST /save-media-id`
-  - Body (JSON): `media_id`, `phone_number_id`
-- `POST /resumable`
-  - Body (JSON): resumable upload payload
-- `POST /upload-meta`
-  - Body (JSON): media metadata payload
+  - Query: `phone_number_id` and `id`
 - `GET /list`
   - Optional query: filter/pagination params
 
@@ -360,3 +356,4 @@ Default compose services:
 
 ### Media
 - Resumable API is for creating template and profile picture.
+- `GET /api/v1/storage-media/get` streams responses in chunks. For non-range requests, the response is streamed without a fixed `Content-Length`; for valid ranges, the server returns `Content-Length` and `Content-Range`.
