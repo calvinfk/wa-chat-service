@@ -35,24 +35,19 @@ type (
 		// GetFile retrieves a file from Google Cloud Storage. It takes the file URL as a parameter
 		// It returns a reader for the file, the file's attributes, and an error if there is an issue during the retrieval process.
 		GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error)
+		// GetFileAttrs retrieves object attributes from Google Cloud Storage without opening a reader.
+		GetFileAttrs(ctx context.Context, fileURL string) (*storage.ObjectAttrs, error)
+		// GetFileRange retrieves a ranged reader for a file from Google Cloud Storage.
+		GetFileRange(ctx context.Context, fileURL string, offset, length int64) (*storage.Reader, *storage.ObjectAttrs, error)
 		// DeleteFile deletes a file from Google Cloud Storage. It takes the file URL as a parameter
 		// It returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, fileURL string) error
 		// Generates a signed URL for accessing a file in Google Cloud Storage. It takes the file URL and the expiration duration for the signed URL as parameters. If the duration is 0, the signed URL will use the max duration.
 		// It returns the generated signed URL if successful, or an error if there is an issue during the URL generation process.
 		GenerateV4GetObjectSignedURL(fileURL string, expiration time.Duration) (string, error)
-		// ParseGoogleStorageURL parses a Google Cloud Storage URL and returns the bucket name and object name.
-		// It returns bucket name, object name, and an error if the URL is invalid.
-		ParseGoogleStorageURL(fileURL string) (bucketName, filePath string, err error)
-		// IsValidSignedURL checks if the provided file URL is a valid signed URL for a file in the project's Google Cloud Storage and haven't expired. It takes the file URL as a parameter
-		// It returns true if the URL is a valid signed URL, or false and an error if the URL is invalid.
-		IsValidSignedURL(ctx context.Context, url string) (bool, error)
 		// GetDefaultFileURL generates a default file URL for accessing a file in Google Cloud Storage. It takes the file path as a parameter and returns the generated file URL.
 		// This method is used to generate a default file URL to access files using this service.
 		GetDefaultFileURL(filePath string) string
-		// ParseSignedURLToFileURL parses a signed URL and creates a google storage file URL
-		// It takes the signed URL as a parameter and returns the original file URL if the parsing is successful, or an error if there is an issue during the parsing process.
-		ParseSignedURLToFileURL(ctx context.Context, signedURL string) (string, error)
 	}
 
 	// WhatsappBusiness is an interface that defines methods for helping with whatsapp business operations.

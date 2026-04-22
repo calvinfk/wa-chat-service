@@ -2,6 +2,7 @@ package auth_usecase
 
 import (
 	"context"
+	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
@@ -39,7 +40,8 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (stri
 		u.zslog.Errorf("[Login] tenant.DocumentID != req.TenantID : %v", errs.ErrGenericNotFound)
 		return "", false, errs.ErrGenericNotFound
 	}
-	accessToken, err := u.accessTokenService.GenerateAccessToken(tenant.DocumentID)
+	sub := fmt.Sprintf("%s:%s", tenant.DocumentID, tenant.PhoneNumberID)
+	accessToken, err := u.accessTokenService.GenerateAccessToken(sub)
 	if err != nil {
 		u.zslog.Errorf("[Login] accessTokenService.GenerateAccessToken error : %v", err)
 		return "", true, err

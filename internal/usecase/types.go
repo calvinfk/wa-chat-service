@@ -49,7 +49,7 @@ type (
 		// the caller is responsible to close the reader after use
 		// GetMedia retrieves a media stream and its metadata for downstream use.
 		// Returns media retrieval data, a server-error flag (true if error is from server), and an error.
-		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest) (dto.StorageMediaGetMediaResponse, bool, error)
+		GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error)
 		// DeleteMedia deletes stored media and related references.
 		// Returns a server-error flag (true if error is from server) and an error.
 		DeleteMedia(ctx context.Context, inputData dto.StorageMediaDeleteRequest) (bool, error)
@@ -59,6 +59,11 @@ type (
 		// GetFiltered returns media records with filtering, sorting, and pagination applied.
 		// Returns a filtered media response, a server-error flag (true if error is from server), and an error.
 		GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], bool, error)
+		// ParsePublicURL parses a public URL and extract the encrypted media token
+		// Returns the extracted file path if parsing is successful, or an error if the URL is invalid.
+		ParsePublicURL(url string) (string, error)
+		// ParseMediaToken parses a media string which can be a URL or an encrypted media token, and returns the file path, a boolean indicating if it's a URL, and an error if the parsing fails.
+		ParseMediaToken(mediaToken string) (string, bool, error)
 	}
 
 	// Chat defines chat querying operations for conversation-level views.
@@ -70,9 +75,12 @@ type (
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.
 	Tenant interface {
-		// GetWhatsappClient resolves tenant identity and builds a WhatsApp client for outbound calls.
+		// GetWhatsappClientByPhone resolves tenant identity and builds a WhatsApp client for outbound calls.
 		// Returns the WhatsApp client, resolved tenant ID, and an error when resolution fails.
-		GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error)
+		GetWhatsappClientByPhone(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error)
+		// GetWhatsappClientByPhone resolves tenant identity and builds a WhatsApp client for outbound calls.
+		// Returns the WhatsApp client, resolved tenant ID, and an error when resolution fails.
+		GetWhatsappClientByTenant(ctx context.Context, tenantID string) (*whatsapp_business.Client, string, error)
 		// CreateContact creates a tenant contact record.
 		// Returns a server-error flag (true if error is from server) and an error.
 		CreateContact(ctx context.Context, inputData dto.ContactCreateRequest) (bool, error)

@@ -9,7 +9,7 @@ import (
 
 const (
 	DEFAULT_SORT_BY    = "created_at"
-	DEFAULT_SORT_ORDER = "asc"
+	DEFAULT_SORT_ORDER = "desc"
 )
 
 // Sort represents the sorting parameters for an API request, including the field to sort by and the sort order (ascending or descending). It includes validation logic to ensure that the sort order is either "asc" or "desc", and a GORM scope function to apply the sorting parameters to a database query.

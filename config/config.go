@@ -31,6 +31,7 @@ type (
 		Environment  string `env:"APP_ENVIRONMENT,required,oneof=development production staging"`
 		Port         int    `env:"APP_PORT,required"`
 		URL          string `env:"APP_URL,required"`
+		PublicURL    string `env:"APP_PUBLIC_URL,default=APP_URL"`
 		SecureCookie bool   `env:"APP_SECURE_COOKIE,default=false"`
 	}
 
@@ -56,7 +57,6 @@ type (
 
 	GCP struct {
 		ProjectID           string `env:"GCP_PROJECT_ID,required"`
-		AppBaseURL          string `env:"GCP_APP_BASE_URL,required"`
 		BroadcastTaskParent string `env:"GCP_TASK_BROADCAST_PARENT,required"`
 		DefaultBucket       string // default bucket for general use
 	}
@@ -139,6 +139,7 @@ func appEnv() (App, error) {
 		Environment:  os.Getenv("APP_ENVIRONMENT"),
 		Port:         0,
 		URL:          os.Getenv("APP_URL"),
+		PublicURL:    os.Getenv("APP_PUBLIC_URL"),
 		SecureCookie: false,
 	}
 	errors := []string{}
@@ -166,6 +167,9 @@ func appEnv() (App, error) {
 	}
 	if config.URL == "" {
 		errors = append(errors, "APP_URL is required")
+	}
+	if config.PublicURL == "" {
+		config.PublicURL = config.URL
 	}
 	if secureCookieString := os.Getenv("APP_SECURE_COOKIE"); secureCookieString != "" {
 		secureCookie, err := strconv.ParseBool(secureCookieString)
@@ -254,15 +258,11 @@ func encryptEnv() (Encrypt, error) {
 func gcpEnv() (GCP, error) {
 	config := GCP{
 		ProjectID:           os.Getenv("GCP_PROJECT_ID"),
-		AppBaseURL:          os.Getenv("GCP_APP_BASE_URL"),
 		BroadcastTaskParent: os.Getenv("GCP_TASK_BROADCAST_PARENT"),
 	}
 	errors := []string{}
 	if config.ProjectID == "" {
 		errors = append(errors, "GCP_PROJECT_ID is required")
-	}
-	if config.AppBaseURL == "" {
-		errors = append(errors, "GCP_APP_BASE_URL is required")
 	}
 	if config.BroadcastTaskParent == "" {
 		errors = append(errors, "GCP_TASK_BROADCAST_PARENT is required")

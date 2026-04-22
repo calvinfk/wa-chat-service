@@ -40,7 +40,7 @@ func NewTemplateUsecase(templateRepository repository.Template, searchTemplateRe
 }
 
 func (u *TemplateUsecase) CreateTemplate(ctx context.Context, inputData dto.TemplateCreateRequest) (any, bool, error) {
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[CreateTemplate] failed to get whatsapp client: %v", err)
 		return nil, true, err
@@ -109,7 +109,7 @@ func (u *TemplateUsecase) GetFilteredByTenantID(ctx context.Context, inputData f
 }
 
 func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.TemplateSyncRequest) (bool, error) {
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[SyncTemplate] failed to get whatsapp client: %v", err)
 		return false, err
@@ -209,7 +209,7 @@ func (u *TemplateUsecase) SyncTemplate(ctx context.Context, inputData dto.Templa
 }
 
 func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.TemplateDeleteRequest) (bool, error) {
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[DeleteTemplate] failed to get whatsapp client: %v", err)
 		return false, err
@@ -238,7 +238,7 @@ func (u *TemplateUsecase) DeleteTemplate(ctx context.Context, inputData dto.Temp
 }
 
 func (u *TemplateUsecase) UpdateTemplate(ctx context.Context, inputData dto.TemplateUpdateRequest) (bool, error) {
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[UpdateTemplate] failed to get whatsapp client: %v", err)
 		return true, err

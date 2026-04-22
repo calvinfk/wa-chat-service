@@ -89,12 +89,12 @@ type usecases struct {
 	Auth         usecase.Auth
 }
 
-func NewDefaultWiring(zslog *zap.SugaredLogger, config *config.Config) servers {
-	clients := newDefaultClients(config, zslog)
-	services := newDefaultServices(config, zslog, clients)
+func NewDefaultWiring(zslog *zap.SugaredLogger, cfg *config.Config) servers {
+	clients := newDefaultClients(cfg, zslog)
+	services := newDefaultServices(cfg, zslog, clients)
 	repositories := newDefaultRepositories(clients, services)
-	usecases := newDefaultUsecases(zslog, clients, repositories, services)
-	servers := newDefaultServers(config, zslog, services, usecases)
+	usecases := newDefaultUsecases(cfg, zslog, clients, repositories, services)
+	servers := newDefaultServers(cfg, zslog, services, usecases)
 	return servers
 }
 
@@ -130,13 +130,13 @@ func newDefaultClients(cfg *config.Config, zsLog *zap.SugaredLogger) clients {
 	}
 }
 
-func newDefaultServices(config *config.Config, zslog *zap.SugaredLogger, clients clients) services {
-	accessTokenService := access_token_service.NewAccessTokenService(config, zslog)
-	encryptService := encrypt_service.NewEncryptService(&config.Encrypt, zslog)
-	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &config.GCP, zslog)
+func newDefaultServices(cfg *config.Config, zslog *zap.SugaredLogger, clients clients) services {
+	accessTokenService := access_token_service.NewAccessTokenService(cfg, zslog)
+	encryptService := encrypt_service.NewEncryptService(&cfg.Encrypt, zslog)
+	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &cfg.GCP, zslog)
 	whatsappService := whatsapp_service.NewWhatsappService(zslog)
-	jwtService := jose_service.NewJWTService(&config.JOSE, zslog)
-	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &config.GCP, jwtService, encryptService, zslog)
+	jwtService := jose_service.NewJWTService(&cfg.JOSE, zslog)
+	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &cfg.GCP, jwtService, encryptService, zslog, cfg.App.PublicURL)
 	return services{
 		AccessToken:      accessTokenService,
 		Encrypt:          encryptService,
@@ -168,10 +168,10 @@ func newDefaultRepositories(clients clients, services services) repositories {
 	}
 }
 
-func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
+func newDefaultUsecases(cfg *config.Config, zslog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, zslog)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zslog, cfg.App.PublicURL)
 	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zslog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zslog)
@@ -187,15 +187,15 @@ func newDefaultUsecases(zslog *zap.SugaredLogger, clients clients, repositories 
 	}
 }
 
-func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services services, usecases usecases) servers {
+func newDefaultServers(cfg *config.Config, zslog *zap.SugaredLogger, services services, usecases usecases) servers {
 	grpcServer := server_grpc.New(
 		zslog.Desugar().Named("gRPC"),
-		server_grpc.Port(fmt.Sprintf("%d", config.GRPC.Port)),
+		server_grpc.Port(fmt.Sprintf("%d", cfg.GRPC.Port)),
 		server_grpc.ServerOptions(
 			grpc.ChainUnaryInterceptor(
 				grpc_middleware.UnaryRequestLogger(),
 				grpc_middleware.TimingServerInterceptor(30*time.Second),
-				grpc_middleware.HMACServerInterceptor(config.GRPC.Secret),
+				grpc_middleware.HMACServerInterceptor(cfg.GRPC.Secret),
 			),
 		),
 	)
@@ -206,14 +206,14 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		ZSLog:        zslog,
 	}
 	handler_grpc.NewRouter(handlerGRPCV1)
-	if config.App.Environment != "production" {
+	if cfg.App.Environment != "production" {
 		reflection.Register(grpcServer.App)
 	}
 
 	httpServer := server_http.New(
 		zslog.Desugar().Named("HTTP"),
 		server_http.StructValidator(utils.NewStructValidator()),
-		server_http.Port(fmt.Sprintf("%d", config.App.Port)),
+		server_http.Port(fmt.Sprintf("%d", cfg.App.Port)),
 		server_http.Middleware(
 			http_middleware.Recover(zslog),
 			http_middleware.OptionsRoute(),
@@ -234,7 +234,7 @@ func newDefaultServers(config *config.Config, zslog *zap.SugaredLogger, services
 		AccessTokenService:  services.AccessToken,
 		ZSLog:               zslog.Named("HTTP"),
 	}
-	handler_http.NewRouter(httpServer.App, config, handlerHTTPV1)
+	handler_http.NewRouter(httpServer.App, cfg, handlerHTTPV1)
 	return servers{
 		grpc: grpcServer,
 		http: httpServer,

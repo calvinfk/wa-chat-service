@@ -155,41 +155,29 @@ func (r *StorageMediaRepository) Update(ctx context.Context, tx *firestore.Trans
 	return r.db.RunTransaction(ctx, execDB)
 }
 
-func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) (filter_request.FilterResponse[dto.StorageMediaResponse], error) {
-	var response filter_request.FilterResponse[dto.StorageMediaResponse]
+func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error) {
+	var data []model.StorageMedia
 	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.storageMedia.AllowedFilterFields(), r.storageMedia.AllowedSortFields())
 	if err != nil {
-		return response, err
+		return data, paginate, 0, err
 	}
 	collection := r.db.Collection(r.storageMedia.TableName())
 	query := collection.Query
 	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
-		return response, err
+		return data, paginate, 0, err
 	}
-	var result []dto.StorageMediaResponse
 	for _, doc := range docs {
 		var media model.StorageMedia
 		docData := doc.Data()
 		docData["id"] = doc.Ref.ID
 		err = utils.MapToStruct(docData, &media)
 		if err != nil {
-			return response, err
+			return data, paginate, totalData, err
 		}
-		var accessURL *string
-		if media.IsURLFromStorage && media.URL != nil {
-			signedUrl, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*media.URL, 0)
-			if err != nil {
-				return response, err
-			}
-			accessURL = &signedUrl
-		} else if media.URL != nil {
-			accessURL = media.URL
-		}
-		result = append(result, dto.StorageMediaResponse{}.FromModel(media, accessURL))
+		data = append(data, media)
 	}
-	response = filter_request.NewFilterResponse(result, paginate, totalData)
-	return response, nil
+	return data, paginate, totalData, nil
 }
 
 func (r *StorageMediaRepository) GetByDocumentIDs(ctx context.Context, documentIDs []string) (map[string]model.StorageMedia, error) {

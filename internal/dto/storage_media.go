@@ -1,11 +1,12 @@
 package dto
 
 import (
+	"io"
 	"mime/multipart"
+	"time"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/utils"
 
-	"cloud.google.com/go/storage"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -27,17 +28,18 @@ type (
 		AccessURL    *string `json:"access_url"`
 	}
 	StorageMediaGetRequest struct {
-		ID string `query:"id" validate:"required,uuid"`
+		Media string `query:"media" validate:"required"`
 	}
 
 	StorageMediaGetMediaResponse struct {
-		// for now only return storage reader
-		Reader      *storage.Reader `json:"-"`
-		ContentType string          `json:"content_type"`
-		FileName    string          `json:"file_name"`
-		Size        int64           `json:"size"`
+		Reader       io.ReadCloser `json:"-"`
+		ContentType  string        `json:"content_type"`
+		FileName     string        `json:"file_name"`
+		Size         int64         `json:"size"`
+		ExpiresIn    time.Duration `json:"expires_in"`
+		StatusCode   int           `json:"status_code"`
+		ContentRange string        `json:"content_range,omitempty"`
 	}
-
 	StorageMediaDeleteRequest struct {
 		ID            string `query:"id" validate:"required,uuid"`
 		PhoneNumberID string `query:"phone_number_id" validate:"required"`

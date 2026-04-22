@@ -81,25 +81,25 @@ func (wb *Client) GetMediaURL(mediaID string) (GetMediaURLResponse, int, error) 
 	return response, httpCode, nil
 }
 
-func (wb *Client) DownloadMedia(mediaURL string) ([]byte, http.Header, int, error) {
+// Downloads media content from the given media URL. Caller is responsible for closing the response body.
+func (wb *Client) DownloadMedia(mediaURL string, rangeHeader string) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodGet, mediaURL, nil)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+wb.UserAccessToken)
+	if rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
 	resp, err := wb.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.Header, resp.StatusCode, fmt.Errorf("failed to download media, status code: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		resp.Body.Close() // Ensure we close the body if we're not returning it
+		return nil, fmt.Errorf("failed to download media, status code: %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.Header, resp.StatusCode, err
-	}
-	return body, resp.Header, resp.StatusCode, nil
+	return resp, nil
 }
 
 func (wb *Client) DeleteMedia(mediaID string) (DeleteMediaResponse, int, error) {

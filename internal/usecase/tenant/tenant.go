@@ -29,15 +29,28 @@ func NewTenantUsecase(tenantRepository repository.Tenant, encryptService service
 	}
 }
 
-func (u *TenantUsecase) GetWhatsappClient(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error) {
+func (u *TenantUsecase) GetWhatsappClientByPhone(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error) {
 	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, phoneNumberID)
 	if err != nil {
-		u.zslog.Errorf("[GetWhatsappClient] Failed to get phone number: %v", err)
+		u.zslog.Errorf("[GetWhatsappClientByPhone] Failed to get tenant by phone number: %v", err)
 		return nil, "", err
 	}
+	return u.getWhatsappClient(tenant)
+}
+
+func (u *TenantUsecase) GetWhatsappClientByTenant(ctx context.Context, tenantID string) (*whatsapp_business.Client, string, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
+	if err != nil {
+		u.zslog.Errorf("[GetWhatsappClientByTenant] Failed to get tenant by ID: %v", err)
+		return nil, "", err
+	}
+	return u.getWhatsappClient(tenant)
+}
+
+func (u *TenantUsecase) getWhatsappClient(tenant model.Tenant) (*whatsapp_business.Client, string, error) {
 	decyptedAccessToken, err := u.encryptService.Decrypt(tenant.AccessToken)
 	if err != nil {
-		u.zslog.Errorf("[GetWhatsappClient] Failed to decrypt access token: %v", err)
+		u.zslog.Errorf("[getWhatsappClient] Failed to decrypt access token: %v", err)
 		return nil, "", err
 	}
 	whatsappClient := whatsapp_business.New(decyptedAccessToken, tenant.WabaID, tenant.PhoneNumberID)

@@ -190,7 +190,7 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 		}
 	}
 	inputData.Recipients = uniqueRecipientIDs
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[ScheduleBroadcast] failed to get whatsapp client: %v", err)
 		return emptyResponse, true, err
@@ -330,7 +330,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			u.zslog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
 		}
 	}()
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClient(ctx, broadcast.PhoneNumberID)
+	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, broadcast.PhoneNumberID)
 	if err != nil {
 		u.zslog.Errorf("[SendBroadcast] failed to get whatsapp client: %v", err)
 		return true, err

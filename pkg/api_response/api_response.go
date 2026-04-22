@@ -53,6 +53,12 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 			case errs.ErrGenericNotFound:
 				response.Code = http.StatusNotFound
 				response.Data = nil
+			case errs.ErrGenericGone:
+				response.Code = http.StatusGone
+				response.Data = nil
+			case errs.ErrGenericRangeNotSatisfiable:
+				response.Code = http.StatusRequestedRangeNotSatisfiable
+				response.Data = nil
 			default:
 				response.Code = http.StatusBadRequest
 				response.Data = nil

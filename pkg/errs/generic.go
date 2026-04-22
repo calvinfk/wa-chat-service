@@ -15,4 +15,7 @@ var (
 	ErrGenericFileSizeExceeded = errors.New("file size exceeds the allowed limit")
 	ErrGenericEmptyFile        = errors.New("file is empty")
 	ErrGenericUnauthorized     = errors.New("unauthorized access")
+	ErrGenericInternalServer   = errors.New("internal server error")
+	ErrGenericGone             = errors.New("resource is no longer available")
+	ErrGenericRangeNotSatisfiable = errors.New("requested range not satisfiable")
 )

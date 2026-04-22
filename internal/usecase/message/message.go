@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
-	"strings"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -60,7 +59,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	var err error
 	var response model.Message
 	if whatsappClient == nil {
-		whatsappClient, tenantID, err = u.tenantUsecase.GetWhatsappClient(ctx, inputData.PhoneNumberID)
+		whatsappClient, tenantID, err = u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
 		if err != nil {
 			u.zslog.Errorf("[SendMessage] Failed to get WhatsApp client: %v", err)
 			return response, true, err
@@ -90,26 +89,15 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	var sto *model.StorageMedia
 	if media := whatsapp_business.GetMedia(component); media != nil {
 		if media.Link != nil {
-			isValid, err := u.googleStorageService.IsValidSignedURL(ctx, *media.Link)
-			if err != nil {
-				u.zslog.Errorf("[SendMessage] Failed to validate media link: %v", err)
-				return response, true, err
-			}
-			if isValid {
+			mediaToken, err := u.storageMediaUsecase.ParsePublicURL(*media.Link)
+			if err == nil {
 				// get file URL from signed URL
-				fileURL, err := u.googleStorageService.ParseSignedURLToFileURL(ctx, *media.Link)
+				storageMediaID, serverError, err := u.storageMediaUsecase.ParseMediaToken(mediaToken)
 				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to parse signed URL to file URL: %v", err)
-					return response, true, err
+					u.zslog.Errorf("[SendMessage] Failed to parse media token: %v", err)
+					return response, serverError, err
 				}
-				_, filePath, err := u.googleStorageService.ParseGoogleStorageURL(fileURL)
-				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to parse file URL: %v", err)
-					return response, true, err
-				}
-				fileName := filePath[strings.LastIndex(filePath, "/")+1:]
-				fileNameWithoutExt := fileName[:strings.LastIndex(fileName, ".")]
-				storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, fileNameWithoutExt)
+				storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
 				if err != nil {
 					u.zslog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
 					return response, true, err

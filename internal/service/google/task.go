@@ -16,15 +16,17 @@ type GoogleTaskService struct {
 	jwtService     service.JWT
 	encryptService service.Encrypt
 	zslog          *zap.SugaredLogger
+	baseURL        string
 }
 
-func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zslog *zap.SugaredLogger) *GoogleTaskService {
+func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zslog *zap.SugaredLogger, baseURL string) *GoogleTaskService {
 	return &GoogleTaskService{
 		client:         client,
 		cfg:            cfg,
 		jwtService:     jwtService,
 		encryptService: encryptService,
 		zslog:          zslog,
+		baseURL:        baseURL,
 	}
 }
 
@@ -42,7 +44,7 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 			Name:         s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID,
 			ScheduleTime: scheduleTime.Format(time.RFC3339), // Schedule task to run at specified time
 			HttpRequest: &cloudtasks.HttpRequest{
-				Url:        s.cfg.AppBaseURL + "/api/v1/broadcast/send",
+				Url:        s.baseURL + "/api/v1/broadcast/send",
 				HttpMethod: http.MethodPost,
 				Headers: map[string]string{
 					"Authorization": "Bearer " + encryptedToken,
