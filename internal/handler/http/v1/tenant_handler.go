@@ -82,3 +82,18 @@ func (h *TenantHandler) updateContact(ctx fiber.Ctx) error {
 	httpCode, apiResponse := api_response.NewApiResponse("Successfully updated contact", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
+
+func (h *TenantHandler) deleteContact(ctx fiber.Ctx) error {
+	var inputData dto.ContactDeleteRequest
+	if err := ctx.Bind().Query(&inputData); err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	serverError, err := h.tenantUsecase.DeleteContact(ctx, inputData)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully deleted contact", nil)
+	return ctx.Status(httpCode).JSON(apiResponse)
+}

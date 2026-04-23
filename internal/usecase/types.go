@@ -93,6 +93,9 @@ type (
 		// UpdateContact updates existing tenant contact data.
 		// Returns a server-error flag (true if error is from server) and an error.
 		UpdateContact(ctx context.Context, inputData dto.ContactUpdateRequest) (bool, error)
+		// DeleteContact deletes a tenant contact record.
+		// Returns a server-error flag (true if error is from server) and an error.
+		DeleteContact(ctx context.Context, inputData dto.ContactDeleteRequest) (bool, error)
 	}
 
 	// Broadcast defines broadcast scheduling, execution, update, cancelation, and read operations.

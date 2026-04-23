@@ -156,3 +156,11 @@ func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID strin
 	}
 	return templateFields, nil
 }
+
+func (r *TenantRepository) DeleteContact(ctx context.Context, tenantID string, contactID string) error {
+	_, err := r.db.
+		Collection(r.tenant.TableName()).Doc(tenantID).
+		Collection(r.contact.TableName()).Doc(contactID).
+		Delete(ctx)
+	return err
+}

@@ -137,3 +137,17 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.Contact
 	}
 	return false, nil
 }
+
+func (u *TenantUsecase) DeleteContact(ctx context.Context, inputData dto.ContactDeleteRequest) (bool, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, inputData.TenantID)
+	if err != nil {
+		u.zslog.Errorf("[DeleteContact] Failed to get tenant by ID: %v", err)
+		return true, err
+	}
+	err = u.tenantRepository.DeleteContact(ctx, tenant.DocumentID, inputData.ID)
+	if err != nil {
+		u.zslog.Errorf("[DeleteContact] Failed to delete contact: %v", err)
+		return true, err
+	}
+	return false, nil
+}

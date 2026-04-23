@@ -25,6 +25,11 @@ type (
 		Name        string `json:"name" validate:"required"`
 		PhoneNumber string `json:"phone_number" validate:"required"`
 	}
+
+	ContactDeleteRequest struct {
+		ID       string `query:"id" validate:"required"`
+		TenantID string `query:"tenant_id" validate:"required"`
+	}
 )
 
 func (ContactResponse) FromModel(data model.Contact) ContactResponse {
