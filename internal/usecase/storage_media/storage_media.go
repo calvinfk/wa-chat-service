@@ -159,7 +159,7 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 	if inputData.StorageMediaID != nil {
 		return u.getMediaStreamByID(ctx, *inputData.StorageMediaID, rangeHeader)
 	} else {
-		return u.getMediaStreamByURL(*inputData.Url, rangeHeader)
+		return u.getMediaStreamByURL(ctx, *inputData.Url, rangeHeader)
 	}
 }
 
@@ -180,7 +180,7 @@ func (u *StorageMediaUsecase) getMediaStreamByID(ctx context.Context, storageMed
 		return response, false, nil
 	} else if media.URL != nil {
 		// if URL exists but not from storage, stream it directly
-		return u.getMediaStreamByURL(*media.URL, rangeHeader)
+		return u.getMediaStreamByURL(ctx, *media.URL, rangeHeader)
 	} else if media.MediaID != nil {
 		// if media ID exists, get the media URL from WhatsApp Business API and stream it
 		whatsappClient, _, err := u.tenantUsecase.GetWhatsappClientByTenant(ctx, media.TenantID)
@@ -213,9 +213,9 @@ func (u *StorageMediaUsecase) getMediaStreamByID(ctx context.Context, storageMed
 	return dto.StorageMediaGetMediaResponse{}, false, fmt.Errorf("no valid media source found for media")
 }
 
-func (u *StorageMediaUsecase) getMediaStreamByURL(url string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
+func (u *StorageMediaUsecase) getMediaStreamByURL(ctx context.Context, url string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
 	var response dto.StorageMediaGetMediaResponse
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
 		return response, true, err
@@ -223,7 +223,12 @@ func (u *StorageMediaUsecase) getMediaStreamByURL(url string, rangeHeader string
 	if rangeHeader != "" {
 		req.Header.Set("Range", rangeHeader)
 	}
-	rc, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			ResponseHeaderTimeout: 10 * time.Second, // set a timeout for receiving response headers to prevent hanging
+		},
+	}
+	rc, err := httpClient.Do(req)
 	if err != nil {
 		u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
 		return response, true, err

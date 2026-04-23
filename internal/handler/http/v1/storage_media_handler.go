@@ -1,7 +1,6 @@
 package http_v1
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -111,50 +110,6 @@ func isClientClosedStreamError(err error) bool {
 		strings.Contains(errText, "connection closed")
 }
 
-// func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
-// 	var requestData dto.StorageMediaGetRequest
-// 	if err := ctx.Bind().Query(&requestData); err != nil {
-// 		code, response := api_response.NewApiResponse(false, err, "", nil)
-// 		return ctx.Status(code).JSON(response)
-// 	}
-// 	rangeHeader := ctx.Get(fiber.HeaderRange)
-// 	mediaResponse, serverError, err := h.storageMediaUsecase.GetMedia(ctx.Context(), requestData, rangeHeader)
-// 	if serverError || err != nil {
-// 		code, response := api_response.NewApiResponse(serverError, err, "Failed to retrieve media", nil)
-// 		return ctx.Status(code).JSON(response)
-// 	}
-// 	defer mediaResponse.Reader.Close()
-// 	ctx.Set(fiber.HeaderContentType, mediaResponse.ContentType)
-// 	ctx.Set(fiber.HeaderContentDisposition, mime.FormatMediaType("attachment", map[string]string{"filename": mediaResponse.FileName}))
-// 	ctx.Set(fiber.HeaderCacheControl, "private, max-age="+fmt.Sprintf("%d", int(mediaResponse.ExpiresIn.Seconds())))
-// 	ctx.Set(fiber.HeaderXContentTypeOptions, "nosniff")
-// 	ctx.Set("Accept-Ranges", "bytes")
-// 	if mediaResponse.ContentRange != "" {
-// 		ctx.Set("Content-Range", mediaResponse.ContentRange)
-// 	}
-// 	if mediaResponse.Size > 0 {
-// 		ctx.Set(fiber.HeaderContentLength, strconv.FormatInt(mediaResponse.Size, 10))
-// 	}
-// 	if mediaResponse.StatusCode != 0 {
-// 		ctx.Status(mediaResponse.StatusCode)
-// 	}
-// 	pr := &progressReader{
-// 		ctx:       ctx.Context(),
-// 		r:         mediaResponse.Reader,
-// 		size:      mediaResponse.Size,
-// 		lastLog:   time.Now(),
-// 		log:       h.zslog.Infof,
-// 		enableLog: true,
-// 	}
-// 	_, err = io.Copy(ctx.Response().BodyWriter(), pr)
-// 	// _, err = io.Copy(ctx.Response().BodyWriter(), mediaResponse.Reader)
-// 	if err != nil {
-// 		h.zslog.Error("[getMedia] Failed to stream file:", err)
-// 		return err
-// 	}
-// 	return nil
-// }
-
 func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaGetRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
@@ -165,7 +120,7 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	payload, serverError, err := h.storageMediaUsecase.ParseMediaToken(requestData.Media)
 	if err != nil {
 		// code, response := api_response.NewApiResponse(serverError, err, "", nil)
-		code, response := api_response.NewErrorApiResponse(false, errs.ErrGenericForbidden)
+		code, response := api_response.NewErrorApiResponse(false, errs.ErrGenericNotFound)
 		return ctx.Status(code).JSON(response)
 	}
 	_, err = uuid.Parse(payload)
@@ -194,6 +149,9 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	if mediaResponse.StatusCode != 0 {
 		ctx.Status(mediaResponse.StatusCode)
 	}
+	if mediaResponse.Size <= 0 {
+		mediaResponse.Size = -1 // unknown size, let fiber handle it with chunked encoding
+	}
 
 	pr := &progressReader{
 		ctx:       ctx.Context(),
@@ -203,45 +161,8 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 		enableLog: true,
 	}
 
-	reqCtx := ctx.Context()
-
-	return ctx.SendStreamWriter(func(w *bufio.Writer) {
-		defer mediaResponse.Reader.Close()
-
-		buf := make([]byte, 128*1024)
-		for {
-			if reqCtx.Err() != nil {
-				h.zslog.Infof("[getMedia] Client disconnected, stopping stream")
-				return
-			}
-
-			n, readErr := pr.Read(buf)
-			if n > 0 { // only write if we actually have bytes
-				_, writeErr := w.Write(buf[:n])
-				if writeErr != nil {
-					if !isClientClosedStreamError(writeErr) {
-						h.zslog.Errorf("[getMedia] Write error: %v", writeErr)
-					}
-					return
-				}
-				if flushErr := w.Flush(); flushErr != nil {
-					if !isClientClosedStreamError(flushErr) {
-						h.zslog.Errorf("[getMedia] Flush error: %v", flushErr)
-					}
-					return
-				}
-			}
-			if readErr == io.EOF {
-				return
-			}
-			if readErr != nil {
-				if !isClientClosedStreamError(readErr) {
-					h.zslog.Errorf("[getMedia] Read error: %v", readErr)
-				}
-				return
-			}
-		}
-	})
+	defer mediaResponse.Reader.Close() // safe here since SendStream is synchronous
+	return ctx.SendStream(pr, int(mediaResponse.Size))
 }
 
 func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {

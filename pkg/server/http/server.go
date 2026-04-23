@@ -70,9 +70,9 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 		StructValidator: s.validator,
 		BodyLimit:       s.bodyLimit,
 		ReadTimeout:     s.readTimeout,
-		WriteTimeout:    s.writeTimeout,
-		JSONDecoder:     json.Unmarshal,
-		JSONEncoder:     json.Marshal,
+		// WriteTimeout:    s.writeTimeout,
+		JSONDecoder: json.Unmarshal,
+		JSONEncoder: json.Marshal,
 	})
 
 	s.App = app
