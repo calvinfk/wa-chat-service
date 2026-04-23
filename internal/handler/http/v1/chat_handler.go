@@ -36,59 +36,71 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	var requestData dto.MessageSendRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 
 	jsonBody := ctx.Body()
 	var additionalData map[string]any
 	if err := json.Unmarshal(jsonBody, &additionalData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 
 	messageData, ok := additionalData[requestData.Type]
 	if !ok {
-		code, response := api_response.NewApiResponse(false, fmt.Errorf("%s is required", requestData.Type), "", nil)
+		code, response := api_response.NewErrorApiResponse(false, fmt.Errorf("%s is required", requestData.Type))
 		return ctx.Status(code).JSON(response)
 	}
 	if messageData == nil {
-		code, response := api_response.NewApiResponse(false, fmt.Errorf("%s is required", requestData.Type), "", nil)
+		code, response := api_response.NewErrorApiResponse(false, fmt.Errorf("%s is required", requestData.Type))
 		return ctx.Status(code).JSON(response)
 	}
 	requestData.Payload = messageData
 
 	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), nil, "", requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Successfully sent message", nil)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully sent message", nil)
 	return ctx.Status(code).JSON(response)
 }
 
 func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved chats", chats)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully retrieved chats", chats)
 	return ctx.Status(code).JSON(response)
 }
 
 func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Successfully retrieved messages", messages)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully retrieved messages", messages)
 	return ctx.Status(code).JSON(response)
 }

@@ -110,10 +110,10 @@ func GetValidatorErrorMessages(err error) map[string]string {
 			"error": err.Error(),
 		}
 	}
-	return FormatErrors(err, nil)
+	return FormatErrors(err)
 }
 
-func FormatErrors(err error, rootEntity any) map[string]string {
+func FormatErrors(err error) map[string]string {
 	result := make(map[string]string)
 
 	if ve, ok := err.(validator.ValidationErrors); ok {

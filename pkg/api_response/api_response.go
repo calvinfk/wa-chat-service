@@ -17,8 +17,18 @@ type ApiResponse struct {
 	Errors any `json:"errors"`
 }
 
-// NewApiResponse creates a standardized API response based on the provided parameters. It determines the appropriate HTTP status code and message based on whether there was a server error, a client error, or a successful operation, and formats the response accordingly.
-func NewApiResponse(serverError bool, err any, successMessage string, data any) (int, ApiResponse) {
+// NewApiResponse creates a standardized API response based on the provided parameters.
+// It takes a success message and data, and returns an HTTP status code along with the ApiResponse struct.
+func NewApiResponse(successMessage string, data any) (int, ApiResponse) {
+	var response ApiResponse
+	response.Code = http.StatusOK
+	response.Message = successMessage
+	response.Data = data
+	response.Errors = nil
+	return response.Code, response
+}
+
+func NewErrorApiResponse(serverError bool, err any) (int, ApiResponse) {
 	var response ApiResponse
 	if serverError {
 		response.Code = http.StatusInternalServerError
@@ -29,7 +39,7 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 	}
 	if err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			errors := utils.FormatErrors(validationErrors, data)
+			errors := utils.FormatErrors(validationErrors)
 			response.Code = http.StatusBadRequest
 			response.Data = nil
 			response.Errors = errors
@@ -71,11 +81,6 @@ func NewApiResponse(serverError bool, err any, successMessage string, data any) 
 			response.Errors = err
 			response.Message = "Bad request"
 		}
-	} else {
-		response.Code = http.StatusOK
-		response.Message = successMessage
-		response.Data = data
-		response.Errors = nil
 	}
 	return response.Code, response
 }

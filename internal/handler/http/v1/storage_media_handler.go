@@ -51,15 +51,19 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 func (h *StorageMediaHandler) uploadMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaUploadRequest
 	if err := ctx.Bind().All(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	if requestData.File == nil {
-		code, response := api_response.NewApiResponse(false, fmt.Errorf("file is required"), "", nil)
+		code, response := api_response.NewErrorApiResponse(false, fmt.Errorf("file is required"))
 		return ctx.Status(code).JSON(response)
 	}
 	media, serverError, err := h.storageMediaUsecase.UploadMedia(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", media)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Media uploaded successfully", media)
 	return ctx.Status(code).JSON(response)
 }
 
@@ -154,13 +158,14 @@ func isClientClosedStreamError(err error) bool {
 func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaGetRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	rangeHeader := ctx.Get(fiber.HeaderRange)
 	payload, serverError, err := h.storageMediaUsecase.ParseMediaToken(requestData.Media)
 	if err != nil {
-		code, response := api_response.NewApiResponse(serverError, err, "Invalid media token", nil)
+		// code, response := api_response.NewApiResponse(serverError, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, errs.ErrGenericForbidden)
 		return ctx.Status(code).JSON(response)
 	}
 	_, err = uuid.Parse(payload)
@@ -169,14 +174,14 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	} else {
 		// check if valid URL
 		if _, err := url.ParseRequestURI(payload); err != nil {
-			code, response := api_response.NewApiResponse(false, errs.ErrGenericNotFound, "", nil)
+			code, response := api_response.NewErrorApiResponse(false, errs.ErrGenericNotFound)
 			return ctx.Status(code).JSON(response)
 		}
 		requestData.Url = &payload
 	}
 	mediaResponse, serverError, err := h.storageMediaUsecase.GetMedia(ctx.Context(), requestData, rangeHeader)
 	if serverError || err != nil {
-		code, response := api_response.NewApiResponse(serverError, err, "Failed to retrieve media", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	ctx.Set(fiber.HeaderContentType, mediaResponse.ContentType)
@@ -242,37 +247,49 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaDeleteRequest
 	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
-	deleted, err := h.storageMediaUsecase.DeleteMedia(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(false, err, "Media deleted successfully", deleted)
+	serverError, err := h.storageMediaUsecase.DeleteMedia(ctx.Context(), requestData)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Media deleted successfully", nil)
 	return ctx.Status(code).JSON(response)
 }
 
 func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaSaveMediaIDRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx.Context(), requestData)
-	code, response := api_response.NewApiResponse(serverError, err, "Media uploaded successfully", data)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Media uploaded successfully", data)
 	return ctx.Status(code).JSON(response)
 }
 
 func (h *StorageMediaHandler) getMediaList(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.StorageMediaGetListRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	response, serverError, err := h.storageMediaUsecase.GetFiltered(ctx.Context(), requestData)
-	code, apiResponse := api_response.NewApiResponse(serverError, err, "Media list retrieved successfully", response)
+	if err != nil {
+		code, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(apiResponse)
+	}
+	code, apiResponse := api_response.NewApiResponse("Media list retrieved successfully", response)
 	return ctx.Status(code).JSON(apiResponse)
 
 }
@@ -280,10 +297,14 @@ func (h *StorageMediaHandler) getMediaList(ctx fiber.Ctx) error {
 func (h *StorageMediaHandler) encryptMediaLink(ctx fiber.Ctx) error {
 	var requestData dto.StorageMediaEncryptLinkRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	response, serverError, err := h.storageMediaUsecase.GenerateEncryptedLink(ctx.Context(), requestData)
-	code, apiResponse := api_response.NewApiResponse(serverError, err, "Encrypted media link generated successfully", response)
+	if err != nil {
+		code, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(apiResponse)
+	}
+	code, apiResponse := api_response.NewApiResponse("Encrypted media link generated successfully", response)
 	return ctx.Status(code).JSON(apiResponse)
 }

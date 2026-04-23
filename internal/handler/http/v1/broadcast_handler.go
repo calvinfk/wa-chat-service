@@ -45,22 +45,30 @@ func (h *BroadcastHandler) RegisterRoute(api fiber.Router) {
 func (h *BroadcastHandler) upsertBroadcast(ctx fiber.Ctx) error {
 	var inputData dto.BroadcastUpsertRequest
 	if err := ctx.Bind().All(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	data, serverError, err := h.broadcastUsecase.UpsertBroadcast(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully insert/update broadcast", data)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully insert/update broadcast", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
 func (h *BroadcastHandler) scheduleBroadcast(ctx fiber.Ctx) error {
 	var inputData dto.BroadcastScheduleRequest
 	if err := ctx.Bind().All(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	serverError, err := h.broadcastUsecase.ScheduleBroadcast(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully schedule broadcast", nil)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully schedule broadcast", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
@@ -85,48 +93,60 @@ func (h *BroadcastHandler) sendBroadcast(ctx fiber.Ctx) error {
 func (h *BroadcastHandler) cancelBroadcast(ctx fiber.Ctx) error {
 	var inputData dto.BroadcastCancelRequest
 	if err := ctx.Bind().All(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	serverError, err := h.broadcastUsecase.CancelBroadcast(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully cancel broadcast", nil)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully cancel broadcast", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
 func (h *BroadcastHandler) getFilteredBroadcast(ctx fiber.Ctx) error {
 	var inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]
 	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	if err := ctx.Bind().Query(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	if err := inputData.Validate(); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcast(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get filtered broadcast", data)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully get filtered broadcast", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
 func (h *BroadcastHandler) getFilteredBroadcastRecipients(ctx fiber.Ctx) error {
 	var inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]
 	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	if err := ctx.Bind().Query(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	if err := inputData.Validate(); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcastRecipients(ctx.Context(), inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully get filtered broadcast recipients", data)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully get filtered broadcast recipients", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }

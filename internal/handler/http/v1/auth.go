@@ -32,12 +32,12 @@ func (h *AuthHandler) RegisterRoutes(api fiber.Router) {
 func (h *AuthHandler) login(ctx fiber.Ctx) error {
 	var requestData dto.AuthLoginRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewApiResponse(false, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	encrypedToken, serverError, err := h.authUsecase.Login(ctx.Context(), requestData)
 	if err != nil {
-		code, response := api_response.NewApiResponse(serverError, err, "", nil)
+		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
 	ctx.Cookie(&fiber.Cookie{
@@ -46,6 +46,6 @@ func (h *AuthHandler) login(ctx fiber.Ctx) error {
 		Expires:  time.Now().Add(h.cfg.JOSE.AccessTokenExpiry),
 		HTTPOnly: true,
 	})
-	code, response := api_response.NewApiResponse(false, nil, "Login successful", nil)
+	code, response := api_response.NewApiResponse("Login successful", nil)
 	return ctx.Status(code).JSON(response)
 }

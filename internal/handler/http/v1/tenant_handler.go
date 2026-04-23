@@ -36,26 +36,34 @@ func (h *TenantHandler) RegisterRoute(router fiber.Router) {
 func (h *TenantHandler) createContact(ctx fiber.Ctx) error {
 	var inputData dto.ContactCreateRequest
 	if err := ctx.Bind().Body(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	serverError, err := h.tenantUsecase.CreateContact(ctx, inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully created contact", nil)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully created contact", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
 
 func (h *TenantHandler) getFiltered(ctx fiber.Ctx) error {
 	var inputData filter_request.FilterRequest[dto.ContactGetFilteredRequest]
 	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	if err := ctx.Bind().Query(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	data, serverError, err := h.tenantUsecase.GetContactsFiltered(ctx, inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully retrieved contacts", data)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully retrieved contacts", data)
 	return ctx.Status(httpCode).JSON(apiResponse)
 
 }
@@ -63,10 +71,14 @@ func (h *TenantHandler) getFiltered(ctx fiber.Ctx) error {
 func (h *TenantHandler) updateContact(ctx fiber.Ctx) error {
 	var inputData dto.ContactUpdateRequest
 	if err := ctx.Bind().All(&inputData); err != nil {
-		httpCode, apiResponse := api_response.NewApiResponse(false, err, "", nil)
+		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
 	serverError, err := h.tenantUsecase.UpdateContact(ctx, inputData)
-	httpCode, apiResponse := api_response.NewApiResponse(serverError, err, "Successfully updated contact", nil)
+	if err != nil {
+		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(httpCode).JSON(apiResponse)
+	}
+	httpCode, apiResponse := api_response.NewApiResponse("Successfully updated contact", nil)
 	return ctx.Status(httpCode).JSON(apiResponse)
 }
