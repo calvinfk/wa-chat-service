@@ -34,11 +34,6 @@ type StorageMediaUsecase struct {
 	mediaUrlExpiryDuration time.Duration
 }
 
-type byteRange struct {
-	start int64
-	end   int64
-}
-
 func NewStorageMediaUsecase(
 	storageMediaRepository repository.StorageMedia,
 	tenantUsecase usecase.Tenant,
@@ -57,60 +52,8 @@ func NewStorageMediaUsecase(
 		zslog:                  zslog,
 		baseURL:                baseURL,
 		getEndpoint:            "api/v1/storage-media/get",
-		mediaUrlExpiryDuration: 30 * time.Second, // default expiry duration for media URLs
+		mediaUrlExpiryDuration: 15 * time.Minute, // default expiry duration for media URLs
 	}
-}
-
-func parseRangeHeader(rangeHeader string, totalSize int64) (byteRange, bool, error) {
-	rangeHeader = strings.TrimSpace(rangeHeader)
-	if rangeHeader == "" {
-		return byteRange{}, false, nil
-	}
-	if totalSize <= 0 {
-		return byteRange{}, false, errs.ErrGenericRangeNotSatisfiable
-	}
-	lowerHeader := strings.ToLower(rangeHeader)
-	rangeSpec := rangeHeader
-	if strings.HasPrefix(lowerHeader, "bytes=") {
-		rangeSpec = strings.TrimSpace(rangeHeader[len("bytes="):])
-	}
-	if idx := strings.Index(rangeSpec, ","); idx >= 0 {
-		rangeSpec = rangeSpec[:idx]
-	}
-	rangeSpec = strings.TrimSpace(rangeSpec)
-	parts := strings.SplitN(rangeSpec, "-", 2)
-	if len(parts) != 2 {
-		return byteRange{}, false, errs.ErrGenericRangeNotSatisfiable
-	}
-	parts[0] = strings.TrimSpace(parts[0])
-	parts[1] = strings.TrimSpace(parts[1])
-	if parts[0] == "" {
-		suffixLength, err := strconv.ParseInt(parts[1], 10, 64)
-		if err != nil || suffixLength <= 0 {
-			return byteRange{}, false, errs.ErrGenericRangeNotSatisfiable
-		}
-		if suffixLength > totalSize {
-			suffixLength = totalSize
-		}
-		return byteRange{start: totalSize - suffixLength, end: totalSize - 1}, true, nil
-	}
-	start, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil || start < 0 || start >= totalSize {
-		return byteRange{}, false, errs.ErrGenericRangeNotSatisfiable
-	}
-	var end int64
-	if parts[1] == "" {
-		end = totalSize - 1
-	} else {
-		end, err = strconv.ParseInt(parts[1], 10, 64)
-		if err != nil || end < start {
-			return byteRange{}, false, errs.ErrGenericRangeNotSatisfiable
-		}
-		if end >= totalSize {
-			end = totalSize - 1
-		}
-	}
-	return byteRange{start: start, end: end}, true, nil
 }
 
 func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.StorageMediaUploadRequest) (dto.StorageMediaResponse, bool, error) {
@@ -189,7 +132,7 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 			u.zslog.Errorf("[UploadMedia] Failed to upload file: %v", err)
 			return response, true, err
 		}
-		url, err := u.generatePublicURL(media)
+		url, err := u.generatePublicURL(media.DocumentID)
 		if err != nil {
 			u.zslog.Errorf("[UploadMedia] Failed to generate public URL for media (DocumentID: %s): %v", media.DocumentID, err)
 		}
@@ -208,102 +151,36 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, inputData dto.Sto
 	return response, false, nil
 }
 
-// TODO: if url not exists, check media id and stream that instead
 func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.StorageMediaGetRequest, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
+	if inputData.StorageMediaID == nil && inputData.Url == nil {
+		u.zslog.Errorf("[GetMedia] Both StorageMediaID and URL are nil in the request")
+		return dto.StorageMediaGetMediaResponse{}, false, fmt.Errorf("either storage_media_id or url must be provided")
+	}
+	if inputData.StorageMediaID != nil {
+		return u.getMediaStreamByID(ctx, *inputData.StorageMediaID, rangeHeader)
+	} else {
+		return u.getMediaStreamByURL(*inputData.Url, rangeHeader)
+	}
+}
+
+func (u *StorageMediaUsecase) getMediaStreamByID(ctx context.Context, storageMediaID string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
 	var response dto.StorageMediaGetMediaResponse
-	// Decrypt media payload to get the actual media document ID and validate expiry
-	decrypted, err := u.encryptService.Decrypt(inputData.Media)
-	if err != nil {
-		u.zslog.Errorf("[GetMedia] Failed to decrypt media ID: %v", err)
-		return response, false, errs.ErrGenericInvalidInput
-	}
-	splits := strings.SplitN(decrypted, ":", 2)
-	if len(splits) != 2 {
-		u.zslog.Errorf("[GetMedia] Invalid media ID format after decryption")
-		return response, false, errs.ErrGenericInvalidInput
-	}
-	tUnix, err := strconv.ParseInt(splits[0], 10, 64)
-	if err != nil {
-		u.zslog.Errorf("[GetMedia] Failed to parse timestamp: %v", err)
-		return response, false, errs.ErrGenericInvalidInput
-	}
-	expTime := time.Unix(tUnix, 0)
-	if time.Now().After(expTime) {
-		u.zslog.Errorf("[GetMedia] Media token has expired")
-		return response, false, errs.ErrGenericGone
-	}
-	storageMediaID := splits[1]
 	media, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
 	if err != nil {
 		u.zslog.Errorf("[GetMedia] Failed to get media data from repository: %v", err)
 		return response, true, err
 	}
 	if media.URL != nil && media.IsURLFromStorage {
-		// if media is stored in our storage, stream it from there
-		attrs, err := u.googleStorageService.GetFileAttrs(ctx, *media.URL)
+		response, serverError, err := u.googleStorageService.GetFile(ctx, *media.URL, rangeHeader)
 		if err != nil {
-			u.zslog.Errorf("[GetMedia] Failed to get file attributes from Google Cloud Storage: %v", err)
-			return response, true, err
+			u.zslog.Errorf("[GetMedia] Failed to get media stream by URL: %v", err)
+			return response, serverError, err
 		}
-		requestedRange, hasRange, err := parseRangeHeader(rangeHeader, attrs.Size)
-		if err != nil {
-			u.zslog.Warnf("[GetMedia] Invalid range header: %q (size=%d)", rangeHeader, attrs.Size)
-			return response, false, err
-		}
-		if hasRange {
-			length := requestedRange.end - requestedRange.start + 1
-			rcRange, attrs, err := u.googleStorageService.GetFileRange(ctx, *media.URL, requestedRange.start, length)
-			if err != nil {
-				u.zslog.Errorf("[GetMedia] Failed to get ranged file from Google Cloud Storage: %v", err)
-				return response, true, err
-			}
-			response.Reader = rcRange
-			response.Size = length
-			response.StatusCode = http.StatusPartialContent
-			response.ContentRange = fmt.Sprintf("bytes %d-%d/%d", requestedRange.start, requestedRange.end, attrs.Size)
-			response.ContentType = attrs.ContentType
-			response.FileName = attrs.Name
-			response.ExpiresIn = u.mediaUrlExpiryDuration
-			return response, false, nil
-		}
-		rcFull, attrs, err := u.googleStorageService.GetFile(ctx, *media.URL)
-		if err != nil {
-			u.zslog.Errorf("[GetMedia] Failed to get file from Google Cloud Storage: %v", err)
-			return response, true, err
-		}
-		response.Reader = rcFull
-		response.ContentType = attrs.ContentType
-		response.FileName = attrs.Name
-		response.Size = attrs.Size
-		response.StatusCode = http.StatusOK
 		response.ExpiresIn = u.mediaUrlExpiryDuration
+		return response, false, nil
 	} else if media.URL != nil {
 		// if URL exists but not from storage, stream it directly
-		req, err := http.NewRequest(http.MethodGet, *media.URL, nil)
-		if err != nil {
-			u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
-			return response, true, err
-		}
-		if rangeHeader != "" {
-			req.Header.Set("Range", rangeHeader)
-		}
-		rc, err := http.DefaultClient.Do(req)
-		if err != nil {
-			u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
-			return response, true, err
-		}
-		if rc.StatusCode != http.StatusOK && rc.StatusCode != http.StatusPartialContent {
-			rc.Body.Close()
-			u.zslog.Errorf("[GetMedia] Failed to get media from URL, status code: %d", rc.StatusCode)
-			return response, rc.StatusCode >= http.StatusInternalServerError, fmt.Errorf("failed to get media from URL")
-		}
-		response.Reader = rc.Body
-		response.ContentType = rc.Header.Get("Content-Type")
-		response.FileName = media.OriginalName
-		response.Size = rc.ContentLength
-		response.StatusCode = rc.StatusCode
-		response.ContentRange = rc.Header.Get("Content-Range")
-		response.ExpiresIn = u.mediaUrlExpiryDuration // even if it's not from our storage, we can still set an expiry for caching purposes
+		return u.getMediaStreamByURL(*media.URL, rangeHeader)
 	} else if media.MediaID != nil {
 		// if media ID exists, get the media URL from WhatsApp Business API and stream it
 		whatsappClient, _, err := u.tenantUsecase.GetWhatsappClientByTenant(ctx, media.TenantID)
@@ -321,31 +198,48 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 			u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
 			return response, true, err
 		}
-		// defer httpRes.Body.Close()
-
-		// bodyRes, err := io.ReadAll(httpRes.Body)
-		// if err != nil {
-		// 	u.zslog.Errorf("[GetMedia] Failed to read media body: %v", err)
-		// 	return response, true, err
-		// }
-		// make reader
-		// reader := bytes.NewReader(bodyRes)
-		// response.Reader = io.NopCloser(reader)
 		response.Reader = httpRes.Body
 		response.ContentType = httpRes.Header.Get("Content-Type")
 		response.FileName = media.OriginalName
 		response.Size = httpRes.ContentLength
 		response.StatusCode = httpRes.StatusCode
 		response.ContentRange = httpRes.Header.Get("Content-Range")
-		// response.Size = int64(len(bodyRes))
 		// media from WhatsApp should have 5 minutes expiry as per WhatsApp's documentation
 		// https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/media/media-download-api#get-version-media-url
 		response.ExpiresIn = 5 * time.Minute
-	} else {
-		u.zslog.Errorf("[GetMedia] No valid media source found for media (DocumentID: %s)", media.DocumentID)
-		return response, false, errs.ErrGenericNotFound
+		return response, false, nil
 	}
+	u.zslog.Errorf("[GetMedia] No valid media source found for media with DocumentID: %s", media.DocumentID)
+	return dto.StorageMediaGetMediaResponse{}, false, fmt.Errorf("no valid media source found for media")
+}
 
+func (u *StorageMediaUsecase) getMediaStreamByURL(url string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
+	var response dto.StorageMediaGetMediaResponse
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
+		return response, true, err
+	}
+	if rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+	rc, err := http.DefaultClient.Do(req)
+	if err != nil {
+		u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
+		return response, true, err
+	}
+	if rc.StatusCode != http.StatusOK && rc.StatusCode != http.StatusPartialContent {
+		rc.Body.Close()
+		u.zslog.Errorf("[GetMedia] Failed to get media from URL, status code: %d", rc.StatusCode)
+		return response, rc.StatusCode >= http.StatusInternalServerError, fmt.Errorf("failed to get media from URL")
+	}
+	response.Reader = rc.Body
+	response.ContentType = rc.Header.Get("Content-Type")
+	response.FileName = filepath.Base(req.URL.Path)
+	response.Size = rc.ContentLength
+	response.StatusCode = rc.StatusCode
+	response.ContentRange = rc.Header.Get("Content-Range")
+	response.ExpiresIn = u.mediaUrlExpiryDuration // even if it's not from our storage, we can still set an expiry for caching purposes
 	return response, false, nil
 }
 
@@ -452,7 +346,7 @@ func (u *StorageMediaUsecase) GetFiltered(ctx context.Context, inputData filter_
 	for i := range len(data) {
 		var accessURL *string
 		if data[i].URL != nil || data[i].MediaID != nil {
-			generatedURL, err := u.generatePublicURL(data[i])
+			generatedURL, err := u.generatePublicURL(data[i].DocumentID)
 			if err != nil {
 				u.zslog.Errorf("[GetFiltered] Failed to generate public URL for media (DocumentID: %s): %v", data[i].DocumentID, err)
 			} else {
@@ -465,13 +359,13 @@ func (u *StorageMediaUsecase) GetFiltered(ctx context.Context, inputData filter_
 	return response, false, nil
 }
 
-func (u *StorageMediaUsecase) generatePublicURL(media model.StorageMedia) (string, error) {
-	mediaLink, err := u.encryptService.Encrypt(fmt.Sprintf("%d:%s", time.Now().Add(u.mediaUrlExpiryDuration).Unix(), media.DocumentID))
+func (u *StorageMediaUsecase) generatePublicURL(payload string) (string, error) {
+	mediaToken, err := u.encryptService.Encrypt(fmt.Sprintf("%d:%s", time.Now().Add(u.mediaUrlExpiryDuration).Unix(), payload))
 	if err != nil {
-		u.zslog.Errorf("[generatePublicURL] Failed to encrypt media link for media (DocumentID: %s): %v", media.DocumentID, err)
+		u.zslog.Errorf("[generatePublicURL] Failed to encrypt media : %v", err)
 		return "", err
 	}
-	return fmt.Sprintf("%s/%s?media=%s", u.baseURL, u.getEndpoint, mediaLink), nil
+	return fmt.Sprintf("%s/%s?media=%s", u.baseURL, u.getEndpoint, mediaToken), nil
 }
 
 func (u *StorageMediaUsecase) ParsePublicURL(url string) (string, error) {
@@ -491,19 +385,27 @@ func (u *StorageMediaUsecase) ParseMediaToken(mediaToken string) (string, bool, 
 	}
 	splits := strings.SplitN(decrypted, ":", 2)
 	if len(splits) != 2 {
-		u.zslog.Errorf("[ParseMediaToken] Invalid decrypted media link format")
+		u.zslog.Errorf("[ParseMediaToken] Invalid decrypted media token format")
 		return "", false, errs.ErrGenericInvalidInput
 	}
 	tUnix, err := strconv.ParseInt(splits[0], 10, 64)
 	if err != nil {
-		u.zslog.Errorf("[ParseMediaToken] Failed to parse timestamp from decrypted media link: %v", err)
+		u.zslog.Errorf("[ParseMediaToken] Failed to parse timestamp from decrypted media token: %v", err)
 		return "", true, err
 	}
 	expTime := time.Unix(tUnix, 0)
 	if time.Now().After(expTime) {
-		u.zslog.Errorf("[ParseMediaToken] Media link has expired")
-		return "", false, errs.ErrGenericForbidden
+		u.zslog.Errorf("[ParseMediaToken] Media token has expired")
+		return splits[1], false, errs.ErrGenericGone
 	}
-	storageMediaID := splits[1]
-	return storageMediaID, false, nil
+	return splits[1], false, nil
+}
+
+func (u *StorageMediaUsecase) GenerateEncryptedLink(ctx context.Context, inputData dto.StorageMediaEncryptLinkRequest) (string, bool, error) {
+	mediaToken, err := u.encryptService.Encrypt(fmt.Sprintf("%d:%s", time.Now().Add(u.mediaUrlExpiryDuration).Unix(), inputData.Link))
+	if err != nil {
+		u.zslog.Errorf("[GenerateEncryptedLink] Failed to encrypt media link: %v", err)
+		return "", true, err
+	}
+	return mediaToken, false, nil
 }

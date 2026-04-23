@@ -3,10 +3,13 @@ package google_service
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 	"wa_chat_service/config"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/pkg/errs"
+	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/storage"
 	"go.uber.org/zap"
@@ -61,59 +64,48 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 	return writer.Attrs(), nil
 }
 
-func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error) {
-	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
-	if err != nil {
-		s.zslog.Errorf("[GetFile] failed to parse Google Storage URL: %v", err)
-		return nil, nil, err
-	}
-	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		s.zslog.Errorf("[GetFile] failed to get file attributes: %v", err)
-		return nil, nil, err
-	}
-	reader, err := obj.NewReader(ctx)
-	if err != nil {
-		s.zslog.Errorf("[GetFile] failed to create file reader: %v", err)
-		return nil, nil, err
-	}
-	return reader, attrs, nil
-}
-
-func (s *GoogleStorageService) GetFileAttrs(ctx context.Context, fileURL string) (*storage.ObjectAttrs, error) {
+func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
+	var response dto.StorageMediaGetMediaResponse
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
 		s.zslog.Errorf("[GetFileAttrs] failed to parse Google Storage URL: %v", err)
-		return nil, err
+		return response, false, err
 	}
 	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
 		s.zslog.Errorf("[GetFileAttrs] failed to get file attributes: %v", err)
-		return nil, err
+		return response, true, err
 	}
-	return attrs, nil
-}
-
-func (s *GoogleStorageService) GetFileRange(ctx context.Context, fileURL string, offset, length int64) (*storage.Reader, *storage.ObjectAttrs, error) {
-	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
+	startRange, endRange, hasRange, err := utils.ParseRangeHeader(rangeHeader, attrs.Size)
 	if err != nil {
-		s.zslog.Errorf("[GetFileRange] failed to parse Google Storage URL: %v", err)
-		return nil, nil, err
+		s.zslog.Warnf("[GetMedia] Invalid range header: %q (size=%d)", rangeHeader, attrs.Size)
+		return response, false, err
 	}
-	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
-	attrs, err := obj.Attrs(ctx)
-	if err != nil {
-		s.zslog.Errorf("[GetFileRange] failed to get file attributes: %v", err)
-		return nil, nil, err
+	if hasRange {
+		length := endRange - startRange + 1
+		rcRange, err := obj.NewRangeReader(ctx, startRange, length)
+		if err != nil {
+			s.zslog.Errorf("[GetMedia] Failed to get ranged file from Google Cloud Storage: %v", err)
+			return response, true, err
+		}
+		response.Reader = rcRange
+		response.Size = length
+		response.StatusCode = http.StatusPartialContent
+		response.ContentRange = fmt.Sprintf("bytes %d-%d/%d", startRange, endRange, attrs.Size)
+	} else {
+		rcFull, err := obj.NewReader(ctx)
+		if err != nil {
+			s.zslog.Errorf("[GetMedia] Failed to get full file from Google Cloud Storage: %v", err)
+			return response, true, err
+		}
+		response.Reader = rcFull
+		response.Size = attrs.Size
+		response.StatusCode = http.StatusOK
 	}
-	reader, err := obj.NewRangeReader(ctx, offset, length)
-	if err != nil {
-		s.zslog.Errorf("[GetFileRange] failed to create file range reader: %v", err)
-		return nil, nil, err
-	}
-	return reader, attrs, nil
+	response.ContentType = attrs.ContentType
+	response.FileName = attrs.Name
+	return response, false, nil
 }
 
 func (s *GoogleStorageService) DeleteFile(ctx context.Context, fileURL string) error {

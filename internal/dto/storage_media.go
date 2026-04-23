@@ -28,7 +28,9 @@ type (
 		AccessURL    *string `json:"access_url"`
 	}
 	StorageMediaGetRequest struct {
-		Media string `query:"media" validate:"required"`
+		Media          string `query:"media" validate:"required"` // can be either encrypted media id or media URL
+		StorageMediaID *string
+		Url            *string
 	}
 
 	StorageMediaGetMediaResponse struct {
@@ -56,6 +58,10 @@ type (
 
 	StorageMediaGetListRequest struct {
 		TenantID string `json:"tenant_id" query:"tenant_id" validate:"required"`
+	}
+
+	StorageMediaEncryptLinkRequest struct {
+		Link string `json:"link" validate:"required,url"`
 	}
 )
 

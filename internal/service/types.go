@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"time"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 
@@ -34,11 +35,7 @@ type (
 		UploadFile(ctx context.Context, fileData []byte, fileURL string) (*storage.ObjectAttrs, error)
 		// GetFile retrieves a file from Google Cloud Storage. It takes the file URL as a parameter
 		// It returns a reader for the file, the file's attributes, and an error if there is an issue during the retrieval process.
-		GetFile(ctx context.Context, fileURL string) (*storage.Reader, *storage.ObjectAttrs, error)
-		// GetFileAttrs retrieves object attributes from Google Cloud Storage without opening a reader.
-		GetFileAttrs(ctx context.Context, fileURL string) (*storage.ObjectAttrs, error)
-		// GetFileRange retrieves a ranged reader for a file from Google Cloud Storage.
-		GetFileRange(ctx context.Context, fileURL string, offset, length int64) (*storage.Reader, *storage.ObjectAttrs, error)
+		GetFile(ctx context.Context, fileURL string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error)
 		// DeleteFile deletes a file from Google Cloud Storage. It takes the file URL as a parameter
 		// It returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, fileURL string) error

@@ -64,6 +64,9 @@ type (
 		ParsePublicURL(url string) (string, error)
 		// ParseMediaToken parses a media string which can be a URL or an encrypted media token, and returns the file path, a boolean indicating if it's a URL, and an error if the parsing fails.
 		ParseMediaToken(mediaToken string) (string, bool, error)
+		// GenerateEncryptedLink generates an encrypted link for a given media ID.
+		// Returns the encrypted link, a server-error flag (true if error is from server), and an error.
+		GenerateEncryptedLink(ctx context.Context, inputData dto.StorageMediaEncryptLinkRequest) (string, bool, error)
 	}
 
 	// Chat defines chat querying operations for conversation-level views.
