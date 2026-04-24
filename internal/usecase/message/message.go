@@ -3,7 +3,6 @@ package message_usecase
 import (
 	"context"
 	"fmt"
-	"mime"
 	"net/http"
 	"time"
 	"wa_chat_service/internal/dto"
@@ -118,16 +117,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 					return response, true, fmt.Errorf("unsupported media type: %s", mimeType)
 				}
 				// TODO: check file size is allowed or not
-				var originalFileName string
-				contentDisposition := urlHeaders.Get("Content-Disposition")
-				if contentDisposition != "" {
-					_, params, err := mime.ParseMediaType(contentDisposition)
-					if err == nil {
-						originalFileName = params["filename"]
-					}
-				} else {
-					originalFileName = utils.GetFileNameFromURL(*media.Link)
-				}
+				originalFileName := utils.GetFileNameFromURL(urlHeaders, *media.Link)
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
 					u.zslog.Errorf("[SendMessage] Failed to generate storage media ID: %v", err)

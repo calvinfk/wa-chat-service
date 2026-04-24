@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -34,7 +35,13 @@ func DownloadFile(fileURL string) ([]byte, http.Header, error) {
 	return fileData, resp.Header, nil
 }
 
-func GetFileNameFromURL(fileURL string) string {
+func GetFileNameFromURL(urlHeaders http.Header, fileURL string) string {
+	contentDisposition := urlHeaders.Get("Content-Disposition")
+	if contentDisposition != "" {
+		if _, params, err := mime.ParseMediaType(contentDisposition); err == nil {
+			return params["filename"]
+		}
+	}
 	u, err := url.Parse(fileURL)
 	if err != nil {
 		return ""

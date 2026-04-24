@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -176,6 +178,7 @@ func (u *StorageMediaUsecase) getMediaStreamByID(ctx context.Context, storageMed
 			u.zslog.Errorf("[GetMedia] Failed to get media stream by URL: %v", err)
 			return response, serverError, err
 		}
+		response.FileName = media.OriginalName
 		response.ExpiresIn = u.mediaUrlExpiryDuration
 		return response, false, nil
 	} else if media.URL != nil {
@@ -224,8 +227,19 @@ func (u *StorageMediaUsecase) getMediaStreamByURL(ctx context.Context, url strin
 		req.Header.Set("Range", rangeHeader)
 	}
 	httpClient := &http.Client{
+		Timeout: 0, // no total timeout, let streaming run
 		Transport: &http.Transport{
-			ResponseHeaderTimeout: 10 * time.Second, // set a timeout for receiving response headers to prevent hanging
+			ResponseHeaderTimeout: 30 * time.Second,
+			DialContext: (&net.Dialer{
+				Timeout: 10 * time.Second,
+			}).DialContext,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// follow up to 10 redirects, copying auth headers
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
 		},
 	}
 	rc, err := httpClient.Do(req)
@@ -233,14 +247,31 @@ func (u *StorageMediaUsecase) getMediaStreamByURL(ctx context.Context, url strin
 		u.zslog.Errorf("[GetMedia] Failed to get media from URL: %v", err)
 		return response, true, err
 	}
+	// fileName := utils.GetFileNameFromURL(rc.Header, url)
+	fileName := ""
+	// Google Drive returns HTML confirmation page for large files
+	contentType := rc.Header.Get("Content-Type")
+	if strings.Contains(contentType, "text/html") {
+		rc.Body.Close()
+		u.zslog.Errorf("[GetMedia] Got HTML response instead of file - likely Google Drive confirmation page")
+		return response, false, fmt.Errorf("got HTML response instead of file content")
+	}
 	if rc.StatusCode != http.StatusOK && rc.StatusCode != http.StatusPartialContent {
 		rc.Body.Close()
 		u.zslog.Errorf("[GetMedia] Failed to get media from URL, status code: %d", rc.StatusCode)
 		return response, rc.StatusCode >= http.StatusInternalServerError, fmt.Errorf("failed to get media from URL")
 	}
+	if fileName == "" {
+		extension, err := mime.ExtensionsByType(contentType)
+		if err != nil || len(extension) == 0 {
+			u.zslog.Warnf("[GetMedia] Could not determine file extension from Content-Type: %s", contentType)
+			extension = []string{""}
+		}
+		fileName = "download_" + strconv.FormatInt(time.Now().Unix(), 10) + extension[len(extension)-1]
+	}
 	response.Reader = rc.Body
 	response.ContentType = rc.Header.Get("Content-Type")
-	response.FileName = filepath.Base(req.URL.Path)
+	response.FileName = fileName
 	response.Size = rc.ContentLength
 	response.StatusCode = rc.StatusCode
 	response.ContentRange = rc.Header.Get("Content-Range")
@@ -300,20 +331,13 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, inputData dto.Sto
 		return emptyResponse, httpCode >= http.StatusInternalServerError, err
 	}
 	// download the file to get the mime type and original filename
-	var originalFileName string
 	urlHeaders, err := whatsappClient.GetHeaders(url.URL)
 	if err != nil {
 		u.zslog.Errorf("[SaveMediaID] Failed to get media headers: %v", err)
 		return emptyResponse, true, err
 	}
 	mimeType := urlHeaders.Get("Content-Type")
-	contentDisposition := urlHeaders.Get("Content-Disposition")
-	if contentDisposition != "" {
-		_, params, err := mime.ParseMediaType(contentDisposition)
-		if err == nil {
-			originalFileName = params["filename"]
-		}
-	}
+	originalFileName := utils.GetFileNameFromURL(urlHeaders, url.URL)
 	if originalFileName == "" {
 		originalFileName = fmt.Sprintf("%s.%s", inputData.MediaID, whatsapp_business.ParseMediaExtension(mimeType))
 	}
@@ -407,6 +431,21 @@ func (u *StorageMediaUsecase) ParseMediaToken(mediaToken string) (string, bool, 
 }
 
 func (u *StorageMediaUsecase) GenerateEncryptedLink(ctx context.Context, inputData dto.StorageMediaEncryptLinkRequest) (string, bool, error) {
+	httpHeader, err := utils.GetURLHeaders(inputData.Link)
+	if err != nil {
+		u.zslog.Errorf("[GenerateEncryptedLink] Failed to get URL headers: %v", err)
+		return "", true, err
+	}
+	contentType := httpHeader.Get("Content-Type")
+	if contentType == "" {
+		u.zslog.Errorf("[GenerateEncryptedLink] URL does not have Content-Type header: %s", inputData.Link)
+		return "", false, fmt.Errorf("URL does not have Content-Type header")
+	}
+	if strings.Contains(contentType, "text/html") {
+		u.zslog.Errorf("[GenerateEncryptedLink] URL points to an HTML content, which is not allowed: %s", inputData.Link)
+		return "", false, fmt.Errorf("URL points to an HTML content, which is not allowed")
+	}
+	fmt.Println(contentType)
 	mediaToken, err := u.encryptService.Encrypt(fmt.Sprintf("%d:%s", time.Now().Add(u.mediaUrlExpiryDuration).Unix(), inputData.Link))
 	if err != nil {
 		u.zslog.Errorf("[GenerateEncryptedLink] Failed to encrypt media link: %v", err)

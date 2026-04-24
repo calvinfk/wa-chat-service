@@ -1,6 +1,7 @@
 package http_v1
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -161,8 +162,44 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 		enableLog: true,
 	}
 
-	defer mediaResponse.Reader.Close() // safe here since SendStream is synchronous
-	return ctx.SendStream(pr, int(mediaResponse.Size))
+	rawCtx := ctx.RequestCtx()
+	rawCtx.Response.SetBodyStreamWriter(func(w *bufio.Writer) {
+		defer mediaResponse.Reader.Close()
+		buf := make([]byte, 64*1024)
+		for {
+			if ctx.Context().Err() != nil {
+				return
+			}
+			n, readErr := pr.Read(buf)
+			if n > 0 {
+				_, writeErr := w.Write(buf[:n])
+				if writeErr != nil {
+					if !isClientClosedStreamError(writeErr) {
+						h.zslog.Errorf("[getMedia] Write error: %v", writeErr)
+					}
+					return
+				}
+				if flushErr := w.Flush(); flushErr != nil {
+					if !isClientClosedStreamError(flushErr) {
+						h.zslog.Errorf("[getMedia] Flush error: %v", flushErr)
+					}
+					return
+				}
+			}
+			if readErr == io.EOF {
+				return
+			}
+			if readErr != nil {
+				if !isClientClosedStreamError(readErr) {
+					h.zslog.Errorf("[getMedia] Read error: %v", readErr)
+				}
+				return
+			}
+		}
+	})
+	rawCtx.Response.Header.SetContentLength(int(mediaResponse.Size))
+	rawCtx.Response.Header.SetContentTypeBytes([]byte(mediaResponse.ContentType))
+	return nil
 }
 
 func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {
