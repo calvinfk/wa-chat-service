@@ -21,12 +21,12 @@ type BroadcastHandler struct {
 	ZSLog            *zap.SugaredLogger
 }
 
-func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService service.Encrypt, jwtService service.JWT, zslog *zap.SugaredLogger) *BroadcastHandler {
+func NewBroadcastHandler(broadcastUsecase usecase.Broadcast, encryptService service.Encrypt, jwtService service.JWT, zsLog *zap.SugaredLogger) *BroadcastHandler {
 	return &BroadcastHandler{
 		broadcastUsecase: broadcastUsecase,
 		encryptService:   encryptService,
 		jwtService:       jwtService,
-		ZSLog:            zslog,
+		ZSLog:            zsLog,
 	}
 }
 
@@ -48,7 +48,8 @@ func (h *BroadcastHandler) upsertBroadcast(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.broadcastUsecase.UpsertBroadcast(ctx.Context(), inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.broadcastUsecase.UpsertBroadcast(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -63,7 +64,8 @@ func (h *BroadcastHandler) scheduleBroadcast(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.broadcastUsecase.ScheduleBroadcast(ctx.Context(), inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.broadcastUsecase.ScheduleBroadcast(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -96,7 +98,8 @@ func (h *BroadcastHandler) cancelBroadcast(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.broadcastUsecase.CancelBroadcast(ctx.Context(), inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.broadcastUsecase.CancelBroadcast(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -119,7 +122,8 @@ func (h *BroadcastHandler) getFilteredBroadcast(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcast(ctx.Context(), inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcast(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -142,7 +146,8 @@ func (h *BroadcastHandler) getFilteredBroadcastRecipients(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcastRecipients(ctx.Context(), inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.broadcastUsecase.GetFilteredBroadcastRecipients(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)

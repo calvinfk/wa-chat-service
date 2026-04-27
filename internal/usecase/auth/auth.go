@@ -9,46 +9,50 @@ import (
 	"wa_chat_service/pkg/errs"
 
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthUsecase struct {
+	userRepository     repository.User
 	tenantRepository   repository.Tenant
 	accessTokenService service.AccessToken
 	encryptService     service.Encrypt
-	zslog              *zap.SugaredLogger
+	zsLog              *zap.SugaredLogger
 }
 
-func NewAuthUsecase(tenantRepository repository.Tenant, accessTokenService service.AccessToken, encryptService service.Encrypt, zslog *zap.SugaredLogger) *AuthUsecase {
+func NewAuthUsecase(userRepository repository.User, tenantRepository repository.Tenant, accessTokenService service.AccessToken, encryptService service.Encrypt, zsLog *zap.SugaredLogger) *AuthUsecase {
 	return &AuthUsecase{
+		userRepository:     userRepository,
 		tenantRepository:   tenantRepository,
 		accessTokenService: accessTokenService,
 		encryptService:     encryptService,
-		zslog:              zslog,
+		zsLog:              zsLog,
 	}
 }
 
 func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (string, bool, error) {
-	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, req.PhoneNumberID)
+	user, err := u.userRepository.GetByEmail(ctx, req.Email)
 	if err != nil {
-		u.zslog.Errorf("[Login] tenantRepository.GetByPhoneNumberID error : %v", err)
+		u.zsLog.Errorf("[Login] userRepository.GetByEmail error : %v", err)
 		if err == errs.ErrGenericNotFound {
 			return "", false, err
 		}
 		return "", true, err
 	}
-	if tenant.DocumentID != req.TenantID {
-		u.zslog.Errorf("[Login] tenant.DocumentID != req.TenantID : %v", errs.ErrGenericNotFound)
-		return "", false, errs.ErrGenericNotFound
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	if err != nil {
+		u.zsLog.Errorf("[Login] bcrypt.CompareHashAndPassword error : %v", err)
+		return "", true, errs.ErrGenericUnauthorized
 	}
-	sub := fmt.Sprintf("%s:%s", tenant.DocumentID, tenant.PhoneNumberID)
+	sub := fmt.Sprintf("%s:%s", user.TenantID, user.DocumentID)
 	accessToken, err := u.accessTokenService.GenerateAccessToken(sub)
 	if err != nil {
-		u.zslog.Errorf("[Login] accessTokenService.GenerateAccessToken error : %v", err)
+		u.zsLog.Errorf("[Login] accessTokenService.GenerateAccessToken error : %v", err)
 		return "", true, err
 	}
 	encryptedToken, err := u.encryptService.Encrypt(accessToken)
 	if err != nil {
-		u.zslog.Errorf("[Login] encryptService.Encrypt error : %v", err)
+		u.zsLog.Errorf("[Login] encryptService.Encrypt error : %v", err)
 		return "", true, err
 	}
 	return encryptedToken, false, nil

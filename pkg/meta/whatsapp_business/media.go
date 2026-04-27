@@ -20,7 +20,7 @@ func ParseMediaExtension(mimeType string) string {
 
 func (wb *Client) UploadMedia(fileBytes []byte, filename string, mimeType string) (UploadMediaResponse, int, error) {
 	var emptyResponse UploadMediaResponse
-	endpoint := fmt.Sprintf("%s/%s/media", wb.GetBaseURLVersion(), wb.PhoneNumberID)
+	endpoint := fmt.Sprintf("%s/%s/media", wb.GetBaseURLVersion(), wb.PhoneNumberId)
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 
@@ -151,7 +151,7 @@ func (wb *Client) StartResumableUploadSession(fileName string, fileLength int64,
 	if err := wb.validator.Struct(payload); err != nil {
 		return StartUploadSessionResponse{}, 0, fmt.Errorf("validation error: %w", err)
 	}
-	endpoint := fmt.Sprintf("%s/%s/uploads?file_name=%s&file_length=%d&file_type=%s&access_token=%s", wb.GetBaseURLVersion(), wb.AppID, payload.FileName, payload.FileLength, payload.FileType, payload.AccessToken)
+	endpoint := fmt.Sprintf("%s/%s/uploads?file_name=%s&file_length=%d&file_type=%s&access_token=%s", wb.GetBaseURLVersion(), wb.AppId, payload.FileName, payload.FileLength, payload.FileType, payload.AccessToken)
 	body, httpCode, err := wb.accessAPIWithoutAuth(http.MethodPost, endpoint, nil)
 	if err != nil {
 		return StartUploadSessionResponse{}, httpCode, err

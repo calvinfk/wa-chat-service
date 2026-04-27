@@ -176,6 +176,7 @@ func (x *MessageModel) GetError() string {
 type SaveMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       *MessageModel          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	PhoneNumberId string                 `protobuf:"bytes,2,opt,name=phone_number_id,json=phoneNumberId,proto3" json:"phone_number_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -217,6 +218,13 @@ func (x *SaveMessageRequest) GetMessage() *MessageModel {
 	return nil
 }
 
+func (x *SaveMessageRequest) GetPhoneNumberId() string {
+	if x != nil {
+		return x.PhoneNumberId
+	}
+	return ""
+}
+
 var File_v1_message_proto protoreflect.FileDescriptor
 
 const file_v1_message_proto_rawDesc = "" +
@@ -246,9 +254,10 @@ const file_v1_message_proto_rawDesc = "" +
 	"\r_delivered_atB\n" +
 	"\n" +
 	"\b_read_atB\b\n" +
-	"\x06_error\"@\n" +
+	"\x06_error\"h\n" +
 	"\x12SaveMessageRequest\x12*\n" +
-	"\amessage\x18\x01 \x01(\v2\x10.v1.MessageModelR\amessage2H\n" +
+	"\amessage\x18\x01 \x01(\v2\x10.v1.MessageModelR\amessage\x12&\n" +
+	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId2H\n" +
 	"\aMessage\x12=\n" +
 	"\vSaveMessage\x12\x16.v1.SaveMessageRequest\x1a\x16.google.protobuf.EmptyB\x0fZ\rdocs/proto/v1b\x06proto3"
 

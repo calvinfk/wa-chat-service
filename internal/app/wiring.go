@@ -29,6 +29,7 @@ import (
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
+	wa_business_account_usecase "wa_chat_service/internal/usecase/wa_business_account"
 	server_grpc "wa_chat_service/pkg/server/grpc"
 	grpc_middleware "wa_chat_service/pkg/server/grpc/middleware"
 	server_http "wa_chat_service/pkg/server/http"
@@ -69,32 +70,36 @@ type services struct {
 }
 
 type repositories struct {
-	Chat           repository.Chat
-	Message        repository.Message
-	StorageMedia   repository.StorageMedia
-	Tenant         repository.Tenant
-	Template       repository.Template
-	Broadcast      repository.Broadcast
-	SearchTemplate repository.SearchTemplate
-	SearchMessage  repository.SearchMessage
+	Chat              repository.Chat
+	Message           repository.Message
+	StorageMedia      repository.StorageMedia
+	Tenant            repository.Tenant
+	Template          repository.Template
+	Broadcast         repository.Broadcast
+	SearchTemplate    repository.SearchTemplate
+	SearchMessage     repository.SearchMessage
+	User              repository.User
+	WaBusinessAccount repository.WaBusinessAccount
+	WaPhone           repository.WaPhone
 }
 
 type usecases struct {
-	Chat         usecase.Chat
-	Message      usecase.Message
-	StorageMedia usecase.StorageMedia
-	Tenant       usecase.Tenant
-	Template     usecase.Template
-	Broadcast    usecase.Broadcast
-	Auth         usecase.Auth
+	Chat              usecase.Chat
+	Message           usecase.Message
+	StorageMedia      usecase.StorageMedia
+	Tenant            usecase.Tenant
+	Template          usecase.Template
+	Broadcast         usecase.Broadcast
+	Auth              usecase.Auth
+	WaBusinessAccount usecase.WaBusinessAccount
 }
 
-func NewDefaultWiring(zslog *zap.SugaredLogger, cfg *config.Config) servers {
-	clients := newDefaultClients(cfg, zslog)
-	services := newDefaultServices(cfg, zslog, clients)
-	repositories := newDefaultRepositories(clients, services)
-	usecases := newDefaultUsecases(cfg, zslog, clients, repositories, services)
-	servers := newDefaultServers(cfg, zslog, services, usecases)
+func NewDefaultWiring(zsLog *zap.SugaredLogger, cfg *config.Config) servers {
+	clients := newDefaultClients(cfg, zsLog)
+	services := newDefaultServices(cfg, zsLog, clients)
+	repositories := newDefaultRepositories(clients, services, zsLog)
+	usecases := newDefaultUsecases(cfg, zsLog, clients, repositories, services)
+	servers := newDefaultServers(cfg, zsLog, services, usecases)
 	return servers
 }
 
@@ -130,13 +135,13 @@ func newDefaultClients(cfg *config.Config, zsLog *zap.SugaredLogger) clients {
 	}
 }
 
-func newDefaultServices(cfg *config.Config, zslog *zap.SugaredLogger, clients clients) services {
-	accessTokenService := access_token_service.NewAccessTokenService(cfg, zslog)
-	encryptService := encrypt_service.NewEncryptService(&cfg.Encrypt, zslog)
-	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &cfg.GCP, zslog)
-	whatsappService := whatsapp_service.NewWhatsappService(zslog)
-	jwtService := jose_service.NewJWTService(&cfg.JOSE, zslog)
-	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &cfg.GCP, jwtService, encryptService, zslog, cfg.App.PublicURL)
+func newDefaultServices(cfg *config.Config, zsLog *zap.SugaredLogger, clients clients) services {
+	accessTokenService := access_token_service.NewAccessTokenService(cfg, zsLog)
+	encryptService := encrypt_service.NewEncryptService(&cfg.Encrypt, zsLog)
+	googleStorageService := google_service.NewGoogleStorageService(clients.gcpStorageClient, &cfg.GCP, zsLog)
+	whatsappService := whatsapp_service.NewWhatsappService(zsLog)
+	jwtService := jose_service.NewJWTService(&cfg.JOSE, zsLog)
+	googleTaskService := google_service.NewGoogleTaskService(clients.gcpTaskClient, &cfg.GCP, jwtService, encryptService, zsLog, cfg.App.PublicURL)
 	return services{
 		AccessToken:      accessTokenService,
 		Encrypt:          encryptService,
@@ -147,49 +152,57 @@ func newDefaultServices(cfg *config.Config, zslog *zap.SugaredLogger, clients cl
 	}
 }
 
-func newDefaultRepositories(clients clients, services services) repositories {
+func newDefaultRepositories(clients clients, services services, zsLog *zap.SugaredLogger) repositories {
 	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
 	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient, services.GoogleStorage)
 	tenantRepository := repository_firestore.NewTenantRepository(clients.firestoreClient)
 	templateRepository := repository_firestore.NewTemplateRepository(clients.firestoreClient)
 	broadcastRepository := repository_firestore.NewBroadcastRepository(clients.firestoreClient)
-	meiliTemplateRepository := repository_meili.NewMeiliTemplateRepository(clients.meiliClient)
-	meiliMessageRepository := repository_meili.NewMeiliMessageRepository(clients.meiliClient)
+	meiliTemplateRepository := repository_meili.NewMeiliTemplateRepository(clients.meiliClient, zsLog)
+	meiliMessageRepository := repository_meili.NewMeiliMessageRepository(clients.meiliClient, zsLog)
+	userRepository := repository_firestore.NewUserRepository(clients.firestoreClient)
+	whatsappBusinessAccountRepository := repository_firestore.NewWhatsappBusinessAccountRepository(clients.firestoreClient)
+	waPhoneRepository := repository_firestore.NewWaPhoneRepository(clients.firestoreClient)
 	return repositories{
-		Chat:           chatRepository,
-		Message:        messageRepository,
-		StorageMedia:   storageMediaRepository,
-		Template:       templateRepository,
-		Tenant:         tenantRepository,
-		Broadcast:      broadcastRepository,
-		SearchTemplate: meiliTemplateRepository,
-		SearchMessage:  meiliMessageRepository,
+		Chat:              chatRepository,
+		Message:           messageRepository,
+		StorageMedia:      storageMediaRepository,
+		Template:          templateRepository,
+		Tenant:            tenantRepository,
+		Broadcast:         broadcastRepository,
+		SearchTemplate:    meiliTemplateRepository,
+		SearchMessage:     meiliMessageRepository,
+		User:              userRepository,
+		WaBusinessAccount: whatsappBusinessAccountRepository,
+		WaPhone:           waPhoneRepository,
 	}
 }
 
-func newDefaultUsecases(cfg *config.Config, zslog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
-	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zslog)
-	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, tenantUsecase, services.WhatsappBusiness, clients.txManager, zslog)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, tenantUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zslog, cfg.App.PublicURL)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, storageMediaUsecase, tenantUsecase, services.WhatsappBusiness, services.GoogleStorage, zslog)
-	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zslog)
-	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, tenantUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zslog)
-	authUsecase := auth_usecase.NewAuthUsecase(repositories.Tenant, services.AccessToken, services.Encrypt, zslog)
+func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
+	waBusinessAccountUsecase := wa_business_account_usecase.NewWaBusinessAccountUsecase(repositories.WaBusinessAccount, services.Encrypt, repositories.WaPhone, zsLog)
+	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zsLog)
+	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, repositories.WaBusinessAccount, waBusinessAccountUsecase, services.WhatsappBusiness, clients.txManager, zsLog)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, waBusinessAccountUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zsLog, cfg.App.PublicURL)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, zsLog)
+	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zsLog)
+	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, waBusinessAccountUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zsLog)
+	authUsecase := auth_usecase.NewAuthUsecase(repositories.User, repositories.Tenant, services.AccessToken, services.Encrypt, zsLog)
 	return usecases{
-		Template:     templateUsecase,
-		Message:      messageUsecase,
-		StorageMedia: storageMediaUsecase,
-		Chat:         chatUsecase,
-		Tenant:       tenantUsecase,
-		Broadcast:    broadcastUsecase,
-		Auth:         authUsecase,
+		Template:          templateUsecase,
+		Message:           messageUsecase,
+		StorageMedia:      storageMediaUsecase,
+		Chat:              chatUsecase,
+		Tenant:            tenantUsecase,
+		Broadcast:         broadcastUsecase,
+		Auth:              authUsecase,
+		WaBusinessAccount: waBusinessAccountUsecase,
 	}
 }
 
-func newDefaultServers(cfg *config.Config, zslog *zap.SugaredLogger, services services, usecases usecases) servers {
+func newDefaultServers(cfg *config.Config, zsLog *zap.SugaredLogger, services services, usecases usecases) servers {
 	grpcServer := server_grpc.New(
-		zslog.Desugar().Named("gRPC"),
+		zsLog.Desugar().Named("gRPC"),
 		server_grpc.Port(fmt.Sprintf("%d", cfg.GRPC.Port)),
 		server_grpc.ServerOptions(
 			grpc.ChainUnaryInterceptor(
@@ -200,10 +213,11 @@ func newDefaultServers(cfg *config.Config, zslog *zap.SugaredLogger, services se
 		),
 	)
 	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
-		App:          grpcServer.App,
-		StorageMedia: usecases.StorageMedia,
-		Message:      usecases.Message,
-		ZSLog:        zslog,
+		App:               grpcServer.App,
+		StorageMedia:      usecases.StorageMedia,
+		Message:           usecases.Message,
+		WaBusinessAccount: usecases.WaBusinessAccount,
+		ZSLog:             zsLog,
 	}
 	handler_grpc.NewRouter(handlerGRPCV1)
 	if cfg.App.Environment != "production" {
@@ -211,11 +225,11 @@ func newDefaultServers(cfg *config.Config, zslog *zap.SugaredLogger, services se
 	}
 
 	httpServer := server_http.New(
-		zslog.Desugar().Named("HTTP"),
+		zsLog.Desugar().Named("HTTP"),
 		server_http.StructValidator(utils.NewStructValidator()),
 		server_http.Port(fmt.Sprintf("%d", cfg.App.Port)),
 		server_http.Middleware(
-			http_middleware.Recover(zslog),
+			http_middleware.Recover(zsLog),
 			http_middleware.OptionsRoute(),
 			http_middleware.FileSizeLimit(16*1024*1024), // 16MB
 		),
@@ -232,7 +246,7 @@ func newDefaultServers(cfg *config.Config, zslog *zap.SugaredLogger, services se
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
 		AccessTokenService:  services.AccessToken,
-		ZSLog:               zslog.Named("HTTP"),
+		ZSLog:               zsLog.Named("HTTP"),
 	}
 	handler_http.NewRouter(httpServer.App, cfg, handlerHTTPV1)
 	return servers{

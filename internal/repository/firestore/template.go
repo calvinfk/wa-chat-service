@@ -2,9 +2,7 @@ package repository_firestore
 
 import (
 	"context"
-	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
@@ -13,8 +11,9 @@ import (
 )
 
 type TemplateRepository struct {
-	template model.Template
-	db       *firestore.Client
+	WaBusinessAccount model.WaBusinessAccount
+	template          model.Template
+	db                *firestore.Client
 }
 
 func NewTemplateRepository(db *firestore.Client) *TemplateRepository {
@@ -23,37 +22,37 @@ func NewTemplateRepository(db *firestore.Client) *TemplateRepository {
 	}
 }
 
-func (r *TemplateRepository) GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], error) {
-	var response filter_request.FilterResponse[dto.TemplateResponse]
-	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.template.AllowedFilterFields(), r.template.AllowedSortFields())
-	if err != nil {
-		return response, err
-	}
-	collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
-	query := collection.Query
-	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
-	if err != nil {
-		return response, err
-	}
-	var result []dto.TemplateResponse
-	for _, doc := range docs {
-		var template model.Template
-		docData := doc.Data()
-		docData["id"] = doc.Ref.ID
-		docData["tenant_id"] = tenantID
-		err := utils.MapToStruct(docData, &template)
-		if err != nil {
-			return response, err
-		}
-		result = append(result, dto.TemplateResponse{}.FromModel(template))
-	}
-	response = filter_request.NewFilterResponse(result, paginate, totalData)
-	return response, nil
-}
+// func (r *TemplateRepository) GetFilteredByWhatsappBusinessAccountID(ctx context.Context, whatsappBusinessAccountID string, inputData filter_request.FilterRequest[dto.TemplateFilterRequest]) (filter_request.FilterResponse[dto.TemplateResponse], error) {
+// 	var response filter_request.FilterResponse[dto.TemplateResponse]
+// 	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.template.AllowedFilterFields(), r.template.AllowedSortFields())
+// 	if err != nil {
+// 		return response, err
+// 	}
+// 	collection := r.db.Collection(r.WaBusinessAccount.TableName()).Doc(whatsappBusinessAccountID).Collection(r.template.TableName())
+// 	query := collection.Query
+// 	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
+// 	if err != nil {
+// 		return response, err
+// 	}
+// 	var result []dto.TemplateResponse
+// 	for _, doc := range docs {
+// 		var template model.Template
+// 		docData := doc.Data()
+// 		docData["id"] = doc.Ref.ID
+// 		docData["whatsapp_business_account_id"] = whatsappBusinessAccountID
+// 		err := utils.MapToStruct(docData, &template)
+// 		if err != nil {
+// 			return response, err
+// 		}
+// 		result = append(result, dto.TemplateResponse{}.FromModel(template))
+// 	}
+// 	response = filter_request.NewFilterResponse(result, paginate, totalData)
+// 	return response, nil
+// }
 
-func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]model.Template, error) {
+func (r *TemplateRepository) GetAll(ctx context.Context, whatsappBusinessAccountID string) ([]model.Template, error) {
 	var templates []model.Template
-	collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
+	collection := r.db.Collection(r.WaBusinessAccount.TableName()).Doc(whatsappBusinessAccountID).Collection(r.template.TableName())
 	query := collection.Query
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
@@ -63,7 +62,7 @@ func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]mod
 		var template model.Template
 		docData := doc.Data()
 		docData["id"] = doc.Ref.ID
-		docData["tenant_id"] = tenantID
+		docData["whatsapp_business_account_id"] = whatsappBusinessAccountID
 		err := utils.MapToStruct(docData, &template)
 		if err != nil {
 			return templates, err
@@ -73,11 +72,11 @@ func (r *TemplateRepository) GetAll(ctx context.Context, tenantID string) ([]mod
 	return templates, nil
 }
 
-func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, documentID string) (model.Template, error) {
+func (r *TemplateRepository) GetByID(ctx context.Context, whatsappBusinessAccountID string, documentID string) (model.Template, error) {
 	var template model.Template
 	docRef := r.db.
-		Collection("tenants").
-		Doc(tenantID).
+		Collection(r.WaBusinessAccount.TableName()).
+		Doc(whatsappBusinessAccountID).
 		Collection(r.template.TableName()).
 		Doc(documentID)
 	doc, err := docRef.Get(ctx)
@@ -86,7 +85,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 	}
 	docData := doc.Data()
 	docData["id"] = doc.Ref.ID
-	docData["tenant_id"] = tenantID
+	docData["whatsapp_business_account_id"] = whatsappBusinessAccountID
 	err = utils.MapToStruct(docData, &template)
 	if err != nil {
 		return template, err
@@ -97,8 +96,8 @@ func (r *TemplateRepository) GetByID(ctx context.Context, tenantID string, docum
 func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transaction, inputData model.Template) (model.Template, error) {
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		doc := r.db.
-			Collection("tenants").
-			Doc(inputData.TenantID).
+			Collection(r.WaBusinessAccount.TableName()).
+			Doc(inputData.WaBusinessAccountID).
 			Collection(r.template.TableName()).
 			Doc(inputData.DocumentID)
 		_, getErr := tx.Get(doc)
@@ -140,10 +139,10 @@ func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transacti
 	return inputData, err
 }
 
-func (r *TemplateRepository) DeleteByID(ctx context.Context, tx *firestore.Transaction, tenantID string, templateID string) error {
+func (r *TemplateRepository) DeleteByID(ctx context.Context, tx *firestore.Transaction, whatsappBusinessAccountID string, templateID string) error {
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		doc := r.db.Collection("tenants").
-			Doc(tenantID).
+		doc := r.db.Collection(r.WaBusinessAccount.TableName()).
+			Doc(whatsappBusinessAccountID).
 			Collection(r.template.TableName()).
 			Doc(templateID)
 		_, err := tx.Get(doc)
@@ -154,31 +153,6 @@ func (r *TemplateRepository) DeleteByID(ctx context.Context, tx *firestore.Trans
 			return err
 		}
 		return tx.Delete(doc)
-	}
-	var err error
-	if tx == nil {
-		err = r.db.RunTransaction(ctx, execDB)
-	} else {
-		err = execDB(ctx, tx)
-	}
-	return err
-}
-
-func (r *TemplateRepository) DeleteByName(ctx context.Context, tx *firestore.Transaction, tenantID string, name string) error {
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		collection := r.db.Collection("tenants").Doc(tenantID).Collection(r.template.TableName())
-		query := collection.Where("name", "==", name)
-		docs, err := query.Documents(ctx).GetAll()
-		if err != nil {
-			return err
-		}
-		for _, doc := range docs {
-			err := tx.Delete(doc.Ref)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
 	}
 	var err error
 	if tx == nil {

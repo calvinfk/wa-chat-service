@@ -9,7 +9,7 @@ import (
 type (
 	BroadcastUpsertRequest struct {
 		ID            *string          `query:"id,omitempty"`
-		PhoneNumberID string           `json:"phone_number_id" validate:"required"`
+		PhoneNumberId string           `json:"phone_number_id" validate:"required"`
 		TemplateID    string           `json:"template_id" validate:"required"`
 		Name          string           `json:"name" validate:"required"`
 		SendAt        *time.Time       `json:"send_at" validate:"omitempty,gt"`
@@ -22,7 +22,7 @@ type (
 		ID              string    `json:"id"` // uuid v7
 		Name            string    `json:"name"`
 		TemplateID      string    `json:"template_id"`
-		PhoneNumberID   string    `json:"phone_number_id"`
+		PhoneNumberId   string    `json:"phone_number_id"`
 		RecipientTotal  int       `json:"recipient_total"`
 		ParameterFormat *string   `json:"parameter_format"`
 		Payload         string    `json:"payload"` // raw json string of template
@@ -43,8 +43,7 @@ type (
 	}
 
 	BroadcastGetFilteredRequest struct {
-		TenantID string  `json:"-" query:"tenant_id" validate:"required"`
-		Status   *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
+		Status *string `json:"status" query:"status" validate:"omitempty,filter_options=draft failed failed_partially cancelled success sending scheduled"`
 	}
 
 	BroadcastGetRecipientsFilteredRequest struct {
@@ -54,8 +53,8 @@ type (
 	BroadcastRecipientResponse struct {
 		ID            string    `json:"id"`           // uuid v7
 		BroadcastID   string    `json:"broadcast_id"` // reference to broadcast document
-		WamID         string    `json:"wamid,omitempty"`
-		RecipientID   string    `json:"recipient_id"`
+		WamId         string    `json:"wamid,omitempty"`
+		RecipientId   string    `json:"recipient_id"`
 		RecipientName string    `json:"recipient_name"`
 		RecipientType string    `json:"recipient_type"` // individual, group
 		ReplyData     *string   `json:"reply_data"`
@@ -83,8 +82,8 @@ func (BroadcastResponse) FromModel(data model.Broadcast) BroadcastResponse {
 		ID:              data.DocumentID,
 		Name:            data.Name,
 		TemplateID:      data.TemplateID,
-		RecipientTotal:  len(data.RecipientIDs),
-		PhoneNumberID:   data.PhoneNumberID,
+		RecipientTotal:  len(data.RecipientIds),
+		PhoneNumberId:   data.PhoneNumberId,
 		ParameterFormat: data.ParameterFormat,
 		Payload:         data.Payload,
 		Status:          data.Status,
@@ -115,8 +114,8 @@ func (r BroadcastRecipientResponse) FromModel(data model.BroadcastRecipient) Bro
 	return BroadcastRecipientResponse{
 		ID:            data.DocumentID,
 		BroadcastID:   data.BroadcastID,
-		WamID:         data.WamID,
-		RecipientID:   data.RecipientID,
+		WamId:         data.WamId,
+		RecipientId:   data.RecipientId,
 		RecipientName: data.RecipientName,
 		RecipientType: data.RecipientType,
 		ReplyData:     data.ReplyData,

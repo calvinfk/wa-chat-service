@@ -58,7 +58,8 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	}
 	requestData.Payload = messageData
 
-	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), nil, "", requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	_, serverError, err := h.messageUsecase.SendMessage(ctx.Context(), nil, authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -77,7 +78,8 @@ func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
-	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -96,7 +98,8 @@ func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
-	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)

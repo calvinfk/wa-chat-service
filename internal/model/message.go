@@ -4,8 +4,8 @@ import "time"
 
 type Message struct {
 	DocumentID      string        `json:"id" firestore:"-"`                                        // uuid v7
-	Wamid           string        `json:"wamid" firestore:"wamid"`                                 // id from whatsapp
 	ChatID          string        `json:"chat_id" firestore:"-"`                                   // reference to chat document
+	Wamid           string        `json:"wamid" firestore:"wamid"`                                 // id from whatsapp
 	MessageType     string        `json:"message_type" firestore:"message_type"`                   // text, image, video, etc
 	MessageCategory string        `json:"message_category" firestore:"message_category"`           // marketing, authentication, utility, service
 	SenderName      string        `json:"sender_name" firestore:"sender_name"`                     // sender name for individual chat, group name for group chat

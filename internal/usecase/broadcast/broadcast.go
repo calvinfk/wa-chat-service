@@ -15,6 +15,7 @@ import (
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
@@ -25,44 +26,58 @@ import (
 )
 
 type BroadcastUsecase struct {
-	templateRepository  repository.Template
-	broadcastRepository repository.Broadcast
-	tenantRepository    repository.Tenant
-	messageUsecase      usecase.Message
-	tenantUsecase       usecase.Tenant
-	googleTaskService   service.GoogleTask
-	whatsappService     service.WhatsappBusiness
-	txManager           *utils.TxManager
-	zslog               *zap.SugaredLogger
+	templateRepository       repository.Template
+	broadcastRepository      repository.Broadcast
+	tenantRepository         repository.Tenant
+	messageUsecase           usecase.Message
+	waBusinessAccountUsecase usecase.WaBusinessAccount
+	googleTaskService        service.GoogleTask
+	whatsappService          service.WhatsappBusiness
+	txManager                *utils.TxManager
+	zsLog                    *zap.SugaredLogger
 }
 
-func NewBroadcastUsecase(templateRepository repository.Template, broadcastRepository repository.Broadcast, tenantRepository repository.Tenant, messageUsecase usecase.Message, tenantUsecase usecase.Tenant, googleTaskService service.GoogleTask, whatsappService service.WhatsappBusiness, txManager *utils.TxManager, zslog *zap.SugaredLogger) *BroadcastUsecase {
+func NewBroadcastUsecase(
+	templateRepository repository.Template,
+	broadcastRepository repository.Broadcast,
+	tenantRepository repository.Tenant,
+	messageUsecase usecase.Message,
+	waBusinessAccountUsecase usecase.WaBusinessAccount,
+	googleTaskService service.GoogleTask,
+	whatsappService service.WhatsappBusiness,
+	txManager *utils.TxManager,
+	zsLog *zap.SugaredLogger,
+) *BroadcastUsecase {
 	return &BroadcastUsecase{
-		templateRepository:  templateRepository,
-		broadcastRepository: broadcastRepository,
-		tenantRepository:    tenantRepository,
-		messageUsecase:      messageUsecase,
-		tenantUsecase:       tenantUsecase,
-		googleTaskService:   googleTaskService,
-		whatsappService:     whatsappService,
-		txManager:           txManager,
-		zslog:               zslog,
+		templateRepository:       templateRepository,
+		broadcastRepository:      broadcastRepository,
+		tenantRepository:         tenantRepository,
+		messageUsecase:           messageUsecase,
+		waBusinessAccountUsecase: waBusinessAccountUsecase,
+		googleTaskService:        googleTaskService,
+		whatsappService:          whatsappService,
+		txManager:                txManager,
+		zsLog:                    zsLog,
 	}
 }
 
-func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.BroadcastScheduleRequest) (bool, error) {
+func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, tenantID string, inputData dto.BroadcastScheduleRequest) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-		u.zslog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
+		u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
 		return false, nil
+	}
+	if broadcast.TenantID != tenantID {
+		u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot schedule", inputData.ID, tenantID)
+		return false, errs.ErrGenericForbidden
 	}
 	template, err := u.templateRepository.GetByID(ctx, broadcast.TenantID, broadcast.TemplateID)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
 		return true, err
 	}
 	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, tx *firestore.Transaction) (bool, error) {
@@ -74,7 +89,7 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, inputData dto.
 		}
 		err = u.broadcastRepository.Update(ctx, tx, broadcast)
 		if err != nil {
-			u.zslog.Errorf("[ScheduleBroadcast] failed to update broadcast status: %v", err)
+			u.zsLog.Errorf("[ScheduleBroadcast] failed to update broadcast status: %v", err)
 			return true, err
 		}
 		serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
@@ -90,12 +105,12 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	var broadcastPayload map[string]any
 	err := json.Unmarshal([]byte(broadcast.Payload), &broadcastPayload)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to unmarshal template components: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to unmarshal template components: %v", err)
 		return true, err
 	}
 	templateSend, ok := broadcastPayload["template"].(map[string]any)
 	if !ok {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to parse template payload: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to parse template payload: %v", err)
 		return true, err
 	}
 	var templateSendComponents []map[string]any
@@ -108,7 +123,7 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	}
 	quickReplyPayload, err := u.injectQuickReplyPayload(broadcast.DocumentID, template)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to inject quick reply payload: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to inject quick reply payload: %v", err)
 		return true, err
 	}
 	for _, payload := range quickReplyPayload {
@@ -118,22 +133,22 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 	broadcastPayload["template"] = templateSend
 	payloadBytes, err := json.Marshal(broadcastPayload)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal broadcast payload with quick reply: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to marshal broadcast payload with quick reply: %v", err)
 		return true, err
 	}
 	broadcast.Payload = string(payloadBytes)
 	err = u.broadcastRepository.Update(ctx, tx, broadcast)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to update broadcast with quick reply payload: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to update broadcast with quick reply payload: %v", err)
 		return true, err
 	}
 
-	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, broadcast.TenantID, broadcast.RecipientIDs)
+	phoneNumbers, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, broadcast.TenantID, broadcast.RecipientIds)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get contacts by phone numbers: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get contacts by phone numbers: %v", err)
 		return true, err
 	}
-	for _, recipient := range broadcast.RecipientIDs {
+	for _, recipient := range broadcast.RecipientIds {
 		var recipientName string
 		contact, exists := phoneNumbers[recipient]
 		if exists {
@@ -144,7 +159,7 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 		broadcastRecipient := model.BroadcastRecipient{
 			DocumentID:    uuid.NewString(),
 			BroadcastID:   broadcast.DocumentID,
-			RecipientID:   recipient,
+			RecipientId:   recipient,
 			RecipientName: recipientName,
 			RecipientType: "individual", // TODO: support group recipient type
 			CreatedAt:     time.Now(),
@@ -152,57 +167,64 @@ func (u *BroadcastUsecase) createScheduleBroadcastTask(ctx context.Context, tx *
 		}
 		err = u.broadcastRepository.InsertRecipient(ctx, tx, broadcastRecipient)
 		if err != nil {
-			u.zslog.Errorf("[ScheduleBroadcast] failed to insert broadcast recipient: %v", err)
+			u.zsLog.Errorf("[ScheduleBroadcast] failed to insert broadcast recipient: %v", err)
 			return true, err
 		}
 	}
 
 	err = u.googleTaskService.CreateBroadcastTask(broadcast.DocumentID, broadcast.SendAt)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to create broadcast task: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to create broadcast task: %v", err)
 		return true, err
 	}
 	return false, nil
 }
 
-func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error) {
+func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, tenantID string, inputData dto.BroadcastUpsertRequest) (dto.BroadcastResponse, bool, error) {
 	var err error
 	var broadcast model.Broadcast
 	var emptyResponse dto.BroadcastResponse
 	if inputData.ID != nil {
 		broadcast, err = u.broadcastRepository.GetByID(ctx, *inputData.ID)
 		if err != nil {
-			u.zslog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
+			u.zsLog.Errorf("[ScheduleBroadcast] failed to get broadcast by ID: %v", err)
 			return emptyResponse, true, err
 		}
 		if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-			u.zslog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
+			u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
 			return emptyResponse, false, fmt.Errorf("broadcast currently in %s status, only broadcast in draft status can be updated", broadcast.Status)
+		}
+		if broadcast.TenantID != tenantID {
+			u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant %s", *inputData.ID, tenantID)
+			return emptyResponse, false, errs.ErrGenericForbidden
 		}
 	}
 	// remove duplicate recipient IDs
 	recipientIDMap := make(map[string]bool)
-	var uniqueRecipientIDs []string
+	var uniqueRecipientIds []string
 	for _, recipientID := range inputData.Recipients {
 		if _, exists := recipientIDMap[recipientID]; !exists {
 			recipientIDMap[recipientID] = true
-			uniqueRecipientIDs = append(uniqueRecipientIDs, recipientID)
+			uniqueRecipientIds = append(uniqueRecipientIds, recipientID)
 		}
 	}
-	inputData.Recipients = uniqueRecipientIDs
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
+	inputData.Recipients = uniqueRecipientIds
+	whatsappClient, wabaID, err := u.waBusinessAccountUsecase.GetWhatsappClient(ctx, tenantID, inputData.PhoneNumberId)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get whatsapp client: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get whatsapp client: %v", err)
 		return emptyResponse, true, err
 	}
-	template, err := u.templateRepository.GetByID(ctx, tenantID, inputData.TemplateID)
+	template, err := u.templateRepository.GetByID(ctx, wabaID, inputData.TemplateID)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get template: %v", err)
+		if err == errs.ErrGenericNotFound {
+			return emptyResponse, false, errs.ErrGenericNotFound
+		}
 		return emptyResponse, true, err
 	}
 	broadcastID, err := uuid.NewV7()
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to generate broadcast ID: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to generate broadcast ID: %v", err)
 		return emptyResponse, true, err
 	}
 	payload := make(map[string]any)
@@ -213,12 +235,12 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
 		return emptyResponse, true, err
 	}
 	templateComponent, err := whatsapp_business.NewTemplateComponent(payloadBytes)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to create template component: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to create template component: %v", err)
 		return emptyResponse, true, err
 	}
 	err = u.whatsappService.ValidateTemplatePayload(whatsappClient, template, templateComponent)
@@ -227,7 +249,7 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 	}
 	payloadString, err := json.Marshal(templateComponent.GetPayload())
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to marshal template payload: %v", err)
 		return emptyResponse, true, err
 	}
 	var sendingTime time.Time
@@ -242,27 +264,27 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, inputData dto.Br
 				DocumentID:      broadcastID.String(),
 				TenantID:        tenantID,
 				ParameterFormat: template.ParameterFormat,
-				CreatedBy:       inputData.PhoneNumberID,
+				CreatedBy:       inputData.PhoneNumberId,
 				CreatedAt:       time.Now(),
 			}
 		}
 		broadcast.Name = inputData.Name
 		broadcast.TemplateID = inputData.TemplateID
-		broadcast.RecipientIDs = inputData.Recipients
-		broadcast.PhoneNumberID = inputData.PhoneNumberID
+		broadcast.RecipientIds = inputData.Recipients
+		broadcast.PhoneNumberId = inputData.PhoneNumberId
 		broadcast.Payload = string(payloadString)
 		broadcast.Status = inputData.Status
 		broadcast.SendAt = sendingTime
 		broadcast.UpdatedAt = time.Now()
 		err = u.broadcastRepository.Insert(ctx, tx, broadcast)
 		if err != nil {
-			u.zslog.Errorf("[ScheduleBroadcast] failed to insert broadcast: %v", err)
+			u.zsLog.Errorf("[ScheduleBroadcast] failed to insert broadcast: %v", err)
 			return true, err
 		}
 		if broadcast.Status == string(dto.BroadcastScheduleScheduled) {
 			serverError, err := u.createScheduleBroadcastTask(ctx, tx, broadcast, template)
 			if err != nil {
-				u.zslog.Errorf("[ScheduleBroadcast] failed to schedule broadcast: %v", err)
+				u.zsLog.Errorf("[ScheduleBroadcast] failed to schedule broadcast: %v", err)
 				broadcast.Status = string(dto.BroadcastScheduleDraft)
 				return serverError, err
 			}
@@ -279,7 +301,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 	var templateDBComponents []map[string]any
 	err := json.Unmarshal([]byte(template.Components), &templateDBComponents)
 	if err != nil {
-		u.zslog.Errorf("[ScheduleBroadcast] failed to get template components: %v", err)
+		u.zsLog.Errorf("[ScheduleBroadcast] failed to get template components: %v", err)
 		return nil, err
 	}
 	// broadcast_{{broadcast-id}}_{{contact-phone}}_{{text}}
@@ -289,7 +311,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 			for i, buttonComponent := range component["buttons"].([]any) {
 				button, err := whatsapp_business.NewTemplateCreateButton(buttonComponent)
 				if err != nil {
-					u.zslog.Errorf("[injectQuickReplyPayload] failed to create button component: %v", err)
+					u.zsLog.Errorf("[injectQuickReplyPayload] failed to create button component: %v", err)
 					return nil, err
 				}
 				iStr := strconv.Itoa(i)
@@ -315,7 +337,7 @@ func (u *BroadcastUsecase) injectQuickReplyPayload(broadcastID string, template 
 func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, broadcastID)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to get broadcast by ID: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	var finalStatus dto.BroadcastScheduleStatus
@@ -327,17 +349,17 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcast.UpdatedAt = time.Now()
 		err = u.broadcastRepository.Update(ctx, nil, broadcast)
 		if err != nil {
-			u.zslog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
+			u.zsLog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
 		}
 	}()
-	whatsappClient, tenantID, err := u.tenantUsecase.GetWhatsappClientByPhone(ctx, broadcast.PhoneNumberID)
+	whatsappClient, _, err := u.waBusinessAccountUsecase.GetWhatsappClient(ctx, broadcast.TenantID, broadcast.PhoneNumberId)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to get whatsapp client: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to get whatsapp client: %v", err)
 		return true, err
 	}
 	broadcastRecipients, err := u.broadcastRepository.GetRecipientsByBroadcastID(ctx, broadcastID)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to list broadcast recipients: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to list broadcast recipients: %v", err)
 		return true, err
 	}
 	// get tenant's template fields to validate the payload before sending messages
@@ -345,7 +367,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	err = json.Unmarshal([]byte(broadcast.Payload), &payload)
 	if err != nil {
 		finalStatus = dto.BroadcastScheduleFailed
-		u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
 		return true, err
 	}
 	sendComponents := make([]map[string]any, 0)
@@ -356,19 +378,19 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			}
 		}
 	} else {
-		u.zslog.Errorf("[SendBroadcast] failed to parse broadcast payload components: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to parse broadcast payload components: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
 	sendParameter, err := u.whatsappService.ExtractSendComponentParameterValues(*broadcast.ParameterFormat, sendComponents)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to extract parameter values from broadcast payload: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to extract parameter values from broadcast payload: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
-	templateFields, err := u.tenantRepository.GetTemplateFields(ctx, tenantID)
+	templateFields, err := u.tenantRepository.GetTemplateFields(ctx, broadcast.TenantID)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to get template fields: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to get template fields: %v", err)
 		finalStatus = dto.BroadcastScheduleFailed
 		return true, err
 	}
@@ -388,11 +410,11 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	if len(replaceVariable) > 0 {
 		var phoneNumbers []string
 		for _, recipeint := range broadcastRecipients {
-			phoneNumbers = append(phoneNumbers, recipeint.RecipientID)
+			phoneNumbers = append(phoneNumbers, recipeint.RecipientId)
 		}
-		contacts, err = u.tenantRepository.GetContactByPhoneNumbers(ctx, tenantID, phoneNumbers)
+		contacts, err = u.tenantRepository.GetContactByPhoneNumbers(ctx, broadcast.TenantID, phoneNumbers)
 		if err != nil {
-			u.zslog.Errorf("[SendBroadcast] failed to get contacts by phone numbers: %v", err)
+			u.zsLog.Errorf("[SendBroadcast] failed to get contacts by phone numbers: %v", err)
 			finalStatus = dto.BroadcastScheduleFailed
 			return true, err
 		}
@@ -404,18 +426,18 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcastStatus = dto.BroadcastScheduleSending
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		u.zslog.Infof("[SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
+		u.zsLog.Infof("[SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
 		return false, nil
 	}
 	broadcast.Status = string(broadcastStatus)
 	broadcast.UpdatedAt = time.Now()
 	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
-		u.zslog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
+		u.zsLog.Errorf("[SendBroadcast] failed to update broadcast status: %v", err)
 		return true, err
 	}
 	if broadcastStatus == dto.BroadcastScheduleCancelled {
-		u.zslog.Infof("[SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
+		u.zsLog.Infof("[SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
 		return false, nil
 	}
 	type broadcastSend struct {
@@ -435,7 +457,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		for recipient := range recipientStatusUpdates {
 			err := u.broadcastRepository.UpdateRecipientStatus(ctx, nil, recipient)
 			if err != nil {
-				u.zslog.Errorf("[SendBroadcast] failed to update recipient status: %v", err)
+				u.zsLog.Errorf("[SendBroadcast] failed to update recipient status: %v", err)
 			}
 		}
 	})
@@ -446,20 +468,20 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				payloadMap := make(map[string]any)
 				err := json.Unmarshal([]byte(req.Broadcast.Payload), &payloadMap)
 				if err != nil {
-					u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
+					u.zsLog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
 					continue
 				}
 				inputData := dto.MessageSendRequest{
-					PhoneNumberID: req.Broadcast.PhoneNumberID,
-					RecipientID:   req.Recipient.RecipientID,
+					PhoneNumberId: req.Broadcast.PhoneNumberId,
+					RecipientId:   req.Recipient.RecipientId,
 					RecipientName: req.Recipient.RecipientName,
 					SenderName:    "Broadcast: " + req.Broadcast.Name,
 					Type:          "template",
 					Payload:       payloadMap["template"],
 				}
-				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, tenantID, inputData)
+				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, req.Broadcast.TenantID, inputData)
 				if err != nil {
-					u.zslog.Errorf("[SendBroadcast] failed to send message to recipient: %v", err)
+					u.zsLog.Errorf("[SendBroadcast] failed to send message to recipient: %v", err)
 					errStr := err.Error()
 					req.Recipient.Status = string(dto.BroadcastScheduleFailed)
 					req.Recipient.Errors = &errStr
@@ -482,19 +504,19 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 			broadcastPayload := make(map[string]any)
 			err := json.Unmarshal([]byte(broadcastCopy.Payload), &broadcastPayload)
 			if err != nil {
-				u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload for recipient: %v", err)
+				u.zsLog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload for recipient: %v", err)
 				errStr = err.Error()
 				break
 			}
 			if templatePayload, ok := broadcastPayload["template"].(map[string]any); ok {
 				componentsBytes, err := json.Marshal(templatePayload["components"])
 				if err != nil {
-					u.zslog.Errorf("[SendBroadcast] failed to marshal broadcast components for recipient: %v", err)
+					u.zsLog.Errorf("[SendBroadcast] failed to marshal broadcast components for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
 				componentsStr := string(componentsBytes)
-				replaceWith, exists := contacts[recipient.RecipientID][value]
+				replaceWith, exists := contacts[recipient.RecipientId][value]
 				if !exists || replaceWith == "" {
 					replaceWith = "-"
 				}
@@ -502,7 +524,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				var components []map[string]any
 				err = json.Unmarshal([]byte(componentsStr), &components)
 				if err != nil {
-					u.zslog.Errorf("[SendBroadcast] failed to unmarshal broadcast components after replacement for recipient: %v", err)
+					u.zsLog.Errorf("[SendBroadcast] failed to unmarshal broadcast components after replacement for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
@@ -510,13 +532,13 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 				broadcastPayload["template"] = templatePayload
 				payloadBytes, err := json.Marshal(broadcastPayload)
 				if err != nil {
-					u.zslog.Errorf("[SendBroadcast] failed to marshal broadcast payload after replacement for recipient: %v", err)
+					u.zsLog.Errorf("[SendBroadcast] failed to marshal broadcast payload after replacement for recipient: %v", err)
 					errStr = err.Error()
 					break
 				}
 				broadcastCopy.Payload = string(payloadBytes)
 			} else {
-				u.zslog.Errorf("[SendBroadcast] failed to parse broadcast payload for recipient: %v", err)
+				u.zsLog.Errorf("[SendBroadcast] failed to parse broadcast payload for recipient: %v", err)
 				errStr = "failed to parse broadcast payload for recipient"
 				break
 			}
@@ -550,46 +572,59 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 	return false, nil
 }
 
-func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, inputData dto.BroadcastCancelRequest) (bool, error) {
+func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, tenantID string, inputData dto.BroadcastCancelRequest) (bool, error) {
 	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
-		u.zslog.Errorf("[CancelBroadcast] failed to get broadcast by ID: %v", err)
+		u.zsLog.Errorf("[CancelBroadcast] failed to get broadcast by ID: %v", err)
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		u.zslog.Infof("[CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
+		u.zsLog.Infof("[CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
 		return false, fmt.Errorf("broadcast currently in %s status, only broadcast in scheduled status can be cancelled", broadcast.Status)
+	}
+	if broadcast.TenantID != tenantID {
+		u.zsLog.Infof("[CancelBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot cancel", inputData.ID, tenantID)
+		return false, errs.ErrGenericForbidden
 	}
 	err = u.googleTaskService.DeleteBroadcastTask(inputData.ID)
 	if err != nil {
-		u.zslog.Errorf("[CancelBroadcast] failed to delete broadcast task: %v", err)
+		u.zsLog.Errorf("[CancelBroadcast] failed to delete broadcast task: %v", err)
 		return true, err
 	}
 	broadcast.Status = string(dto.BroadcastScheduleCancelled)
 	broadcast.UpdatedAt = time.Now()
 	err = u.broadcastRepository.Update(ctx, nil, broadcast)
 	if err != nil {
-		u.zslog.Errorf("[CancelBroadcast] failed to update broadcast status: %v", err)
+		u.zsLog.Errorf("[CancelBroadcast] failed to update broadcast status: %v", err)
 		return true, err
 	}
 	return false, nil
 }
 
-func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error) {
+func (u *BroadcastUsecase) GetFilteredBroadcast(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], bool, error) {
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
-	broadcasts, err := u.broadcastRepository.GetFiltered(ctx, inputData)
+	broadcasts, err := u.broadcastRepository.GetFilteredByTenantID(ctx, tenantID, inputData)
 	if err != nil {
-		u.zslog.Errorf("[GetFilteredBroadcast] failed to get filtered broadcasts: %v", err)
+		u.zsLog.Errorf("[GetFilteredBroadcast] failed to get filtered broadcasts: %v", err)
 		return emptyResponse, true, err
 	}
 	return broadcasts, false, nil
 }
 
-func (u *BroadcastUsecase) GetFilteredBroadcastRecipients(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], bool, error) {
+func (u *BroadcastUsecase) GetFilteredBroadcastRecipients(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], bool, error) {
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastRecipientResponse]
+	broadcast, err := u.broadcastRepository.GetByID(ctx, inputData.SpecificFilter.BroadcastID)
+	if err != nil {
+		u.zsLog.Errorf("[GetFilteredBroadcastRecipients] failed to get broadcast by ID: %v", err)
+		return emptyResponse, true, err
+	}
+	if broadcast.TenantID != tenantID {
+		u.zsLog.Infof("[GetFilteredBroadcastRecipients] broadcast with ID %s does not belong to tenant with ID %s, cannot retrieve recipients", inputData.SpecificFilter.BroadcastID, tenantID)
+		return emptyResponse, true, errs.ErrGenericForbidden
+	}
 	recipients, err := u.broadcastRepository.GetRecipientsFiltered(ctx, inputData)
 	if err != nil {
-		u.zslog.Errorf("[GetFilteredBroadcastRecipients] failed to get filtered broadcast recipients: %v", err)
+		u.zsLog.Errorf("[GetFilteredBroadcastRecipients] failed to get filtered broadcast recipients: %v", err)
 		return emptyResponse, true, err
 	}
 	return recipients, false, nil

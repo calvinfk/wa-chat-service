@@ -13,11 +13,12 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// TODO: phone number is optional, make an interface that expands the api only if phone number is provided.
 type Client struct {
-	AppID           string
+	AppId           string
 	BaseURL         string
-	WabaID          string
-	PhoneNumberID   string
+	WabaId          string
+	PhoneNumberId   string
 	Version         string
 	UserAccessToken string
 
@@ -25,19 +26,19 @@ type Client struct {
 	validator  *validator.Validate
 }
 
-func New(userAccessToken string, wabaID string, phoneNumberID string) *Client {
+func New(userAccessToken string, wabaId string, phoneNumberId string) *Client {
 	validator := utils.NewValidator()
-	appID := os.Getenv("META_APP_ID")
-	if appID == "" {
+	appId := os.Getenv("META_APP_ID")
+	if appId == "" {
 		log.Printf("[WARNING][pkg/meta/whatsapp_business/client.go][New] META_APP_ID is not set in environment variables")
 	}
 	return &Client{
-		AppID:           appID,
+		AppId:           appId,
 		BaseURL:         "https://graph.facebook.com",
 		Version:         os.Getenv("META_GRAPH_API_VERSION"),
 		UserAccessToken: userAccessToken,
-		WabaID:          wabaID,
-		PhoneNumberID:   phoneNumberID,
+		WabaId:          wabaId,
+		PhoneNumberId:   phoneNumberId,
 		httpClient:      &http.Client{},
 		validator:       validator,
 	}

@@ -9,72 +9,44 @@ import (
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/filter_request"
-	"wa_chat_service/pkg/meta/whatsapp_business"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 type TenantUsecase struct {
-	tenantRepository repository.Tenant
-	encryptService   service.Encrypt
-	zslog            *zap.SugaredLogger
+	tenantRepository                  repository.Tenant
+	whatsappBusinessAccountRepository repository.WaBusinessAccount
+	encryptService                    service.Encrypt
+	zsLog                             *zap.SugaredLogger
 }
 
-func NewTenantUsecase(tenantRepository repository.Tenant, encryptService service.Encrypt, zslog *zap.SugaredLogger) *TenantUsecase {
+func NewTenantUsecase(tenantRepository repository.Tenant, encryptService service.Encrypt, zsLog *zap.SugaredLogger) *TenantUsecase {
 	return &TenantUsecase{
 		tenantRepository: tenantRepository,
 		encryptService:   encryptService,
-		zslog:            zslog,
+		zsLog:            zsLog,
 	}
 }
 
-func (u *TenantUsecase) GetWhatsappClientByPhone(ctx context.Context, phoneNumberID string) (*whatsapp_business.Client, string, error) {
-	tenant, err := u.tenantRepository.GetByPhoneNumberID(ctx, phoneNumberID)
-	if err != nil {
-		u.zslog.Errorf("[GetWhatsappClientByPhone] Failed to get tenant by phone number: %v", err)
-		return nil, "", err
-	}
-	return u.getWhatsappClient(tenant)
-}
-
-func (u *TenantUsecase) GetWhatsappClientByTenant(ctx context.Context, tenantID string) (*whatsapp_business.Client, string, error) {
+func (u *TenantUsecase) CreateContact(ctx context.Context, tenantID string, inputData dto.ContactCreateRequest) (bool, error) {
 	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zslog.Errorf("[GetWhatsappClientByTenant] Failed to get tenant by ID: %v", err)
-		return nil, "", err
-	}
-	return u.getWhatsappClient(tenant)
-}
-
-func (u *TenantUsecase) getWhatsappClient(tenant model.Tenant) (*whatsapp_business.Client, string, error) {
-	decyptedAccessToken, err := u.encryptService.Decrypt(tenant.AccessToken)
-	if err != nil {
-		u.zslog.Errorf("[getWhatsappClient] Failed to decrypt access token: %v", err)
-		return nil, "", err
-	}
-	whatsappClient := whatsapp_business.New(decyptedAccessToken, tenant.WabaID, tenant.PhoneNumberID)
-	return whatsappClient, tenant.DocumentID, nil
-}
-
-func (u *TenantUsecase) CreateContact(ctx context.Context, inputData dto.ContactCreateRequest) (bool, error) {
-	tenant, err := u.tenantRepository.GetByID(ctx, inputData.TenantID)
-	if err != nil {
-		u.zslog.Errorf("[CreateContact] Failed to get tenant by ID: %v", err)
+		u.zsLog.Errorf("[CreateContact] Failed to get tenant by ID: %v", err)
 		return true, err
 	}
 	contacts, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenant.DocumentID, []string{inputData.PhoneNumber})
 	if err != nil {
-		u.zslog.Errorf("[CreateContact] Failed to get contacts by phone number: %v", err)
+		u.zsLog.Errorf("[CreateContact] Failed to get contacts by phone number: %v", err)
 		return true, err
 	}
 	if contacts != nil {
-		u.zslog.Errorf("[CreateContact] Contact with the same phone number already exists")
+		u.zsLog.Errorf("[CreateContact] Contact with the same phone number already exists")
 		return false, fmt.Errorf("contact with the same phone number already exists")
 	}
 	contactID, err := uuid.NewV7()
 	if err != nil {
-		u.zslog.Errorf("[CreateContact] Failed to generate contact ID: %v", err)
+		u.zsLog.Errorf("[CreateContact] Failed to generate contact ID: %v", err)
 		return true, err
 	}
 	contact := model.Contact{
@@ -87,44 +59,44 @@ func (u *TenantUsecase) CreateContact(ctx context.Context, inputData dto.Contact
 	}
 	err = u.tenantRepository.InsertContact(ctx, contact)
 	if err != nil {
-		u.zslog.Errorf("[CreateContact] Failed to create contact: %v", err)
+		u.zsLog.Errorf("[CreateContact] Failed to create contact: %v", err)
 		return true, err
 	}
 	return false, nil
 }
 
-func (u *TenantUsecase) GetContactsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], bool, error) {
-	tenant, err := u.tenantRepository.GetByID(ctx, inputData.SpecificFilter.TenantID)
+func (u *TenantUsecase) GetContactsFiltered(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], bool, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zslog.Errorf("[GetContactsFiltered] Failed to get tenant by ID: %v", err)
+		u.zsLog.Errorf("[GetContactsFiltered] Failed to get tenant by ID: %v", err)
 		return filter_request.FilterResponse[dto.ContactResponse]{}, true, err
 	}
 	contacts, err := u.tenantRepository.GetContactsFiltered(ctx, tenant.DocumentID, inputData)
 	if err != nil {
-		u.zslog.Errorf("[GetContactsFiltered] Failed to get filtered contacts: %v", err)
+		u.zsLog.Errorf("[GetContactsFiltered] Failed to get filtered contacts: %v", err)
 		return filter_request.FilterResponse[dto.ContactResponse]{}, true, err
 	}
 	return contacts, false, nil
 }
 
-func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.ContactUpdateRequest) (bool, error) {
-	tenant, err := u.tenantRepository.GetByID(ctx, inputData.TenantID)
+func (u *TenantUsecase) UpdateContact(ctx context.Context, tenantID string, inputData dto.ContactUpdateRequest) (bool, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zslog.Errorf("[UpdateContact] Failed to get tenant by ID: %v", err)
+		u.zsLog.Errorf("[UpdateContact] Failed to get tenant by ID: %v", err)
 		return true, err
 	}
 	contacts, err := u.tenantRepository.GetContactByPhoneNumbers(ctx, tenant.DocumentID, []string{inputData.PhoneNumber})
 	if err != nil {
-		u.zslog.Errorf("[UpdateContact] Failed to get contacts by phone number: %v", err)
+		u.zsLog.Errorf("[UpdateContact] Failed to get contacts by phone number: %v", err)
 		return true, err
 	}
 	if len(contacts) > 0 && contacts[inputData.PhoneNumber]["__name__"] != inputData.ID {
-		u.zslog.Errorf("[UpdateContact] Contact with the same phone number already exists")
+		u.zsLog.Errorf("[UpdateContact] Contact with the same phone number already exists")
 		return false, fmt.Errorf("contact with the same phone number already exists")
 	}
 	contact, err := u.tenantRepository.GetContactByID(ctx, tenant.DocumentID, inputData.ID)
 	if err != nil {
-		u.zslog.Errorf("[UpdateContact] Failed to get contact by ID: %v", err)
+		u.zsLog.Errorf("[UpdateContact] Failed to get contact by ID: %v", err)
 		return true, err
 	}
 	contact.Name = inputData.Name
@@ -132,21 +104,21 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, inputData dto.Contact
 	contact.UpdatedAt = time.Now()
 	err = u.tenantRepository.UpdateContact(ctx, contact)
 	if err != nil {
-		u.zslog.Errorf("[UpdateContact] Failed to update contact: %v", err)
+		u.zsLog.Errorf("[UpdateContact] Failed to update contact: %v", err)
 		return true, err
 	}
 	return false, nil
 }
 
-func (u *TenantUsecase) DeleteContact(ctx context.Context, inputData dto.ContactDeleteRequest) (bool, error) {
-	tenant, err := u.tenantRepository.GetByID(ctx, inputData.TenantID)
+func (u *TenantUsecase) DeleteContact(ctx context.Context, tenantID string, inputData dto.ContactDeleteRequest) (bool, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zslog.Errorf("[DeleteContact] Failed to get tenant by ID: %v", err)
+		u.zsLog.Errorf("[DeleteContact] Failed to get tenant by ID: %v", err)
 		return true, err
 	}
 	err = u.tenantRepository.DeleteContact(ctx, tenant.DocumentID, inputData.ID)
 	if err != nil {
-		u.zslog.Errorf("[DeleteContact] Failed to delete contact: %v", err)
+		u.zsLog.Errorf("[DeleteContact] Failed to delete contact: %v", err)
 		return true, err
 	}
 	return false, nil

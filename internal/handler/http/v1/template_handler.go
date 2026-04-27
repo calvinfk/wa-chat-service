@@ -37,7 +37,8 @@ func (h *TemplateHandler) createTemplate(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.templateUsecase.CreateTemplate(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.templateUsecase.CreateTemplate(ctx, authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -47,7 +48,7 @@ func (h *TemplateHandler) createTemplate(ctx fiber.Ctx) error {
 }
 
 func (h *TemplateHandler) getTemplates(ctx fiber.Ctx) error {
-	var inputData filter_request.FilterRequest[dto.TemplateGetByTenantID]
+	var inputData filter_request.FilterRequest[dto.TemplateFilterRequest]
 	if err := ctx.Bind().Query(&inputData.SpecificFilter); err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -56,7 +57,8 @@ func (h *TemplateHandler) getTemplates(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.templateUsecase.GetFilteredByTenantID(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.templateUsecase.GetFiltered(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -71,7 +73,8 @@ func (h *TemplateHandler) syncTemplate(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.templateUsecase.SyncTemplate(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.templateUsecase.SyncTemplate(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -86,7 +89,8 @@ func (h *TemplateHandler) deleteTemplate(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.templateUsecase.DeleteTemplate(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.templateUsecase.DeleteTemplate(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -101,7 +105,8 @@ func (h *TemplateHandler) updateTemplate(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.templateUsecase.UpdateTemplate(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.templateUsecase.UpdateTemplate(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)

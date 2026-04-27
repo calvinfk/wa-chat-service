@@ -42,16 +42,14 @@ type (
 		Delete(ctx context.Context, tx *firestore.Transaction, documentID string) error
 		// Update updates an existing media entry.
 		Update(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) error
-		// GetFiltered gets media entries by filter criteria with pagination metadata.
-		GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error)
+		// GetFilteredByTenantID gets media entries by filter criteria with pagination metadata.
+		GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error)
 	}
 
 	// Tenant defines persistence operations for tenant and contact data.
 	Tenant interface {
 		// GetByID gets a tenant by tenant ID.
 		GetByID(ctx context.Context, tenantID string) (model.Tenant, error)
-		// GetByPhoneNumberID gets a tenant by phone number ID.
-		GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (model.Tenant, error)
 		// InsertContact inserts a new contact for a tenant.
 		InsertContact(ctx context.Context, contact model.Contact) error
 		// GetContactsFiltered gets contacts by filter criteria.
@@ -70,18 +68,14 @@ type (
 
 	// Template defines persistence operations for template data.
 	Template interface {
-		// GetFilteredByTenantID gets templates by tenant ID and filter criteria.
-		GetFilteredByTenantID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.TemplateGetByTenantID]) (filter_request.FilterResponse[dto.TemplateResponse], error)
-		// GetAll gets all templates for a tenant.
-		GetAll(ctx context.Context, tenantID string) ([]model.Template, error)
+		// GetAll gets all templates for a phone number ID.
+		GetAll(ctx context.Context, whatsappBusinessAccountID string) ([]model.Template, error)
 		// GetByID gets a template by document ID.
-		GetByID(ctx context.Context, tenantID string, documentID string) (model.Template, error)
+		GetByID(ctx context.Context, whatsappBusinessAccountID string, documentID string) (model.Template, error)
 		// Upsert inserts or updates a template entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Template) (model.Template, error)
 		// DeleteByID deletes a template by document ID.
-		DeleteByID(ctx context.Context, tx *firestore.Transaction, tenantID string, documentID string) error
-		// DeleteByName deletes templates by name.
-		DeleteByName(ctx context.Context, tx *firestore.Transaction, tenantID string, name string) error
+		DeleteByID(ctx context.Context, tx *firestore.Transaction, whatsappBusinessAccountID string, documentID string) error
 	}
 
 	// Broadcast defines persistence operations for broadcast data and recipients.
@@ -101,7 +95,7 @@ type (
 		// UpdateRecipientStatus updates recipient status.
 		UpdateRecipientStatus(ctx context.Context, tx *firestore.Transaction, data model.BroadcastRecipient) error
 		// GetFiltered gets broadcast entries by filter criteria.
-		GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error)
+		GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error)
 		// GetRecipientsFiltered gets broadcast recipients by filter criteria.
 		GetRecipientsFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetRecipientsFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastRecipientResponse], error)
 	}
@@ -113,7 +107,7 @@ type (
 		// DeleteDocuments deletes template documents from the search index.
 		DeleteDocuments(ctx context.Context, documentIDs []string) error
 		// GetFiltered gets indexed templates by filter criteria with pagination metadata.
-		GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.TemplateGetByTenantID]) ([]model.Template, int64, filter_request.Paginate, error)
+		GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.TemplateFilterRequest]) ([]model.Template, int64, filter_request.Paginate, error)
 	}
 	// SearchMessage defines indexing and query operations for message search.
 	SearchMessage interface {
@@ -121,5 +115,19 @@ type (
 		AddDocuments(ctx context.Context, document []model.Message) error
 		// GetFiltered gets indexed messages by filter criteria with pagination metadata.
 		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
+	}
+
+	User interface {
+		// GetByEmail gets a user by email.
+		GetByEmail(ctx context.Context, email string) (model.User, error)
+	}
+
+	WaBusinessAccount interface {
+		// GetByID gets a WhatsApp Business Account by ID
+		GetByID(ctx context.Context, id string) (model.WaBusinessAccount, error)
+	}
+	WaPhone interface {
+		// GetByPhoneNumberId gets a WhatsApp Business Account phone data by phone number ID from meta.
+		GetByPhoneNumberId(ctx context.Context, phoneNumberId string) (model.WaPhone, error)
 	}
 )

@@ -27,6 +27,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error initializing logger: %v", err)
 	}
-	zslog := zlog.Sugar()
-	app.Run(config, zslog)
+	zsLog := zlog.Sugar()
+	app.Run(config, zsLog)
 }

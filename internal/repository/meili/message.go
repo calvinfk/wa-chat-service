@@ -2,13 +2,14 @@ package repository_meili
 
 import (
 	"context"
-	"log"
+	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"github.com/meilisearch/meilisearch-go"
+	"go.uber.org/zap"
 )
 
 type MeiliMessageRepository struct {
@@ -16,21 +17,56 @@ type MeiliMessageRepository struct {
 	db      meilisearch.ServiceManager
 }
 
-func NewMeiliMessageRepository(db meilisearch.ServiceManager) *MeiliMessageRepository {
+func NewMeiliMessageRepository(db meilisearch.ServiceManager, zsLog *zap.SugaredLogger) *MeiliMessageRepository {
 	var message model.Message
+	index := db.Index(message.TableName())
+	_, err := index.FetchInfo()
+	if err != nil {
+		if meiliErr, ok := err.(*meilisearch.Error); ok && meiliErr.MeilisearchApiError.Code == "index_not_found" {
+			zsLog.Infof("[NewMeiliMessageRepository] Index %s not found, creating...", message.TableName())
+			taskInfo, err := db.CreateIndex(&meilisearch.IndexConfig{
+				Uid:        message.TableName(),
+				PrimaryKey: message.PKName(),
+			})
+			if err != nil {
+				zsLog.Fatalf("[NewMeiliMessageRepository] failed to create index: %v", err)
+			}
+			// Wait for the index creation task to complete
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			for {
+				task, err := db.GetTask(taskInfo.TaskUID)
+				if err != nil {
+					zsLog.Fatalf("[NewMeiliMessageRepository] failed to get task status: %v", err)
+				}
+				if task.Status == "succeeded" {
+					break
+				}
+				if task.Status == "failed" {
+					zsLog.Fatalf("[NewMeiliMessageRepository] index creation task failed: %v", task.Error)
+				}
+				select {
+				case <-ctx.Done():
+					zsLog.Fatalf("[NewMeiliMessageRepository] timed out waiting for index creation task to complete")
+				case <-time.After(500 * time.Millisecond):
+				}
+			}
+		}
+		zsLog.Fatalf("[NewMeiliMessageRepository] failed to fetch index info: %v", err)
+	}
 
 	// Update filterable attributes only when different
 	// Assume the fillterable uses a string slice
 	desiredFilterable := message.AllowedFilterFields()
 	currentFilterable, err := db.Index(message.TableName()).GetFilterableAttributes()
 	if err != nil {
-		log.Fatalf("failed to get filterable attributes: %v", err)
+		zsLog.Fatalf("[NewMeiliMessageRepository] failed to get filterable attributes: %v", err)
 	}
 	currentFilterableSlice := []string{}
 	if currentFilterable != nil {
 		currentFilterableSlice, err = utils.AnySliceToStringSlice(*currentFilterable)
 		if err != nil {
-			log.Fatalf("failed to convert filterable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliMessageRepository] failed to convert filterable attributes: %v", err)
 		}
 	}
 	if currentFilterable == nil || !utils.SameStringSet(currentFilterableSlice, desiredFilterable) {
@@ -39,7 +75,7 @@ func NewMeiliMessageRepository(db meilisearch.ServiceManager) *MeiliMessageRepos
 			filterableAttributes = append(filterableAttributes, field)
 		}
 		if _, err := db.Index(message.TableName()).UpdateFilterableAttributes(&filterableAttributes); err != nil {
-			log.Fatalf("failed to update filterable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliMessageRepository] failed to update filterable attributes: %v", err)
 		}
 	}
 
@@ -47,19 +83,19 @@ func NewMeiliMessageRepository(db meilisearch.ServiceManager) *MeiliMessageRepos
 	desiredSortable := message.AllowedSortFields()
 	currentSortable, err := db.Index(message.TableName()).GetSortableAttributes()
 	if err != nil {
-		log.Fatalf("failed to get sortable attributes: %v", err)
+		zsLog.Fatalf("[NewMeiliMessageRepository] failed to get sortable attributes: %v", err)
 	}
 	currentSortableSlice := []string{}
 	if currentSortable != nil {
 		currentSortableSlice, err = utils.AnySliceToStringSlice(*currentSortable)
 		if err != nil {
-			log.Fatalf("failed to convert sortable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliMessageRepository] failed to convert sortable attributes: %v", err)
 		}
 	}
 	if currentSortable == nil || !utils.SameStringSet(currentSortableSlice, desiredSortable) {
 		sortableAttributes := desiredSortable
 		if _, err := db.Index(message.TableName()).UpdateSortableAttributes(&sortableAttributes); err != nil {
-			log.Fatalf("failed to update sortable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliMessageRepository] failed to update sortable attributes: %v", err)
 		}
 	}
 

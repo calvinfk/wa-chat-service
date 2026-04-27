@@ -9,10 +9,11 @@ import (
 )
 
 type HandlerGRPCV1 struct {
-	App          *grpc.Server
-	StorageMedia usecase.StorageMedia
-	Message      usecase.Message
-	ZSLog        *zap.SugaredLogger
+	App               *grpc.Server
+	StorageMedia      usecase.StorageMedia
+	Message           usecase.Message
+	WaBusinessAccount usecase.WaBusinessAccount
+	ZSLog             *zap.SugaredLogger
 }
 
 func NewRouterGRPCV1(handler HandlerGRPCV1) {
@@ -22,16 +23,18 @@ func NewRouterGRPCV1(handler HandlerGRPCV1) {
 
 func (h *HandlerGRPCV1) newStorageMediaRoutes() {
 	r := &StorageMediaGRPC{
-		storageMediaUsecase: h.StorageMedia,
-		zslog:               h.ZSLog,
+		storageMediaUsecase:      h.StorageMedia,
+		waBusinessAccountUsecase: h.WaBusinessAccount,
+		zsLog:                    h.ZSLog,
 	}
 	v1.RegisterStorageMediaServer(h.App, r)
 }
 
 func (h *HandlerGRPCV1) newMessageRoutes() {
 	r := &MessageGRPC{
-		messageUsecase: h.Message,
-		zslog:          h.ZSLog,
+		messageUsecase:           h.Message,
+		waBusinessAccountUsecase: h.WaBusinessAccount,
+		zsLog:                    h.ZSLog,
 	}
 	v1.RegisterMessageServer(h.App, r)
 }

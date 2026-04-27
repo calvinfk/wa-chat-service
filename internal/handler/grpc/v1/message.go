@@ -14,12 +14,14 @@ import (
 
 type MessageGRPC struct {
 	v1.UnimplementedMessageServer
-	messageUsecase usecase.Message
-	zslog          *zap.SugaredLogger
+	messageUsecase           usecase.Message
+	waBusinessAccountUsecase usecase.WaBusinessAccount
+	zsLog                    *zap.SugaredLogger
 }
 
 func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageRequest) (*emptypb.Empty, error) {
 	message := req.GetMessage()
+	phoneNumberId := req.GetPhoneNumberId()
 	inputData := dto.MessageSaveRequest{
 		ID:              &message.Id,
 		Wamid:           message.Wamid,
@@ -50,7 +52,11 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 	if err := validator.Struct(inputData); err != nil {
 		return nil, api_response.NewGRPCErrorResponse(false, err)
 	}
-	serverError, err := h.messageUsecase.SaveMessage(ctx, inputData)
+	whatsappBusinessAccount, serverError, err := h.waBusinessAccountUsecase.GetByPhoneNumberId(ctx, phoneNumberId)
+	if err != nil {
+		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}

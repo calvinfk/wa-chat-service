@@ -10,12 +10,12 @@ import (
 )
 
 type WhatsappBusiness struct {
-	zslog *zap.SugaredLogger
+	zsLog *zap.SugaredLogger
 }
 
-func NewWhatsappService(zslog *zap.SugaredLogger) *WhatsappBusiness {
+func NewWhatsappService(zsLog *zap.SugaredLogger) *WhatsappBusiness {
 	return &WhatsappBusiness{
-		zslog: zslog,
+		zsLog: zsLog,
 	}
 }
 
@@ -32,16 +32,16 @@ func (s *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cli
 
 	dbParsedParameter, err := parseDBTemplateComponents(validationInput.dbComponents)
 	if err != nil {
-		s.zslog.Errorf("[ValidateTemplatePayload] Failed to parse template components from database: %v", err)
+		s.zsLog.Errorf("[ValidateTemplatePayload] Failed to parse template components from database: %v", err)
 		return fmt.Errorf("failed to parse template components from database: %v", err)
 	}
 
 	if err := validateSendComponents(client, *validationInput.parameterFormat, validationInput.sendComponents); err != nil {
 		if waErr, ok := err.(whatsapp_business.WhatsAppBusinessError); ok {
-			s.zslog.Errorf("[ValidateTemplatePayload] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
+			s.zsLog.Errorf("[ValidateTemplatePayload] WhatsApp Business API error: %s (code: %d, subcode: %d)", waErr.ErrorData.Message, waErr.ErrorData.Code, waErr.ErrorData.ErrorSubcode)
 			return waErr
 		}
-		s.zslog.Errorf("[ValidateTemplatePayload] Failed to validate send components: %v", err)
+		s.zsLog.Errorf("[ValidateTemplatePayload] Failed to validate send components: %v", err)
 		return err
 	}
 
@@ -51,7 +51,7 @@ func (s *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cli
 	}
 
 	if err := validateParameterMatch(dbParsedParameter, sendParsedParameter); err != nil {
-		s.zslog.Errorf("[ValidateTemplatePayload] Template parameter validation failed: %v", err)
+		s.zsLog.Errorf("[ValidateTemplatePayload] Template parameter validation failed: %v", err)
 		return err
 	}
 	return nil
@@ -65,23 +65,23 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 		"BUTTON": {},
 	}
 	if parameterFormat == "" {
-		s.zslog.Errorf("[ExtractSendComponentParameterValues] parameter format is required when components are present")
+		s.zsLog.Errorf("[ExtractSendComponentParameterValues] parameter format is required when components are present")
 		return parameterValues, fmt.Errorf("parameter format is required when components are present")
 	}
 
 	for _, component := range sendComponents {
 		componentType, err := normalizeComponentType(component)
 		if err != nil {
-			s.zslog.Errorf("[ExtractSendComponentParameterValues] Failed to normalize component type: %v", err)
+			s.zsLog.Errorf("[ExtractSendComponentParameterValues] Failed to normalize component type: %v", err)
 			return parameterValues, err
 		}
 		if _, exists := parameterValues[componentType]; !exists {
-			s.zslog.Errorf("[ExtractSendComponentParameterValues] Unsupported component type: %s", componentType)
+			s.zsLog.Errorf("[ExtractSendComponentParameterValues] Unsupported component type: %s", componentType)
 			return parameterValues, fmt.Errorf("unsupported component type: %s", componentType)
 		}
 		componentParametersAny, err := extractArrayField(component, "parameters")
 		if err != nil {
-			s.zslog.Errorf("[ExtractSendComponentParameterValues] parameters field is required but missing or not an array in the payload for component type %s", componentType)
+			s.zsLog.Errorf("[ExtractSendComponentParameterValues] parameters field is required but missing or not an array in the payload for component type %s", componentType)
 			return parameterValues, fmt.Errorf("parameters field is required but missing or not an array in the payload for component type %s", componentType)
 		}
 
@@ -89,7 +89,7 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 		for _, p := range componentParametersAny {
 			param, ok := p.(map[string]any)
 			if !ok {
-				s.zslog.Errorf("[ExtractSendComponentParameterValues] invalid parameter format in the payload for component type %s, expected array of objects", componentType)
+				s.zsLog.Errorf("[ExtractSendComponentParameterValues] invalid parameter format in the payload for component type %s, expected array of objects", componentType)
 				return parameterValues, fmt.Errorf("invalid parameter format in the payload for component type %s, expected array of objects", componentType)
 			}
 			componentParameters = append(componentParameters, param)
@@ -100,20 +100,20 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 			for i, p := range componentParameters {
 				componentParameterType, err := extractStringField(p, "type")
 				if err != nil {
-					s.zslog.Errorf("[ExtractSendComponentParameterValues] type field is required for parameters in %s but missing or not a string", componentType)
+					s.zsLog.Errorf("[ExtractSendComponentParameterValues] type field is required for parameters in %s but missing or not a string", componentType)
 					return parameterValues, fmt.Errorf("type field is required for parameters in %s but missing or not a string", componentType)
 				}
 
 				if componentParameterType == "text" {
 					componentText, err := extractStringField(p, "text")
 					if err != nil {
-						s.zslog.Errorf("[ExtractSendComponentParameterValues] text field is required for parameters in %s but missing or not a string", componentType)
+						s.zsLog.Errorf("[ExtractSendComponentParameterValues] text field is required for parameters in %s but missing or not a string", componentType)
 						return parameterValues, fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
 					}
 					if parameterFormat == "NAMED" {
 						parameterName, err := extractStringField(p, "parameter_name")
 						if err != nil {
-							s.zslog.Errorf("[ExtractSendComponentParameterValues] parameter_name is required for text component in %s with NAMED parameter format but missing or not a string", componentType)
+							s.zsLog.Errorf("[ExtractSendComponentParameterValues] parameter_name is required for text component in %s with NAMED parameter format but missing or not a string", componentType)
 							return parameterValues, fmt.Errorf("parameter_name is required for text component in %s with NAMED parameter format but missing or not a string", componentType)
 						}
 						parameterValues[componentType][parameterName] = componentText
@@ -125,13 +125,13 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 
 				componentParameterPayload, err := extractMapField(p, componentParameterType)
 				if err != nil {
-					s.zslog.Errorf("[ExtractSendComponentParameterValues] %s field is required for parameters in %s but missing or invalid", componentParameterType, componentType)
+					s.zsLog.Errorf("[ExtractSendComponentParameterValues] %s field is required for parameters in %s but missing or invalid", componentParameterType, componentType)
 					return parameterValues, fmt.Errorf("%s field is required for parameters in %s but missing or invalid", componentParameterType, componentType)
 				}
 				if whatsapp_business.IsMediaMessageType(componentParameterType) {
 					mediaID, ok := componentParameterPayload["id"].(string)
 					if !ok {
-						s.zslog.Errorf("[ExtractSendComponentParameterValues] media id is required for media component in %s but missing or not a string", componentType)
+						s.zsLog.Errorf("[ExtractSendComponentParameterValues] media id is required for media component in %s but missing or not a string", componentType)
 						return parameterValues, fmt.Errorf("media id is required for media component in %s but missing or not a string", componentType)
 					}
 					parameterValues[componentType]["mediatype_db_"+componentParameterType] = mediaID
@@ -141,13 +141,13 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 			for i, p := range componentParameters {
 				componentText, err := extractStringField(p, "text")
 				if err != nil {
-					s.zslog.Errorf("[ExtractSendComponentParameterValues] text field is required for parameters in %s but missing or not a string", componentType)
+					s.zsLog.Errorf("[ExtractSendComponentParameterValues] text field is required for parameters in %s but missing or not a string", componentType)
 					return parameterValues, fmt.Errorf("text field is required for parameters in %s but missing or not a string", componentType)
 				}
 				if parameterFormat == "NAMED" {
 					parameterName, err := extractStringField(p, "parameter_name")
 					if err != nil {
-						s.zslog.Errorf("[ExtractSendComponentParameterValues] parameter_name is required for parameters in %s with NAMED parameter format but missing or not a string", componentType)
+						s.zsLog.Errorf("[ExtractSendComponentParameterValues] parameter_name is required for parameters in %s with NAMED parameter format but missing or not a string", componentType)
 						return parameterValues, fmt.Errorf("parameter_name is required for parameters in %s with NAMED parameter format but missing or not a string", componentType)
 					}
 					parameterValues[componentType][parameterName] = componentText
@@ -158,13 +158,13 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 		case "BUTTON":
 			buttonComponent, err := whatsapp_business.NewTemplateSendButton(component)
 			if err != nil {
-				s.zslog.Errorf("[ExtractSendComponentParameterValues] Failed to parse button component: %v", err)
+				s.zsLog.Errorf("[ExtractSendComponentParameterValues] Failed to parse button component: %v", err)
 				return parameterValues, err
 			}
 			if buttonComponent.GetSubType() == "QUICK_REPLY" {
 				quickReplyButton, ok := buttonComponent.(*template_components.SendQuickReplyButton)
 				if !ok {
-					s.zslog.Errorf("[ExtractSendComponentParameterValues] Failed to assert button component as QuickReplyButton for component: %v", component)
+					s.zsLog.Errorf("[ExtractSendComponentParameterValues] Failed to assert button component as QuickReplyButton for component: %v", component)
 					return parameterValues, fmt.Errorf("failed to assert button component as QuickReplyButton")
 				}
 				parameterValues[componentType][quickReplyButton.Index] = quickReplyButton.Parameters[0].Payload

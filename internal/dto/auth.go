@@ -2,7 +2,11 @@ package dto
 
 type (
 	AuthLoginRequest struct {
-		PhoneNumberID string `json:"phone_number_id" validate:"required"`
-		TenantID      string `json:"tenant_id" validate:"required"`
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=8"`
+	}
+	AuthData struct {
+		UserID   string `json:"user_id"`
+		TenantID string `json:"tenant_id"`
 	}
 )

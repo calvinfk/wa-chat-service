@@ -97,7 +97,7 @@ func NewTemplateCreateButton(button any) (TemplateCreateButton, error) {
 }
 
 func (wb *Client) GetTemplateList(query ...string) ([]any, Paging, int, error) {
-	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaId, endpointTemplate)
 	var queries []string
 	if len(query) > 0 {
 		for _, q := range query {
@@ -145,7 +145,7 @@ func (wb *Client) GetTemplateList(query ...string) ([]any, Paging, int, error) {
 }
 
 func (wb *Client) GetTemplateByID(templateID string, query ...string) (TemplateResponse, int, error) {
-	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, templateID)
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaId, templateID)
 	if len(query) > 0 {
 		var queries []string
 		for _, q := range query {
@@ -175,7 +175,7 @@ func (wb *Client) CreateTemplate(payload TemplateCreateRequest) (TemplateCreateR
 	if err := wb.validator.Struct(payload); err != nil {
 		return TemplateCreateResponse{}, 0, err
 	}
-	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaId, endpointTemplate)
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payload)
 	if err != nil {
 		return TemplateCreateResponse{}, httpCode, err
@@ -198,7 +198,7 @@ func (wb *Client) DeleteTemplate(templateID string, templateName string) (Templa
 		return TemplateDeleteResponse{}, 0, err
 	}
 	var queries []string
-	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaID, endpointTemplate)
+	endpoint := fmt.Sprintf("%s/%s/%s", wb.GetBaseURLVersion(), wb.WabaId, endpointTemplate)
 	if templateID != "" {
 		queries = append(queries, "id="+templateID)
 	}

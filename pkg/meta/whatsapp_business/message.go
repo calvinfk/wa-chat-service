@@ -122,7 +122,7 @@ func (wb *Client) SendMessage(to, recipientType string, payload MessageComponent
 		"type":              payload.GetType(),
 	}
 	maps.Copy(payloadData, payload.GetPayload())
-	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), wb.PhoneNumberID)
+	endpoint := fmt.Sprintf("%s/%s/messages", wb.GetBaseURLVersion(), wb.PhoneNumberId)
 	body, httpCode, err := wb.accessAPI(http.MethodPost, endpoint, payloadData)
 	if err != nil {
 		return MessageResponse{}, httpCode, err

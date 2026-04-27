@@ -13,30 +13,30 @@ import (
 
 type EncryptService struct {
 	config *config.Encrypt
-	zslog  *zap.SugaredLogger
+	zsLog  *zap.SugaredLogger
 }
 
-func NewEncryptService(config *config.Encrypt, zslog *zap.SugaredLogger) *EncryptService {
+func NewEncryptService(config *config.Encrypt, zsLog *zap.SugaredLogger) *EncryptService {
 	return &EncryptService{
 		config: config,
-		zslog:  zslog,
+		zsLog:  zsLog,
 	}
 }
 func (s *EncryptService) Encrypt(plaintext string) (string, error) {
 	block, err := aes.NewCipher(s.config.Key)
 	if err != nil {
-		s.zslog.Errorf("[Encrypt] error creating AES cipher: %v", err)
+		s.zsLog.Errorf("[Encrypt] error creating AES cipher: %v", err)
 		return "", err
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		s.zslog.Errorf("[Encrypt] error creating GCM: %v", err)
+		s.zsLog.Errorf("[Encrypt] error creating GCM: %v", err)
 		return "", err
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
-		s.zslog.Errorf("[Encrypt] error generating nonce: %v", err)
+		s.zsLog.Errorf("[Encrypt] error generating nonce: %v", err)
 		return "", err
 	}
 
@@ -48,31 +48,31 @@ func (s *EncryptService) Encrypt(plaintext string) (string, error) {
 func (s *EncryptService) Decrypt(cipherText string) (string, error) {
 	cipherTextDecoded, err := base64.RawURLEncoding.DecodeString(cipherText)
 	if err != nil {
-		s.zslog.Errorf("[Decrypt] error decoding cipher text: %v", err)
+		s.zsLog.Errorf("[Decrypt] error decoding cipher text: %v", err)
 		return "", err
 	}
 
 	block, err := aes.NewCipher(s.config.Key)
 	if err != nil {
-		s.zslog.Errorf("[Decrypt] error creating AES cipher: %v", err)
+		s.zsLog.Errorf("[Decrypt] error creating AES cipher: %v", err)
 		return "", err
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		s.zslog.Errorf("[Decrypt] error creating GCM: %v", err)
+		s.zsLog.Errorf("[Decrypt] error creating GCM: %v", err)
 		return "", err
 	}
 
 	nonceSize := gcm.NonceSize()
 	if len(cipherTextDecoded) < nonceSize {
-		s.zslog.Errorf("[Decrypt] invalid encrypted payload: too short")
+		s.zsLog.Errorf("[Decrypt] invalid encrypted payload: too short")
 		return "", fmt.Errorf("invalid encrypted payload")
 	}
 
 	nonce, encryptedData := cipherTextDecoded[:nonceSize], cipherTextDecoded[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, encryptedData, nil)
 	if err != nil {
-		s.zslog.Errorf("[Decrypt] error decrypting data: %v", err)
+		s.zsLog.Errorf("[Decrypt] error decrypting data: %v", err)
 		return "", err
 	}
 

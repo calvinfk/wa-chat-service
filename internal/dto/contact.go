@@ -7,7 +7,6 @@ import (
 
 type (
 	ContactCreateRequest struct {
-		TenantID    string `json:"tenant_id" validate:"required"`
 		PhoneNumber string `json:"phone_number" validate:"required"` // in international format without + sign, e.g. 6281234567890
 		Name        string `json:"name" validate:"required"`
 	}
@@ -17,18 +16,15 @@ type (
 		Name        string `json:"name"`
 	}
 	ContactGetFilteredRequest struct {
-		TenantID string `json:"-" query:"tenant_id" validate:"required"`
 	}
 	ContactUpdateRequest struct {
 		ID          string `query:"id" validate:"required"`
-		TenantID    string `query:"tenant_id" validate:"required"`
 		Name        string `json:"name" validate:"required"`
 		PhoneNumber string `json:"phone_number" validate:"required"`
 	}
 
 	ContactDeleteRequest struct {
-		ID       string `query:"id" validate:"required"`
-		TenantID string `query:"tenant_id" validate:"required"`
+		ID string `query:"id" validate:"required"`
 	}
 )
 

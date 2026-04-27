@@ -155,14 +155,14 @@ func (r *StorageMediaRepository) Update(ctx context.Context, tx *firestore.Trans
 	return r.db.RunTransaction(ctx, execDB)
 }
 
-func (r *StorageMediaRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error) {
+func (r *StorageMediaRepository) GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error) {
 	var data []model.StorageMedia
 	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.storageMedia.AllowedFilterFields(), r.storageMedia.AllowedSortFields())
 	if err != nil {
 		return data, paginate, 0, err
 	}
 	collection := r.db.Collection(r.storageMedia.TableName())
-	query := collection.Query
+	query := collection.Where("tenant_id", "==", tenantID)
 	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return data, paginate, 0, err

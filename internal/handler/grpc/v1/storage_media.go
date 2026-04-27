@@ -12,16 +12,21 @@ import (
 
 type StorageMediaGRPC struct {
 	v1.UnimplementedStorageMediaServer
-	storageMediaUsecase usecase.StorageMedia
-	zslog               *zap.SugaredLogger
+	storageMediaUsecase      usecase.StorageMedia
+	waBusinessAccountUsecase usecase.WaBusinessAccount
+	zsLog                    *zap.SugaredLogger
 }
 
 func (h *StorageMediaGRPC) SaveMediaID(ctx context.Context, in *v1.SaveMediaIDRequest) (*v1.SaveMediaIDResponse, error) {
 	inputData := dto.StorageMediaSaveMediaIDRequest{
-		MediaID:       in.MediaId,
-		PhoneNumberID: in.PhoneNumberId,
+		MediaId:       in.MediaId,
+		PhoneNumberId: in.PhoneNumberId,
 	}
-	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx, inputData)
+	whatsappBusinessAccount, serverError, err := h.waBusinessAccountUsecase.GetByPhoneNumberId(ctx, in.PhoneNumberId)
+	if err != nil {
+		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}

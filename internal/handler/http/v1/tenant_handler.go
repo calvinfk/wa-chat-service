@@ -39,7 +39,8 @@ func (h *TenantHandler) createContact(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.tenantUsecase.CreateContact(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.tenantUsecase.CreateContact(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -58,7 +59,8 @@ func (h *TenantHandler) getFiltered(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	data, serverError, err := h.tenantUsecase.GetContactsFiltered(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := h.tenantUsecase.GetContactsFiltered(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -74,7 +76,8 @@ func (h *TenantHandler) updateContact(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.tenantUsecase.UpdateContact(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.tenantUsecase.UpdateContact(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
@@ -89,7 +92,8 @@ func (h *TenantHandler) deleteContact(ctx fiber.Ctx) error {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(httpCode).JSON(apiResponse)
 	}
-	serverError, err := h.tenantUsecase.DeleteContact(ctx, inputData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.tenantUsecase.DeleteContact(ctx.Context(), authData.TenantID, inputData)
 	if err != nil {
 		httpCode, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(httpCode).JSON(apiResponse)

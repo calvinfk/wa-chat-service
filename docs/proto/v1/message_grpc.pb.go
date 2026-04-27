@@ -29,7 +29,7 @@ const (
 //
 // Message defines the gRPC service for managing messages.
 type MessageClient interface {
-	// SaveMessage saves a message and returns the result.
+	// SaveMessage saves a message
 	SaveMessage(ctx context.Context, in *SaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -57,7 +57,7 @@ func (c *messageClient) SaveMessage(ctx context.Context, in *SaveMessageRequest,
 //
 // Message defines the gRPC service for managing messages.
 type MessageServer interface {
-	// SaveMessage saves a message and returns the result.
+	// SaveMessage saves a message
 	SaveMessage(context.Context, *SaveMessageRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMessageServer()
 }

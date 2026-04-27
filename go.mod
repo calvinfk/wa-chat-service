@@ -13,6 +13,7 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/meilisearch/meilisearch-go v0.36.2
 	go.uber.org/zap v1.27.1
+	golang.org/x/crypto v0.49.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.271.0
 	google.golang.org/grpc v1.79.2
@@ -85,7 +86,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect

@@ -3,8 +3,8 @@ package model
 import "time"
 
 type Template struct {
-	DocumentID                  string    `json:"id" firestore:"-"` // uuid v7
-	TenantID                    string    `json:"tenant_id" firestore:"-"`
+	DocumentID                  string    `json:"id" firestore:"-"`                          // uuid v7
+	WaBusinessAccountID         string    `json:"wa_business_account_id" firestore:"-"`      // reference to whatsapp business account id
 	WaTemplateID                string    `json:"wa_template_id" firestore:"wa_template_id"` // id from whatsapp
 	Name                        string    `json:"name" firestore:"name"`
 	Category                    string    `json:"category" firestore:"category"` // marketing, utility, authentication
@@ -27,7 +27,7 @@ func (Template) PKName() string {
 }
 
 func (Template) AllowedFilterFields() []string {
-	return []string{"tenant_id", "name", "category", "status"}
+	return []string{"whatsapp_business_account_id", "name", "category", "status"}
 }
 func (Template) AllowedSortFields() []string {
 	return []string{"created_at"}

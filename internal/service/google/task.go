@@ -15,17 +15,17 @@ type GoogleTaskService struct {
 	cfg            *config.GCP
 	jwtService     service.JWT
 	encryptService service.Encrypt
-	zslog          *zap.SugaredLogger
+	zsLog          *zap.SugaredLogger
 	baseURL        string
 }
 
-func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zslog *zap.SugaredLogger, baseURL string) *GoogleTaskService {
+func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zsLog *zap.SugaredLogger, baseURL string) *GoogleTaskService {
 	return &GoogleTaskService{
 		client:         client,
 		cfg:            cfg,
 		jwtService:     jwtService,
 		encryptService: encryptService,
-		zslog:          zslog,
+		zsLog:          zsLog,
 		baseURL:        baseURL,
 	}
 }
@@ -54,7 +54,7 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 	}
 	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.BroadcastTaskParent, req).Do()
 	if err != nil {
-		s.zslog.Errorf("[CreateBroadcastTask] error creating broadcast task: %v", err)
+		s.zsLog.Errorf("[CreateBroadcastTask] error creating broadcast task: %v", err)
 		return err
 	}
 	return nil
@@ -63,7 +63,7 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 func (s *GoogleTaskService) DeleteBroadcastTask(broadcastID string) error {
 	_, err := s.client.Projects.Locations.Queues.Tasks.Delete(s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID).Do()
 	if err != nil {
-		s.zslog.Errorf("[DeleteBroadcastTask] error deleting broadcast task: %v", err)
+		s.zsLog.Errorf("[DeleteBroadcastTask] error deleting broadcast task: %v", err)
 		return err
 	}
 	return nil

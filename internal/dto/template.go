@@ -8,19 +8,19 @@ import (
 
 type (
 	TemplateCreateRequest struct {
-		PhoneNumberID   string           `json:"phone_number_id" validate:"required"`
-		Name            string           `json:"name" validate:"required"`
-		Language        string           `json:"language" validate:"required"`
-		Category        string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
-		ParameterFormat *string          `json:"parameter_format,omitempty"`
-		Components      []map[string]any `json:"components" validate:"required"`
+		WaBusinessAccountID string           `json:"wa_business_account_id" validate:"required,numeric"`
+		Name                string           `json:"name" validate:"required"`
+		Language            string           `json:"language" validate:"required"`
+		Category            string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
+		ParameterFormat     *string          `json:"parameter_format,omitempty"`
+		Components          []map[string]any `json:"components" validate:"required"`
 	}
-	TemplateGetByTenantID struct {
-		TenantID string  `json:"-" query:"tenant_id" validate:"required"`
-		Search   string  `json:"-" query:"search"`
-		Name     *string `json:"name,omitempty" query:"name" validate:"omitempty,min=1"`
-		Status   *string `json:"status,omitempty" query:"status" validate:"omitempty,filter_options=APPROVED REJECTED PENDING"`
-		Category *string `json:"category,omitempty" query:"category" validate:"omitempty,filter_options=MARKETING UTILITY AUTHENTICATION"`
+	TemplateFilterRequest struct {
+		WaBusinessAccountID string  `json:"wa_business_account_id" query:"wa_business_account_id" validate:"required"`
+		Search              string  `json:"-" query:"search"`
+		Name                *string `json:"name,omitempty" query:"name" validate:"omitempty,min=1"`
+		Status              *string `json:"status,omitempty" query:"status" validate:"omitempty,filter_options=APPROVED REJECTED PENDING"`
+		Category            *string `json:"category,omitempty" query:"category" validate:"omitempty,filter_options=MARKETING UTILITY AUTHENTICATION"`
 	}
 	TemplateResponse struct {
 		ID                          string    `json:"id"`
@@ -36,26 +36,26 @@ type (
 		UpdatedAt                   time.Time `json:"updated_at"`
 	}
 	TemplateSyncRequest struct {
-		PhoneNumberID string `json:"phone_number_id" validate:"required"`
+		WaBusinessAccountID string `json:"wa_business_account_id" validate:"required,numeric"`
 	}
 
 	TemplateDeleteRequest struct {
-		PhoneNumberID string `query:"phone_number_id" validate:"required"`
-		ID            string `query:"id" validate:"required"`
+		WaBusinessAccountID string `query:"wa_business_account_id" validate:"required"`
+		ID                  string `query:"id" validate:"required"`
 	}
 
 	TemplateUpdateRequest struct {
-		PhoneNumberID   string           `json:"phone_number_id" validate:"required"`
-		ID              string           `json:"id" query:"id" validate:"required"`
-		Name            string           `json:"name" validate:"required"`
-		Language        string           `json:"language" validate:"required"`
-		Category        string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
-		ParameterFormat *string          `json:"parameter_format,omitempty"`
-		Components      []map[string]any `json:"components" validate:"required"`
+		WaBusinessAccountID string           `json:"wa_business_account_id" validate:"required"`
+		ID                  string           `json:"id" query:"id" validate:"required"`
+		Name                string           `json:"name" validate:"required"`
+		Language            string           `json:"language" validate:"required"`
+		Category            string           `json:"category" validate:"required,oneof=MARKETING UTILITY AUTHENTICATION"`
+		ParameterFormat     *string          `json:"parameter_format,omitempty"`
+		Components          []map[string]any `json:"components" validate:"required"`
 	}
 )
 
-func (r TemplateGetByTenantID) Validate() map[string]string {
+func (r TemplateFilterRequest) Validate() map[string]string {
 	validator := utils.NewValidator()
 	err := validator.Struct(r)
 	return utils.GetValidatorErrorMessages(err)

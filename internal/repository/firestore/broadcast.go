@@ -117,9 +117,9 @@ func (r *BroadcastRepository) UpdateRecipientStatus(ctx context.Context, tx *fir
 	}
 }
 
-func (r *BroadcastRepository) GetFiltered(ctx context.Context, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error) {
+func (r *BroadcastRepository) GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.BroadcastGetFilteredRequest]) (filter_request.FilterResponse[dto.BroadcastResponse], error) {
 	var emptyResponse filter_request.FilterResponse[dto.BroadcastResponse]
-	query := r.db.Collection(r.broadcast.TableName()).Query.Where("tenant_id", "==", inputData.SpecificFilter.TenantID)
+	query := r.db.Collection(r.broadcast.TableName()).Query.Where("tenant_id", "==", tenantID)
 	filters, sort, paginate, err := filter_request.InitializeFilter(inputData, r.broadcast.AllowedFilterFields(), r.broadcast.AllowedSortFields())
 	if err != nil {
 		return emptyResponse, err

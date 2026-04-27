@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/errs"
 
@@ -21,22 +23,32 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 		}
 		decryptedToken, err := encryptService.Decrypt(tokenString)
 		if err != nil {
-			zsLog.Errorf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error decrypting token: %v", err)
+			zsLog.Errorf("[AccessToken] error decrypting token: %v", err)
 			ctx.Locals("token_error_message", "Invalid token")
 			return ctx.Next()
 		}
 		sub, err := accessTokenService.ParseAccessTokenSub(string(decryptedToken))
 		if err != nil {
 			if err == errs.ErrAuthExpiredAccessToken {
-				ctx.Locals("token_sub", sub)
+				splits := strings.Split(sub, ":")
+				authData := dto.AuthData{
+					TenantID: splits[0],
+					UserID:   splits[1],
+				}
+				ctx.Locals("token_sub", authData)
 				ctx.Locals("token_error_message", "Token expired")
 			} else {
-				zsLog.Errorf("[ERROR][internal/handler/http/middleware/jwt.go][AccessToken] error parsing token: %v", err)
+				zsLog.Errorf("[AccessToken] error parsing token: %v", err)
 				ctx.Locals("token_error_message", "Invalid token")
 			}
 			return ctx.Next()
 		}
-		ctx.Locals("token_sub", sub)
+		splits := strings.Split(sub, ":")
+		authData := dto.AuthData{
+			TenantID: splits[0],
+			UserID:   splits[1],
+		}
+		ctx.Locals("token_sub", authData)
 		return ctx.Next()
 	}
 }

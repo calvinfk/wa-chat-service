@@ -18,34 +18,34 @@ import (
 type GoogleStorageService struct {
 	client *storage.Client
 	config *config.GCP
-	zslog  *zap.SugaredLogger
+	zsLog  *zap.SugaredLogger
 }
 
-func NewGoogleStorageService(client *storage.Client, config *config.GCP, zslog *zap.SugaredLogger) *GoogleStorageService {
+func NewGoogleStorageService(client *storage.Client, config *config.GCP, zsLog *zap.SugaredLogger) *GoogleStorageService {
 	return &GoogleStorageService{
 		client: client,
 		config: config,
-		zslog:  zslog,
+		zsLog:  zsLog,
 	}
 }
 
 func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, fileURL string) (*storage.ObjectAttrs, error) {
 	if len(fileData) == 0 {
-		s.zslog.Error("[UploadFile] file data is empty")
+		s.zsLog.Error("[UploadFile] file data is empty")
 		return nil, errs.ErrGenericEmptyFile
 	}
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
-		s.zslog.Errorf("[UploadFile] failed to parse Google Storage URL: %v", err)
+		s.zsLog.Errorf("[UploadFile] failed to parse Google Storage URL: %v", err)
 		return nil, err
 	}
 	bucket := s.client.Bucket(bucketName).UserProject(s.config.ProjectID)
 	if _, err := bucket.Attrs(ctx); err != nil {
 		if err == storage.ErrBucketNotExist {
-			s.zslog.Errorf("[UploadFile] bucket %q does not exist", bucketName)
+			s.zsLog.Errorf("[UploadFile] bucket %q does not exist", bucketName)
 			return nil, errs.ErrGenericNotFound
 		}
-		s.zslog.Errorf("[UploadFile] failed to get bucket: %v", err)
+		s.zsLog.Errorf("[UploadFile] failed to get bucket: %v", err)
 		return nil, err
 	}
 	obj := bucket.Object(filePath).If(storage.Conditions{DoesNotExist: true})
@@ -53,12 +53,12 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 	// writer.ContentType = contentType
 
 	if _, err := writer.Write(fileData); err != nil {
-		s.zslog.Errorf("[UploadFile] failed to write file: %v", err)
+		s.zsLog.Errorf("[UploadFile] failed to write file: %v", err)
 		return nil, err
 	}
 
 	if err := writer.Close(); err != nil {
-		s.zslog.Errorf("[UploadFile] failed to close file writer: %v", err)
+		s.zsLog.Errorf("[UploadFile] failed to close file writer: %v", err)
 		return nil, err
 	}
 	return writer.Attrs(), nil
@@ -68,25 +68,25 @@ func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string, rang
 	var response dto.StorageMediaGetMediaResponse
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
-		s.zslog.Errorf("[GetFileAttrs] failed to parse Google Storage URL: %v", err)
+		s.zsLog.Errorf("[GetFileAttrs] failed to parse Google Storage URL: %v", err)
 		return response, false, err
 	}
 	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		s.zslog.Errorf("[GetFileAttrs] failed to get file attributes: %v", err)
+		s.zsLog.Errorf("[GetFileAttrs] failed to get file attributes: %v", err)
 		return response, true, err
 	}
 	startRange, endRange, hasRange, err := utils.ParseRangeHeader(rangeHeader, attrs.Size)
 	if err != nil {
-		s.zslog.Warnf("[GetMedia] Invalid range header: %q (size=%d)", rangeHeader, attrs.Size)
+		s.zsLog.Warnf("[GetMedia] Invalid range header: %q (size=%d)", rangeHeader, attrs.Size)
 		return response, false, err
 	}
 	if hasRange {
 		length := endRange - startRange + 1
 		rcRange, err := obj.NewRangeReader(ctx, startRange, length)
 		if err != nil {
-			s.zslog.Errorf("[GetMedia] Failed to get ranged file from Google Cloud Storage: %v", err)
+			s.zsLog.Errorf("[GetMedia] Failed to get ranged file from Google Cloud Storage: %v", err)
 			return response, true, err
 		}
 		response.Reader = rcRange
@@ -96,7 +96,7 @@ func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string, rang
 	} else {
 		rcFull, err := obj.NewReader(ctx)
 		if err != nil {
-			s.zslog.Errorf("[GetMedia] Failed to get full file from Google Cloud Storage: %v", err)
+			s.zsLog.Errorf("[GetMedia] Failed to get full file from Google Cloud Storage: %v", err)
 			return response, true, err
 		}
 		response.Reader = rcFull
@@ -111,7 +111,7 @@ func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string, rang
 func (s *GoogleStorageService) DeleteFile(ctx context.Context, fileURL string) error {
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
-		s.zslog.Errorf("[DeleteFile] failed to parse Google Storage URL: %v", err)
+		s.zsLog.Errorf("[DeleteFile] failed to parse Google Storage URL: %v", err)
 		return err
 	}
 	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
@@ -138,7 +138,7 @@ func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(fileURL string, expi
 	// 2. Generate the URL
 	url, err := s.client.Bucket(bucketName).SignedURL(filePath, opts)
 	if err != nil {
-		s.zslog.Errorf("[GenerateV4GetObjectSignedURL] error generating signed URL for file %q in bucket %q: %v", filePath, bucketName, err)
+		s.zsLog.Errorf("[GenerateV4GetObjectSignedURL] error generating signed URL for file %q in bucket %q: %v", filePath, bucketName, err)
 		return "", err
 	}
 
@@ -151,13 +151,13 @@ func (s *GoogleStorageService) GetDefaultFileURL(filePath string) string {
 func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, string, error) {
 	parts := strings.Split(strings.TrimPrefix(fileURL, "gs://"), "/")
 	if len(parts) < 2 {
-		s.zslog.Errorf("[ParseGoogleStorageURL] invalid file URL: %s", fileURL)
+		s.zsLog.Errorf("[ParseGoogleStorageURL] invalid file URL: %s", fileURL)
 		return "", "", fmt.Errorf("invalid file URL: %s", fileURL)
 	}
 	bucketName := parts[0]
 	filePath := strings.Join(parts[1:], "/")
 	if bucketName == "" || filePath == "" {
-		s.zslog.Errorf("[ParseGoogleStorageURL] invalid file URL: %s", fileURL)
+		s.zsLog.Errorf("[ParseGoogleStorageURL] invalid file URL: %s", fileURL)
 		return "", "", fmt.Errorf("invalid file URL: %s", fileURL)
 	}
 	return bucketName, filePath, nil
@@ -169,12 +169,12 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 // 	}
 // 	parts := strings.Split(strings.TrimPrefix(url, "https://storage.googleapis.com/"), "/")
 // 	if len(parts) < 2 {
-// 		s.zslog.Errorf("[isSignedURL] invalid signed URL: %s", url)
+// 		s.zsLog.Errorf("[isSignedURL] invalid signed URL: %s", url)
 // 		return false, fmt.Errorf("invalid signed URL: %s", url)
 // 	}
 // 	req, err := http.NewRequest(http.MethodGet, url, nil)
 // 	if err != nil {
-// 		s.zslog.Errorf("[isSignedURL] error creating HTTP request: %v", err)
+// 		s.zsLog.Errorf("[isSignedURL] error creating HTTP request: %v", err)
 // 		return false, err
 // 	}
 // 	queries := req.URL.Query()
@@ -196,14 +196,14 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 
 // func (s *GoogleStorageService) IsValidSignedURL(ctx context.Context, url string) (bool, error) {
 // 	if isSigned, err := s.isSignedURL(url); err != nil {
-// 		s.zslog.Errorf("[IsValidSignedURL] error validating signed URL: %v", err)
+// 		s.zsLog.Errorf("[IsValidSignedURL] error validating signed URL: %v", err)
 // 		return false, err
 // 	} else if !isSigned {
 // 		return false, nil
 // 	}
 // 	req, err := http.NewRequest(http.MethodGet, url, nil)
 // 	if err != nil {
-// 		s.zslog.Errorf("[IsValidSignedURL] error creating HTTP request: %v", err)
+// 		s.zsLog.Errorf("[IsValidSignedURL] error creating HTTP request: %v", err)
 // 		return false, err
 // 	}
 // 	queries := req.URL.Query()
@@ -214,7 +214,7 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 // 	// check if credential contains service account email
 // 	clientEmail, err := s.client.ServiceAccount(ctx, s.config.ProjectID)
 // 	if err != nil {
-// 		s.zslog.Errorf("[IsValidSignedURL] error fetching service account: %v", err)
+// 		s.zsLog.Errorf("[IsValidSignedURL] error fetching service account: %v", err)
 // 		return false, err
 // 	}
 // 	if !strings.Contains(googCredential, clientEmail) {
@@ -228,7 +228,7 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 // 	}
 // 	expires, err := time.ParseDuration(expiresStr + "s")
 // 	if err != nil {
-// 		s.zslog.Errorf("[IsValidSignedURL] error parsing expires duration: %v", err)
+// 		s.zsLog.Errorf("[IsValidSignedURL] error parsing expires duration: %v", err)
 // 		return false, err
 // 	}
 // 	if expires <= 0 {
@@ -236,7 +236,7 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 // 	}
 // 	date, err := time.Parse("20060102T150405Z", dateStr)
 // 	if err != nil {
-// 		s.zslog.Errorf("[IsValidSignedURL] error parsing date: %v", err)
+// 		s.zsLog.Errorf("[IsValidSignedURL] error parsing date: %v", err)
 // 		return false, err
 // 	}
 // 	if time.Now().After(date.Add(expires)) {
@@ -247,22 +247,22 @@ func (s *GoogleStorageService) ParseGoogleStorageURL(fileURL string) (string, st
 
 // func (s *GoogleStorageService) ParseSignedURLToFileURL(ctx context.Context, signedURL string) (string, error) {
 // 	if isValid, err := s.IsValidSignedURL(ctx, signedURL); err != nil {
-// 		s.zslog.Errorf("[ParseSignedURLToFileURL] error validating signed URL: %v", err)
+// 		s.zsLog.Errorf("[ParseSignedURLToFileURL] error validating signed URL: %v", err)
 // 		return "", err
 // 	} else if !isValid {
-// 		s.zslog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: %s", signedURL)
+// 		s.zsLog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: %s", signedURL)
 // 		return "", fmt.Errorf("invalid signed URL")
 // 	}
 // 	parts := strings.Split(strings.TrimPrefix(signedURL, "https://storage.googleapis.com/"), "/")
 // 	if len(parts) < 2 {
-// 		s.zslog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: %s", signedURL)
+// 		s.zsLog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: %s", signedURL)
 // 		return "", fmt.Errorf("invalid signed URL")
 // 	}
 // 	bucketName := parts[0]
 // 	filePath := strings.Join(parts[1:], "/")
 // 	filePath = strings.Split(filePath, "?")[0] // remove query parameters
 // 	if bucketName == "" || filePath == "" {
-// 		s.zslog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: missing bucket name or file path in URL: %s", signedURL)
+// 		s.zsLog.Errorf("[ParseSignedURLToFileURL] invalid signed URL: missing bucket name or file path in URL: %s", signedURL)
 // 		return "", fmt.Errorf("invalid signed URL: missing bucket name or file path")
 // 	}
 // 	return fmt.Sprintf("gs://%s/%s", bucketName, filePath), nil

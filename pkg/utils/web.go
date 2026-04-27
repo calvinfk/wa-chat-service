@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"context"
+	"errors"
+	"io"
 	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 	"wa_chat_service/pkg/errs"
 )
 
@@ -108,4 +112,47 @@ func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, 
 		}
 	}
 	return start, end, true, nil
+}
+
+type ProgressReader struct {
+	Ctx     context.Context
+	Reader  io.Reader
+	Size    int64
+	read    int64
+	lastLog time.Time
+	Log     func(string, ...any)
+}
+
+func (p *ProgressReader) Read(b []byte) (int, error) {
+	if p.Ctx.Err() != nil {
+		return 0, p.Ctx.Err()
+	}
+	n, err := p.Reader.Read(b)
+	if p.Log != nil && n > 0 {
+		p.read += int64(n)
+		if p.lastLog.IsZero() || time.Since(p.lastLog) >= time.Second {
+			if p.Size > 0 {
+				p.Log("[getMedia] stream progress: %d/%d bytes (%.1f%%)", p.read, p.Size, float64(p.read)*100/float64(p.Size))
+			} else {
+				p.Log("[getMedia] stream progress: %d bytes", p.read)
+			}
+			p.lastLog = time.Now()
+		}
+	}
+	return n, err
+}
+
+func IsClientClosedStreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, io.ErrClosedPipe) {
+		return true
+	}
+	errText := strings.ToLower(err.Error())
+	return strings.Contains(errText, "response body closed") ||
+		strings.Contains(errText, "stream closed") ||
+		strings.Contains(errText, "broken pipe") ||
+		strings.Contains(errText, "connection reset by peer") ||
+		strings.Contains(errText, "connection closed")
 }

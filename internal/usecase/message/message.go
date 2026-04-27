@@ -19,15 +19,15 @@ import (
 )
 
 type MessageUsecase struct {
-	messageRepository       repository.Message
-	chatRepository          repository.Chat
-	storageMediaRepository  repository.StorageMedia
-	searchMessageRepository repository.SearchMessage
-	storageMediaUsecase     usecase.StorageMedia
-	tenantUsecase           usecase.Tenant
-	whatsappService         service.WhatsappBusiness
-	googleStorageService    service.GoogleStorage
-	zslog                   *zap.SugaredLogger
+	messageRepository        repository.Message
+	chatRepository           repository.Chat
+	storageMediaRepository   repository.StorageMedia
+	searchMessageRepository  repository.SearchMessage
+	storageMediaUsecase      usecase.StorageMedia
+	waBusinessAccountUsecase usecase.WaBusinessAccount
+	whatsappService          service.WhatsappBusiness
+	googleStorageService     service.GoogleStorage
+	zsLog                    *zap.SugaredLogger
 }
 
 func NewMessageUsecase(
@@ -36,21 +36,21 @@ func NewMessageUsecase(
 	storageMediaRepository repository.StorageMedia,
 	searchMessageRepository repository.SearchMessage,
 	storageMediaUsecase usecase.StorageMedia,
-	tenantUsecase usecase.Tenant,
+	waBusinessAccountUsecase usecase.WaBusinessAccount,
 	whatsappService service.WhatsappBusiness,
 	googleStorageService service.GoogleStorage,
-	zslog *zap.SugaredLogger,
+	zsLog *zap.SugaredLogger,
 ) *MessageUsecase {
 	return &MessageUsecase{
-		messageRepository:       messageRepository,
-		chatRepository:          chatRepository,
-		storageMediaRepository:  storageMediaRepository,
-		storageMediaUsecase:     storageMediaUsecase,
-		searchMessageRepository: searchMessageRepository,
-		tenantUsecase:           tenantUsecase,
-		whatsappService:         whatsappService,
-		googleStorageService:    googleStorageService,
-		zslog:                   zslog,
+		messageRepository:        messageRepository,
+		chatRepository:           chatRepository,
+		storageMediaRepository:   storageMediaRepository,
+		storageMediaUsecase:      storageMediaUsecase,
+		searchMessageRepository:  searchMessageRepository,
+		waBusinessAccountUsecase: waBusinessAccountUsecase,
+		whatsappService:          whatsappService,
+		googleStorageService:     googleStorageService,
+		zsLog:                    zsLog,
 	}
 }
 
@@ -58,22 +58,23 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	var err error
 	var response model.Message
 	if whatsappClient == nil {
-		whatsappClient, tenantID, err = u.tenantUsecase.GetWhatsappClientByPhone(ctx, inputData.PhoneNumberID)
+		whatsappClient, _, err = u.waBusinessAccountUsecase.GetWhatsappClient(ctx, tenantID, inputData.PhoneNumberId)
 		if err != nil {
-			u.zslog.Errorf("[SendMessage] Failed to get WhatsApp client: %v", err)
+			u.zsLog.Errorf("[SendMessage] Failed to get WhatsApp client: %v", err)
 			return response, true, err
 		}
 	}
 	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to validate message component: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to validate message component: %v", err)
 		return response, false, err
 	}
+	// TODO: save ticketing
 	// create chat header if not exist
 	chat := model.Chat{
-		DocumentID:    fmt.Sprintf("%s-%s", inputData.RecipientID, inputData.PhoneNumberID),
-		PhoneNumberID: inputData.PhoneNumberID,
-		RecipientID:   inputData.RecipientID,
+		DocumentID:    fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId),
+		PhoneNumberId: inputData.PhoneNumberId,
+		RecipientId:   inputData.RecipientId,
 		ChatType:      "individual",
 		LastMessage:   component.GetMessage(),
 		DisplayName:   inputData.RecipientName,
@@ -82,7 +83,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	_, err = u.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to Upsert chat: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to Upsert chat: %v", err)
 		return response, true, err
 	}
 	var sto *model.StorageMedia
@@ -93,12 +94,12 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				// get file URL from signed URL
 				storageMediaID, serverError, err := u.storageMediaUsecase.ParseMediaToken(mediaToken)
 				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to parse media token: %v", err)
+					u.zsLog.Errorf("[SendMessage] Failed to parse media token: %v", err)
 					return response, serverError, err
 				}
 				storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
 				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
+					u.zsLog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
 					return response, true, err
 				}
 				sto = &storageMedia
@@ -106,21 +107,21 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				// check if link is accessible
 				resp, err := http.Head(*media.Link)
 				if err != nil || resp.StatusCode != http.StatusOK {
-					u.zslog.Errorf("[SendMessage] Media link is not accessible: %v", err)
+					u.zsLog.Errorf("[SendMessage] Media link is not accessible: %v", err)
 					return response, false, fmt.Errorf("media link is not accessible")
 				}
 				urlHeaders := resp.Header
 				mimeType := urlHeaders.Get("Content-Type")
 				extension := whatsapp_business.ParseMediaExtension(mimeType)
 				if extension == "" {
-					u.zslog.Errorf("[SendMessage] Unsupported media type: %v", mimeType)
+					u.zsLog.Errorf("[SendMessage] Unsupported media type: %v", mimeType)
 					return response, true, fmt.Errorf("unsupported media type: %s", mimeType)
 				}
 				// TODO: check file size is allowed or not
 				originalFileName := utils.GetFileNameFromURL(urlHeaders, *media.Link)
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to generate storage media ID: %v", err)
+					u.zsLog.Errorf("[SendMessage] Failed to generate storage media ID: %v", err)
 					return response, true, err
 				}
 				if originalFileName == "" {
@@ -137,21 +138,21 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				}
 				_, err = u.storageMediaRepository.Insert(ctx, nil, storageMedia)
 				if err != nil {
-					u.zslog.Errorf("[SendMessage] Failed to create storage media: %v", err)
+					u.zsLog.Errorf("[SendMessage] Failed to create storage media: %v", err)
 					return response, true, err
 				}
 				sto = &storageMedia
 			}
 		}
 	}
-	sendResponse, httpCode, err := whatsappClient.SendMessage(inputData.RecipientID, "individual", component)
+	sendResponse, httpCode, err := whatsappClient.SendMessage(inputData.RecipientId, "individual", component)
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to send message: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to send message: %v", err)
 		return response, httpCode >= http.StatusInternalServerError, err
 	}
 	payloadData, err := utils.AnyToJsonString(component.GetPayload())
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to convert payload to JSON")
+		u.zsLog.Errorf("[SendMessage] Failed to convert payload to JSON")
 	}
 	var storageMediaID *string
 	if sto != nil {
@@ -159,7 +160,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	messageID, err := uuid.NewV7()
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to generate message ID: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to generate message ID: %v", err)
 		return response, true, err
 	}
 	message := model.Message{
@@ -177,22 +178,23 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	}
 	response, err = u.messageRepository.Upsert(ctx, nil, message)
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to upsert message: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to upsert message: %v", err)
 		return response, true, err
 	}
 	err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{response})
 	if err != nil {
-		u.zslog.Errorf("[SendMessage] Failed to add message to search index: %v", err)
+		u.zsLog.Errorf("[SendMessage] Failed to add message to search index: %v", err)
 	}
 
 	return response, false, nil
 }
 
-func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
+func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
+	// TODO: check if chat belongs to tenant
 	var response filter_request.FilterResponse[dto.MessageResponse]
 	messages, totalItems, paginate, err := u.searchMessageRepository.GetFiltered(ctx, requestData)
 	if err != nil {
-		u.zslog.Errorf("[GetMessagesByChatID] Failed to get messages by chat ID: %v", err)
+		u.zsLog.Errorf("[GetMessagesByChatID] Failed to get messages by chat ID: %v", err)
 		return response, true, err
 	}
 	response.Page = paginate.Page
@@ -213,7 +215,7 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 		if len(storageMediaIds) > 0 {
 			storageMediaMap, err = u.storageMediaRepository.GetByDocumentIDs(ctx, storageMediaIds)
 			if err != nil {
-				u.zslog.Errorf("[GetMessagesByChatID] Failed to get storage medias by IDs: %v", err)
+				u.zsLog.Errorf("[GetMessagesByChatID] Failed to get storage medias by IDs: %v", err)
 				return response, true, err
 			}
 		}
@@ -223,10 +225,10 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 				storageMedia, ok := storageMediaMap[*message.StorageMediaID]
 				if ok {
 					var accessURL *string
-					if storageMedia.IsURLFromStorage {
-						url, err := u.googleStorageService.GenerateV4GetObjectSignedURL(*storageMedia.URL, 0)
+					if storageMedia.URL != nil || storageMedia.MediaId != nil {
+						url, err := u.storageMediaUsecase.GeneratePublicURL(storageMedia.DocumentID)
 						if err != nil {
-							u.zslog.Errorf("[GetMessagesByChatID] Failed to generate signed URL: %v", err)
+							u.zsLog.Errorf("[GetMessagesByChatID] Failed to get access URL for storage media ID %s: %v", storageMedia.DocumentID, err)
 						} else {
 							accessURL = &url
 						}
@@ -242,7 +244,8 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, requestData fi
 	return response, false, nil
 }
 
-func (u *MessageUsecase) SaveMessage(ctx context.Context, inputData dto.MessageSaveRequest) (bool, error) {
+func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error) {
+	// TODO: check if chat belongs to tenant
 	message := model.Message{
 		Wamid:           inputData.Wamid,
 		ChatID:          inputData.ChatID,
@@ -263,12 +266,12 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, inputData dto.MessageS
 	}
 	_, err := u.messageRepository.Upsert(ctx, nil, message)
 	if err != nil {
-		u.zslog.Errorf("[SaveMessage] Failed to save message: %v", err)
+		u.zsLog.Errorf("[SaveMessage] Failed to save message: %v", err)
 		return true, err
 	}
 	err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
 	if err != nil {
-		u.zslog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
+		u.zsLog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
 	}
 	return false, nil
 }

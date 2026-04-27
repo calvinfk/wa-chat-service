@@ -34,4 +34,5 @@ message MessageModel {
 // SaveMessageRequest contains the message details to be saved and the associated phone number ID.
 message SaveMessageRequest {
   MessageModel message = 1;
+  string phone_number_id = 2;
 }

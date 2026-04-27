@@ -2,14 +2,10 @@ package http_v1
 
 import (
 	"bufio"
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"net/url"
-	"strings"
-	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/service"
@@ -17,6 +13,7 @@ import (
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
+	"wa_chat_service/pkg/utils"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -26,14 +23,14 @@ import (
 type StorageMediaHandler struct {
 	storageMediaUsecase usecase.StorageMedia
 	encryptService      service.Encrypt
-	zslog               *zap.SugaredLogger
+	zsLog               *zap.SugaredLogger
 }
 
-func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia, encryptService service.Encrypt, zslog *zap.SugaredLogger) *StorageMediaHandler {
+func NewStorageMediaHandler(storageMediaUsecase usecase.StorageMedia, encryptService service.Encrypt, zsLog *zap.SugaredLogger) *StorageMediaHandler {
 	return &StorageMediaHandler{
 		storageMediaUsecase: storageMediaUsecase,
 		encryptService:      encryptService,
-		zslog:               zslog,
+		zsLog:               zsLog,
 	}
 }
 
@@ -42,7 +39,7 @@ func (h *StorageMediaHandler) RegisterRoutes(router fiber.Router) {
 	{
 		storageMediaRouter.Post("/upload", middleware.Protected(), h.uploadMedia)
 		storageMediaRouter.Get("/get", h.getMedia)
-		storageMediaRouter.Post("/encrypt-link", middleware.Protected(), h.encryptMediaLink)
+		storageMediaRouter.Post("/encrypt-link", h.encryptMediaLink)
 		storageMediaRouter.Delete("/delete", middleware.Protected(), h.deleteMedia)
 		storageMediaRouter.Get("/list", middleware.Protected(), h.getMediaList)
 	}
@@ -58,57 +55,14 @@ func (h *StorageMediaHandler) uploadMedia(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(false, fmt.Errorf("file is required"))
 		return ctx.Status(code).JSON(response)
 	}
-	media, serverError, err := h.storageMediaUsecase.UploadMedia(ctx.Context(), requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	media, serverError, err := h.storageMediaUsecase.UploadMedia(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Media uploaded successfully", media)
 	return ctx.Status(code).JSON(response)
-}
-
-type progressReader struct {
-	ctx       context.Context
-	r         io.Reader
-	size      int64
-	read      int64
-	lastLog   time.Time
-	log       func(string, ...any)
-	enableLog bool
-}
-
-func (p *progressReader) Read(b []byte) (int, error) {
-	if p.ctx.Err() != nil {
-		return 0, p.ctx.Err()
-	}
-	n, err := p.r.Read(b)
-	if p.enableLog && n > 0 {
-		p.read += int64(n)
-		if p.lastLog.IsZero() || time.Since(p.lastLog) >= time.Second {
-			if p.size > 0 {
-				p.log("[getMedia] stream progress: %d/%d bytes (%.1f%%)", p.read, p.size, float64(p.read)*100/float64(p.size))
-			} else {
-				p.log("[getMedia] stream progress: %d bytes", p.read)
-			}
-			p.lastLog = time.Now()
-		}
-	}
-	return n, err
-}
-
-func isClientClosedStreamError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, io.ErrClosedPipe) {
-		return true
-	}
-	errText := strings.ToLower(err.Error())
-	return strings.Contains(errText, "response body closed") ||
-		strings.Contains(errText, "stream closed") ||
-		strings.Contains(errText, "broken pipe") ||
-		strings.Contains(errText, "connection reset by peer") ||
-		strings.Contains(errText, "connection closed")
 }
 
 func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
@@ -154,12 +108,11 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 		mediaResponse.Size = -1 // unknown size, let fiber handle it with chunked encoding
 	}
 
-	pr := &progressReader{
-		ctx:       ctx.Context(),
-		r:         mediaResponse.Reader,
-		size:      mediaResponse.Size,
-		log:       h.zslog.Infof,
-		enableLog: true,
+	pr := &utils.ProgressReader{
+		Ctx:    ctx.Context(),
+		Reader: mediaResponse.Reader,
+		Size:   mediaResponse.Size,
+		Log:    h.zsLog.Infof,
 	}
 
 	rawCtx := ctx.RequestCtx()
@@ -174,14 +127,14 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 			if n > 0 {
 				_, writeErr := w.Write(buf[:n])
 				if writeErr != nil {
-					if !isClientClosedStreamError(writeErr) {
-						h.zslog.Errorf("[getMedia] Write error: %v", writeErr)
+					if !utils.IsClientClosedStreamError(writeErr) {
+						h.zsLog.Errorf("[getMedia] Write error: %v", writeErr)
 					}
 					return
 				}
 				if flushErr := w.Flush(); flushErr != nil {
-					if !isClientClosedStreamError(flushErr) {
-						h.zslog.Errorf("[getMedia] Flush error: %v", flushErr)
+					if !utils.IsClientClosedStreamError(flushErr) {
+						h.zsLog.Errorf("[getMedia] Flush error: %v", flushErr)
 					}
 					return
 				}
@@ -190,8 +143,8 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 				return
 			}
 			if readErr != nil {
-				if !isClientClosedStreamError(readErr) {
-					h.zslog.Errorf("[getMedia] Read error: %v", readErr)
+				if !utils.IsClientClosedStreamError(readErr) {
+					h.zsLog.Errorf("[getMedia] Read error: %v", readErr)
 				}
 				return
 			}
@@ -208,27 +161,13 @@ func (h *StorageMediaHandler) deleteMedia(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
-	serverError, err := h.storageMediaUsecase.DeleteMedia(ctx.Context(), requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.storageMediaUsecase.DeleteMedia(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Media deleted successfully", nil)
-	return ctx.Status(code).JSON(response)
-}
-
-func (h *StorageMediaHandler) saveMediaID(ctx fiber.Ctx) error {
-	var requestData dto.StorageMediaSaveMediaIDRequest
-	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewErrorApiResponse(false, err)
-		return ctx.Status(code).JSON(response)
-	}
-	data, serverError, err := h.storageMediaUsecase.SaveMediaID(ctx.Context(), requestData)
-	if err != nil {
-		code, response := api_response.NewErrorApiResponse(serverError, err)
-		return ctx.Status(code).JSON(response)
-	}
-	code, response := api_response.NewApiResponse("Media uploaded successfully", data)
 	return ctx.Status(code).JSON(response)
 }
 
@@ -242,7 +181,8 @@ func (h *StorageMediaHandler) getMediaList(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
-	response, serverError, err := h.storageMediaUsecase.GetFiltered(ctx.Context(), requestData)
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	response, serverError, err := h.storageMediaUsecase.GetFilteredByTenantID(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, apiResponse := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(apiResponse)
