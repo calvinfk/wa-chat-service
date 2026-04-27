@@ -57,10 +57,19 @@ All routes are mounted under:
 
 ### Broadcast (`/api/v1/broadcast`)
 
+- `POST /upsert`
+  - Body (JSON): Broadcast configuration data
 - `POST /schedule`
+  - Body (JSON): Broadcast scheduling data
 - `POST /send`
-  - Accepts encrypted bearer token in `Authorization` header (parsed via JWT middleware)
-  - Endpoint returns `200` immediately and only continues async send flow when a valid `jwt_sub` is present
+  - Expects JWT token in `Authorization` header (JWT middleware validation)
+  - Endpoint returns `200` immediately and continues async send flow with valid `jwt_sub`
+- `PUT /cancel`
+  - Body (JSON): Broadcast ID to cancel
+- `GET /get-filtered`
+  - Supports filter/pagination query params
+- `GET /get-recipients-filtered`
+  - Supports filter/pagination query params for broadcast recipients
 
 ### Tenant Contact (`/api/v1/tenant/contact`)
 
@@ -78,6 +87,8 @@ All routes are mounted under:
   - Optional header: `Range: bytes=...` for browser/video playback and seek support
   - Returns streamed media bytes (`Content-Type` from stored object metadata)
   - Supports `206 Partial Content` when a valid range is requested
+- `POST /encrypt-link`
+  - Body (JSON): Media link/URL to encrypt
 - `DELETE /delete`
   - Query: `phone_number_id` and `id`
 - `GET /list`
@@ -85,12 +96,16 @@ All routes are mounted under:
 
 ## Authentication Notes
 
-- Token parsing middleware exists and expects an AES-encrypted token in cookie `access_token`.
-- `AccessToken` middleware is enabled globally in router wiring.
-- The protected guard (`/api/ping-protected` and most `/api/v1/*` routes) checks:
-  - `token_error_message` request header (if provided)
-  - `token_sub` context value
+- Login endpoint (`POST /api/v1/auth/login`) returns an AES-encrypted JWT token in a cookie `access_token` (HttpOnly).
+- For protected routes, clients can send the encrypted token in the `Authorization: Bearer <encrypted_token>` header.
+- Token parsing middleware exists globally and expects an AES-encrypted token.
+- The protected guard (most `/api/v1/*` routes) checks for `token_sub` context value.
 - If `token_sub` is missing, protected routes return `401 Unauthorized`.
+- Broadcast `/send` endpoint uses JWT-based authentication:
+  - Extracts encrypted JWT from `Authorization` header
+  - Decrypts and validates the token
+  - Extracts `jwt_sub` from the token and sets it in context
+  - Has a "pass-through" mode where it continues with `ctx.Next()` even if validation fails, but only triggers async send if `jwt_sub` is present
 
 ## Global Middleware
 
