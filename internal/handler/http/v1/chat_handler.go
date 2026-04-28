@@ -69,7 +69,7 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 }
 
 func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
-	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]
+	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)

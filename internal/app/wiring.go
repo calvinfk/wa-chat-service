@@ -184,7 +184,7 @@ func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zsLog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, repositories.WaBusinessAccount, waBusinessAccountUsecase, services.WhatsappBusiness, clients.txManager, zsLog)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, waBusinessAccountUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zsLog, cfg.App.PublicURL)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, zsLog)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, repositories.Tenant, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, clients.txManager, zsLog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, zsLog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, waBusinessAccountUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zsLog)
 	authUsecase := auth_usecase.NewAuthUsecase(repositories.User, repositories.Tenant, services.AccessToken, services.Encrypt, zsLog)

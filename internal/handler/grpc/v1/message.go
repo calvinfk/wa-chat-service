@@ -22,10 +22,14 @@ type MessageGRPC struct {
 func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageRequest) (*emptypb.Empty, error) {
 	message := req.GetMessage()
 	phoneNumberId := req.GetPhoneNumberId()
+	recipientId := req.GetRecipientId()
 	inputData := dto.MessageSaveRequest{
 		ID:              &message.Id,
 		Wamid:           message.Wamid,
-		ChatID:          message.ChatId,
+		PhoneNumberId:   phoneNumberId,
+		RecipientId:     recipientId,
+		DisplayName:     req.GetDisplayName(),
+		LastMessage:     req.GetLastMessage(),
 		MessageType:     message.MessageType,
 		MessageCategory: message.MessageCategory,
 		SenderName:      message.SenderName,

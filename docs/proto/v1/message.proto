@@ -35,4 +35,7 @@ message MessageModel {
 message SaveMessageRequest {
   MessageModel message = 1;
   string phone_number_id = 2;
+  string recipient_id = 3;
+  string display_name = 4;
+  string last_message = 5;
 }

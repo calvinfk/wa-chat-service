@@ -4,10 +4,12 @@ import (
 	"context"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -59,8 +61,8 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 	return chat, err
 }
 
-func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], error) {
-	var response filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse]
+func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error) {
+	var response filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]
 	filters, sort, paginate, err := filter_request.InitializeFilter(filter, r.chat.AllowedFilterFields(), r.chat.AllowedSortFields())
 	if err != nil {
 		return response, err
@@ -71,7 +73,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 	if err != nil {
 		return response, err
 	}
-	var result []dto.ChatGetByPhoneNumberIDResponse
+	var result []dto.ChatGetByPhoneNumberIdResponse
 	for _, doc := range docs {
 		var chat model.Chat
 		docData := doc.Data()
@@ -80,8 +82,49 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 		if err != nil {
 			return response, err
 		}
-		result = append(result, dto.ChatGetByPhoneNumberIDResponse{}.FromModel(chat))
+		result = append(result, dto.ChatGetByPhoneNumberIdResponse{}.FromModel(chat))
 	}
 	response = filter_request.NewFilterResponse(result, paginate, totalData)
 	return response, nil
+}
+
+func (r *ChatRepository) GetOpenedTicketChatByPhoneNumberID(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error) {
+	doc, err := r.db.Collection(r.chat.TableName()).
+		Where("phone_number_id", "==", phoneNumberId).
+		Where("recipient_id", "==", recipientId).
+		Where("chat_type", "==", "ticket").
+		Where("ticket_closed", "==", false).
+		Limit(1).Documents(ctx).Next()
+	if err != nil {
+		if err == iterator.Done {
+			return model.Chat{}, errs.ErrGenericNotFound
+		}
+		return model.Chat{}, err
+	}
+	var chat model.Chat
+	docData := doc.Data()
+	docData["id"] = doc.Ref.ID
+	err = utils.MapToStruct(docData, &chat)
+	if err != nil {
+		return model.Chat{}, err
+	}
+	return chat, nil
+}
+
+func (r *ChatRepository) GetByID(ctx context.Context, chatID string) (model.Chat, error) {
+	doc, err := r.db.Collection(r.chat.TableName()).Doc(chatID).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.Chat{}, errs.ErrGenericNotFound
+		}
+		return model.Chat{}, err
+	}
+	var chat model.Chat
+	docData := doc.Data()
+	docData["id"] = doc.Ref.ID
+	err = utils.MapToStruct(docData, &chat)
+	if err != nil {
+		return model.Chat{}, err
+	}
+	return chat, nil
 }

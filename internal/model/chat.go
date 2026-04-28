@@ -5,18 +5,28 @@ import (
 )
 
 type Chat struct {
-	DocumentID    string    `json:"id" firestore:"-"` // {recipient_id}-{phone_number_id}
-	PhoneNumberId string    `json:"phone_number_id" firestore:"phone_number_id"`
-	RecipientId   string    `json:"recipient_id" firestore:"recipient_id"`
-	ChatType      string    `json:"chat_type" firestore:"chat_type"` // individual or group
-	DisplayName   string    `json:"display_name" firestore:"display_name"`
-	LastMessage   string    `json:"last_message" firestore:"last_message"`
-	CreatedAt     time.Time `json:"created_at" firestore:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" firestore:"updated_at"`
+	DocumentID    string     `json:"id" firestore:"-"` // {recipient_id}-{phone_number_id}, or uuid v7 for group and ticket
+	PhoneNumberId string     `json:"phone_number_id" firestore:"phone_number_id"`
+	RecipientId   string     `json:"recipient_id" firestore:"recipient_id"`
+	AgentID       *string    `json:"agent_id,omitempty" firestore:"agent_id,omitempty"`
+	ChatType      string     `json:"chat_type" firestore:"chat_type"` // individual, group, ticket
+	DisplayName   string     `json:"display_name" firestore:"display_name"`
+	LastMessage   string     `json:"last_message" firestore:"last_message"`
+	ChatStatus    ChatStatus `json:"chat_status" firestore:"chat_status"`
+	CreatedAt     time.Time  `json:"created_at" firestore:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" firestore:"updated_at"`
 }
 
+type ChatStatus string
+
+const (
+	ChatStatusOpen       ChatStatus = "open"
+	ChatStatusInProgress ChatStatus = "in_progress"
+	ChatStatusClosed     ChatStatus = "closed"
+)
+
 func (c *Chat) AllowedFilterFields() []string {
-	return []string{"phone_number_id"}
+	return []string{"phone_number_id", "chat_type", "chat_status"}
 }
 
 func (c *Chat) AllowedSortFields() []string {

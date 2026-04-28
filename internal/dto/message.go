@@ -39,7 +39,10 @@ type (
 	MessageSaveRequest struct {
 		ID              *string    `json:"id"`
 		Wamid           string     `json:"wamid" validate:"required"`
-		ChatID          string     `json:"chat_id" validate:"required"`
+		PhoneNumberId   string     `json:"phone_number_id" validate:"required"`
+		RecipientId     string     `json:"recipient_id" validate:"required"`
+		DisplayName     string     `json:"display_name"`
+		LastMessage     string     `json:"last_message"`
 		MessageType     string     `json:"message_type" validate:"required"`
 		MessageCategory string     `json:"message_category" validate:"required"`
 		SenderName      string     `json:"sender_name" validate:"required"`

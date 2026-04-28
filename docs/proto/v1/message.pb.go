@@ -177,6 +177,9 @@ type SaveMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       *MessageModel          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	PhoneNumberId string                 `protobuf:"bytes,2,opt,name=phone_number_id,json=phoneNumberId,proto3" json:"phone_number_id,omitempty"`
+	RecipientId   string                 `protobuf:"bytes,3,opt,name=recipient_id,json=recipientId,proto3" json:"recipient_id,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	LastMessage   string                 `protobuf:"bytes,5,opt,name=last_message,json=lastMessage,proto3" json:"last_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -225,6 +228,27 @@ func (x *SaveMessageRequest) GetPhoneNumberId() string {
 	return ""
 }
 
+func (x *SaveMessageRequest) GetRecipientId() string {
+	if x != nil {
+		return x.RecipientId
+	}
+	return ""
+}
+
+func (x *SaveMessageRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *SaveMessageRequest) GetLastMessage() string {
+	if x != nil {
+		return x.LastMessage
+	}
+	return ""
+}
+
 var File_v1_message_proto protoreflect.FileDescriptor
 
 const file_v1_message_proto_rawDesc = "" +
@@ -254,10 +278,13 @@ const file_v1_message_proto_rawDesc = "" +
 	"\r_delivered_atB\n" +
 	"\n" +
 	"\b_read_atB\b\n" +
-	"\x06_error\"h\n" +
+	"\x06_error\"\xd1\x01\n" +
 	"\x12SaveMessageRequest\x12*\n" +
 	"\amessage\x18\x01 \x01(\v2\x10.v1.MessageModelR\amessage\x12&\n" +
-	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId2H\n" +
+	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId\x12!\n" +
+	"\frecipient_id\x18\x03 \x01(\tR\vrecipientId\x12!\n" +
+	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12!\n" +
+	"\flast_message\x18\x05 \x01(\tR\vlastMessage2H\n" +
 	"\aMessage\x12=\n" +
 	"\vSaveMessage\x12\x16.v1.SaveMessageRequest\x1a\x16.google.protobuf.EmptyB\x0fZ\rdocs/proto/v1b\x06proto3"
 

@@ -10,10 +10,12 @@ import (
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
 	"wa_chat_service/pkg/utils"
 
+	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -23,10 +25,12 @@ type MessageUsecase struct {
 	chatRepository           repository.Chat
 	storageMediaRepository   repository.StorageMedia
 	searchMessageRepository  repository.SearchMessage
+	tenantRepository         repository.Tenant
 	storageMediaUsecase      usecase.StorageMedia
 	waBusinessAccountUsecase usecase.WaBusinessAccount
 	whatsappService          service.WhatsappBusiness
 	googleStorageService     service.GoogleStorage
+	txManager                *utils.TxManager
 	zsLog                    *zap.SugaredLogger
 }
 
@@ -35,21 +39,25 @@ func NewMessageUsecase(
 	chatRepository repository.Chat,
 	storageMediaRepository repository.StorageMedia,
 	searchMessageRepository repository.SearchMessage,
+	tenantRepository repository.Tenant,
 	storageMediaUsecase usecase.StorageMedia,
 	waBusinessAccountUsecase usecase.WaBusinessAccount,
 	whatsappService service.WhatsappBusiness,
 	googleStorageService service.GoogleStorage,
+	txManager *utils.TxManager,
 	zsLog *zap.SugaredLogger,
 ) *MessageUsecase {
 	return &MessageUsecase{
 		messageRepository:        messageRepository,
 		chatRepository:           chatRepository,
 		storageMediaRepository:   storageMediaRepository,
-		storageMediaUsecase:      storageMediaUsecase,
+		tenantRepository:         tenantRepository,
 		searchMessageRepository:  searchMessageRepository,
+		storageMediaUsecase:      storageMediaUsecase,
 		waBusinessAccountUsecase: waBusinessAccountUsecase,
 		whatsappService:          whatsappService,
 		googleStorageService:     googleStorageService,
+		txManager:                txManager,
 		zsLog:                    zsLog,
 	}
 }
@@ -64,6 +72,11 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 			return response, true, err
 		}
 	}
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
+	if err != nil {
+		u.zsLog.Errorf("[SendMessage] Failed to get tenant: %v", err)
+		return response, true, err
+	}
 	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {
 		u.zsLog.Errorf("[SendMessage] Failed to validate message component: %v", err)
@@ -72,14 +85,25 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	// TODO: save ticketing
 	// create chat header if not exist
 	chat := model.Chat{
-		DocumentID:    fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId),
 		PhoneNumberId: inputData.PhoneNumberId,
 		RecipientId:   inputData.RecipientId,
-		ChatType:      "individual",
 		LastMessage:   component.GetMessage(),
 		DisplayName:   inputData.RecipientName,
+		ChatStatus:    model.ChatStatusOpen,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
+	}
+	if tenant.ChatType == "ticket" {
+		chatID, err := uuid.NewV7()
+		if err != nil {
+			u.zsLog.Errorf("[SendMessage] Failed to generate chat ID: %v", err)
+			return response, true, err
+		}
+		chat.DocumentID = chatID.String()
+		chat.ChatType = "ticket"
+	} else {
+		chat.DocumentID = fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId)
+		chat.ChatType = "individual"
 	}
 	_, err = u.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
@@ -246,32 +270,96 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, tenantID strin
 
 func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error) {
 	// TODO: check if chat belongs to tenant
-	message := model.Message{
-		Wamid:           inputData.Wamid,
-		ChatID:          inputData.ChatID,
-		MessageType:     inputData.MessageType,
-		MessageCategory: inputData.MessageCategory,
-		SenderName:      inputData.SenderName,
-		Payload:         inputData.Payload,
-		StorageMediaID:  inputData.StorageMediaID,
-		Status:          inputData.Status,
-		Error:           inputData.Error,
-		CreatedAt:       inputData.CreatedAt,
-		SentAt:          inputData.SentAt,
-		DeliveredAt:     inputData.DeliveredAt,
-		ReadAt:          inputData.ReadAt,
-	}
-	if inputData.ID != nil {
-		message.DocumentID = *inputData.ID
-	}
-	_, err := u.messageRepository.Upsert(ctx, nil, message)
+	// check tenant chat type
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zsLog.Errorf("[SaveMessage] Failed to save message: %v", err)
+		u.zsLog.Errorf("[SaveMessage] Failed to get tenant: %v", err)
 		return true, err
 	}
-	err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
-	if err != nil {
-		u.zsLog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
+	var chatID string
+	var chat model.Chat
+
+	switch tenant.ChatType {
+	case "ticket":
+		chat, err = u.chatRepository.GetOpenedTicketChatByPhoneNumberID(ctx, inputData.PhoneNumberId, inputData.RecipientId)
+		switch err {
+		case nil:
+			chatID = chat.DocumentID
+		case errs.ErrGenericNotFound:
+			newChatID, genErr := uuid.NewV7()
+			if genErr != nil {
+				u.zsLog.Errorf("[SaveMessage] Failed to generate chat ID: %v", genErr)
+				return true, genErr
+			}
+			chatID = newChatID.String()
+		default:
+			u.zsLog.Errorf("[SaveMessage] Failed to get opened ticket chat: %v", err)
+			return true, err
+		}
+	default:
+		chatID = fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId)
 	}
-	return false, nil
+
+	if chat.DocumentID == "" {
+		// create new chat if not exist
+		chat = model.Chat{
+			DocumentID:    chatID,
+			PhoneNumberId: inputData.PhoneNumberId,
+			RecipientId:   inputData.RecipientId,
+			DisplayName:   inputData.DisplayName,
+			ChatStatus:    model.ChatStatusOpen,
+			CreatedAt:     inputData.CreatedAt,
+		}
+	}
+	// if previous chat type is empty, set chat type based on tenant chat type
+	if chat.ChatType == "" {
+		if tenant.ChatType == "ticket" {
+			chat.ChatType = "ticket"
+		} else {
+			chat.ChatType = "individual"
+		}
+	}
+	if chat.DisplayName == "" {
+		chat.DisplayName = inputData.RecipientId
+	}
+	chat.LastMessage = inputData.LastMessage
+	chat.UpdatedAt = time.Now()
+
+	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
+		_, err = u.chatRepository.Upsert(ctx, txFirestore, chat)
+		if err != nil {
+			u.zsLog.Errorf("[SaveMessage] Failed to upsert chat: %v", err)
+			return true, err
+		}
+
+		message := model.Message{
+			Wamid:           inputData.Wamid,
+			ChatID:          chatID,
+			MessageType:     inputData.MessageType,
+			MessageCategory: inputData.MessageCategory,
+			SenderName:      inputData.SenderName,
+			Payload:         inputData.Payload,
+			StorageMediaID:  inputData.StorageMediaID,
+			Status:          inputData.Status,
+			Error:           inputData.Error,
+			CreatedAt:       inputData.CreatedAt,
+			SentAt:          inputData.SentAt,
+			DeliveredAt:     inputData.DeliveredAt,
+			ReadAt:          inputData.ReadAt,
+		}
+		if inputData.ID != nil {
+			message.DocumentID = *inputData.ID
+		}
+		_, err = u.messageRepository.Upsert(ctx, txFirestore, message)
+		if err != nil {
+			u.zsLog.Errorf("[SaveMessage] Failed to save message: %v", err)
+			return true, err
+		}
+		err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
+		if err != nil {
+			u.zsLog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
+		}
+		return false, nil
+	})
+	return serverError, err
 }

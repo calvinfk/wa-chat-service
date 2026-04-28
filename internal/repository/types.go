@@ -15,7 +15,11 @@ type (
 		// Upsert inserts or updates a chat entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)
 		// GetChatByPhoneNumberID gets chat entries filtered by phone number ID.
-		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIDRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIDResponse], error)
+		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
+		// GetOpenedTicketChatByPhoneNumberID gets opened ticket chat entries filtered by phone number ID.
+		GetOpenedTicketChatByPhoneNumberID(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
+		// GetByID gets a chat entry by chat ID.
+		GetByID(ctx context.Context, chatID string) (model.Chat, error)
 	}
 
 	// Message defines persistence operations for message data.
