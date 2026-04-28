@@ -118,8 +118,8 @@ type (
 	}
 	// SearchMessage defines indexing and query operations for message search.
 	SearchMessage interface {
-		// AddDocumentsAsync adds message documents to the search index. This method is designed to be called asynchronously and does not block the caller while the indexing operation is performed.
-		AddDocumentsAsync(ctx context.Context, document []model.Message) error
+		// AddDocuments adds message documents to the search index.
+		AddDocuments(ctx context.Context, document []model.Message) error
 		// GetFiltered gets indexed messages by filter criteria with pagination metadata.
 		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
 	}

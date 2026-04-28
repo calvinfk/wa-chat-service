@@ -28,13 +28,14 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 			return ctx.Next()
 		}
 		sub, err := accessTokenService.ParseAccessTokenSub(string(decryptedToken))
+		splits := strings.Split(sub, ":")
+		authData := dto.AuthData{
+			TenantID: splits[0],
+			UserID:   splits[1],
+			Role:     splits[2],
+		}
 		if err != nil {
 			if err == errs.ErrAuthExpiredAccessToken {
-				splits := strings.Split(sub, ":")
-				authData := dto.AuthData{
-					TenantID: splits[0],
-					UserID:   splits[1],
-				}
 				ctx.Locals("token_sub", authData)
 				ctx.Locals("token_error_message", "Token expired")
 			} else {
@@ -42,11 +43,6 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 				ctx.Locals("token_error_message", "Invalid token")
 			}
 			return ctx.Next()
-		}
-		splits := strings.Split(sub, ":")
-		authData := dto.AuthData{
-			TenantID: splits[0],
-			UserID:   splits[1],
 		}
 		ctx.Locals("token_sub", authData)
 		return ctx.Next()

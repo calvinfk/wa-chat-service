@@ -44,7 +44,7 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (stri
 		u.zsLog.Errorf("[Login] bcrypt.CompareHashAndPassword error : %v", err)
 		return "", true, errs.ErrGenericUnauthorized
 	}
-	sub := fmt.Sprintf("%s:%s", user.TenantID, user.DocumentID)
+	sub := fmt.Sprintf("%s:%s:%s", user.TenantID, user.DocumentID, user.Role)
 	accessToken, err := u.accessTokenService.GenerateAccessToken(sub)
 	if err != nil {
 		u.zsLog.Errorf("[Login] accessTokenService.GenerateAccessToken error : %v", err)

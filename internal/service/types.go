@@ -17,7 +17,7 @@ type (
 		// It returns the generated access token string or an error if there is an issue during token generation.
 		GenerateAccessToken(sub string) (string, error)
 		// ParseAccessToken parses a AccessToken access token string and extracts the user ID (subject) from the token claims.
-		// It validates the token using the configured JWK and returns the user ID as a UUID if the token is valid.
+		// It validates the token using the configured JWK and returns the sub as string even if the token is expired.
 		// If the token is expired, it returns an error indicating that the token has expired and the sub.
 		// If the token is invalid for any other reason, it returns only the error indicating that the token is invalid.
 		ParseAccessTokenSub(tokenStr string) (string, error)
