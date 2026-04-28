@@ -8,27 +8,25 @@ import (
 
 type (
 	MessageSendRequest struct {
-		PhoneNumberId string `json:"phone_number_id" validate:"required"`
-		RecipientId   string `json:"recipient_id" validate:"required"`
-		RecipientName string `json:"recipient_name" validate:"required"`
-		SenderName    string `json:"sender_name" validate:"required"`
-		Type          string `json:"type" validate:"required"` // text, image, video, etc
-		Payload       any
+		ChatID     string `json:"chat_id" validate:"required"` // {recipient_id}-{phone_number_id}, or uuid v7 for group and ticket
+		SenderName string `json:"sender_name"`                 // optional, if not provided, will use current logged in user
+		Type       string `json:"type" validate:"required"`    // text, image, video, etc
+		Payload    any
 	}
 
 	MessageGetByChatIDRequest struct {
 		ChatID string `query:"chat_id" validate:"required"`
 		Search string `json:"-" query:"search"`
 	}
+
 	MessageResponse struct {
-		ID     string `json:"id"`      // id from whatsapp
-		ChatID string `json:"chat_id"` // reference to chat document
-		// StorageMediaID  *string               `json:"storage_media_id"` // reference to media document if message has media
+		ID              string                `json:"id"`      // id from whatsapp
+		ChatID          string                `json:"chat_id"` // reference to chat document
 		StorageMedia    *StorageMediaResponse `json:"storage_media"`
 		MessageType     string                `json:"message_type"`     // text, image, video, etc
-		MessageCategory string                `json:"message_category"` // marketing, authentication, utility, service
+		MessageCategory string                `json:"message_category"` // marketing, authentication, utility, service, (and system_flag for system generated messages)
 		SenderName      string                `json:"sender_name"`      // sender name for individual chat, group name for group chat
-		Payload         string                `json:"payload"`          // raw payload from whatsapp, can be used for debugging or future processing
+		Payload         string                `json:"payload"`          // raw payload from whatsapp or system, can be used for debugging or future processing
 		Status          string                `json:"status"`           // -, sent, delivered, read
 		CreatedAt       time.Time             `json:"created_at"`
 		SentAt          *time.Time            `json:"sent_at,omitempty"`
@@ -36,13 +34,15 @@ type (
 		ReadAt          *time.Time            `json:"read_at,omitempty"`
 		Error           *string               `json:"error,omitempty"` // error message if failed to send, json stringified from whatsapp error response
 	}
+
 	MessageSaveRequest struct {
 		ID              *string    `json:"id"`
+		ChatID          *string    `json:"chat_id"`
 		Wamid           string     `json:"wamid" validate:"required"`
 		PhoneNumberId   string     `json:"phone_number_id" validate:"required"`
 		RecipientId     string     `json:"recipient_id" validate:"required"`
-		DisplayName     string     `json:"display_name"`
-		LastMessage     string     `json:"last_message"`
+		RecipientName   string     `json:"recipient_name"`
+		LastMessage     string     `json:"last_message"` //
 		MessageType     string     `json:"message_type" validate:"required"`
 		MessageCategory string     `json:"message_category" validate:"required"`
 		SenderName      string     `json:"sender_name" validate:"required"`
@@ -68,9 +68,8 @@ func (r MessageGetByChatIDRequest) Validate() map[string]string {
 
 func (MessageResponse) FromModel(data model.Message, storageMedia *StorageMediaResponse) MessageResponse {
 	return MessageResponse{
-		ID:     data.DocumentID,
-		ChatID: data.ChatID,
-		// StorageMediaID:  data.StorageMediaID,
+		ID:              data.DocumentID,
+		ChatID:          data.ChatID,
 		StorageMedia:    storageMedia,
 		MessageType:     data.MessageType,
 		MessageCategory: data.MessageCategory,

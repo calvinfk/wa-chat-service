@@ -11,6 +11,7 @@ option go_package = "docs/proto/v1";
 service Message {
   // SaveMessage saves a message
   rpc SaveMessage(SaveMessageRequest) returns (google.protobuf.Empty);
+  rpc UpdateMessageStatus(UpdateMessageStatusRequest) returns (google.protobuf.Empty);
 }
 
 // Message represents the structure of a message in the system.
@@ -36,6 +37,16 @@ message SaveMessageRequest {
   MessageModel message = 1;
   string phone_number_id = 2;
   string recipient_id = 3;
-  string display_name = 4;
+  string recipient_name = 4;
   string last_message = 5;
+}
+
+message UpdateMessageStatusRequest {
+  string wamid = 1;
+  string phone_number_id = 2;
+  string recipient_id = 3;
+  string status = 4;
+  string message_category = 5;
+  optional string error = 6;
+  google.protobuf.Timestamp timestamp = 7;
 }

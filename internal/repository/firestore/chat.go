@@ -25,7 +25,8 @@ func NewChatRepository(db *firestore.Client) *ChatRepository {
 	}
 }
 
-func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, error) {
+func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, bool, error) {
+	created := false
 	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
 		doc := r.db.Collection("chats").Doc(chat.DocumentID)
 		_, getErr := tx.Get(doc)
@@ -38,6 +39,7 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 			if setErr != nil {
 				return setErr
 			}
+			created = true
 			return nil
 		}
 
@@ -58,7 +60,7 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 	} else {
 		err = execDB(ctx, tx)
 	}
-	return chat, err
+	return chat, created, err
 }
 
 func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error) {
@@ -93,7 +95,7 @@ func (r *ChatRepository) GetOpenedTicketChatByPhoneNumberID(ctx context.Context,
 		Where("phone_number_id", "==", phoneNumberId).
 		Where("recipient_id", "==", recipientId).
 		Where("chat_type", "==", "ticket").
-		Where("ticket_closed", "==", false).
+		Where("chat_status", "==", model.ChatStatusOpen).
 		Limit(1).Documents(ctx).Next()
 	if err != nil {
 		if err == iterator.Done {

@@ -13,6 +13,7 @@ type HandlerGRPCV1 struct {
 	StorageMedia      usecase.StorageMedia
 	Message           usecase.Message
 	WaBusinessAccount usecase.WaBusinessAccount
+	Chat              usecase.Chat
 	ZSLog             *zap.SugaredLogger
 }
 
@@ -34,6 +35,7 @@ func (h *HandlerGRPCV1) newMessageRoutes() {
 	r := &MessageGRPC{
 		messageUsecase:           h.Message,
 		waBusinessAccountUsecase: h.WaBusinessAccount,
+		chatUsecase:              h.Chat,
 		zsLog:                    h.ZSLog,
 	}
 	v1.RegisterMessageServer(h.App, r)

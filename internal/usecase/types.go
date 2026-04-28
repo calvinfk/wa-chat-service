@@ -20,6 +20,11 @@ type (
 		// SaveMessage stores an inbound or outbound message without sending it.
 		// Returns a server-error flag (true if error is from server) and an error.
 		SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error)
+		// GetByWamid retrieves a message by WAMID
+		// if tenant uses ticketing, it will use the recent open ticket association first to find the message
+		// if not, it will search in the default chat associated with the phone number
+		// Returns the message model, a server-error flag (true if error is from server), and an error.
+		GetByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error)
 	}
 
 	// Template defines template lifecycle operations such as create, sync, update, delete, and filtered retrieval.
@@ -77,6 +82,15 @@ type (
 		// GetChatByPhoneNumberID retrieves chat sessions for a phone number with filter options.
 		// Returns a filtered chat response, a server-error flag (true if error is from server), and an error.
 		GetChatByPhoneNumberID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error)
+		// GetByID retrieves a chat session by its unique identifier.
+		// Returns the chat model, a server-error flag (true if error is from server), and an error.
+		GetByID(ctx context.Context, chatID string) (model.Chat, bool, error)
+		// CloseTicket performs operations to close a chat ticket, such as updating chat status and recording closure metadata.
+		// Returns a server-error flag (true if error is from server) and an error.
+		CloseTicket(ctx context.Context, requestData dto.ChatCloseTicketRequest) (bool, error)
+		// AssignAgent assigns a chat ticket to an agent, updating relevant records and associations.
+		// Returns a server-error flag (true if error is from server) and an error.
+		AssignAgent(ctx context.Context, requestData dto.ChatAssignAgentRequest) (bool, error)
 	}
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.

@@ -68,11 +68,11 @@ func (u *BroadcastUsecase) ScheduleBroadcast(ctx context.Context, tenantID strin
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-		u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
+		u.zsLog.Errorf("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot schedule", inputData.ID)
 		return false, nil
 	}
 	if broadcast.TenantID != tenantID {
-		u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot schedule", inputData.ID, tenantID)
+		u.zsLog.Errorf("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot schedule", inputData.ID, tenantID)
 		return false, errs.ErrGenericForbidden
 	}
 	template, err := u.templateRepository.GetByID(ctx, broadcast.TenantID, broadcast.TemplateID)
@@ -191,11 +191,11 @@ func (u *BroadcastUsecase) UpsertBroadcast(ctx context.Context, tenantID string,
 			return emptyResponse, true, err
 		}
 		if broadcast.Status != string(dto.BroadcastScheduleDraft) {
-			u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
+			u.zsLog.Errorf("[ScheduleBroadcast] broadcast with ID %s is not in draft status, cannot update", *inputData.ID)
 			return emptyResponse, false, fmt.Errorf("broadcast currently in %s status, only broadcast in draft status can be updated", broadcast.Status)
 		}
 		if broadcast.TenantID != tenantID {
-			u.zsLog.Infof("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant %s", *inputData.ID, tenantID)
+			u.zsLog.Errorf("[ScheduleBroadcast] broadcast with ID %s does not belong to tenant %s", *inputData.ID, tenantID)
 			return emptyResponse, false, errs.ErrGenericForbidden
 		}
 	}
@@ -426,7 +426,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		broadcastStatus = dto.BroadcastScheduleSending
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		u.zsLog.Infof("[SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
+		u.zsLog.Errorf("[SendBroadcast] broadcast with ID %s is not in scheduled status, skipping sending", broadcastID)
 		return false, nil
 	}
 	broadcast.Status = string(broadcastStatus)
@@ -437,7 +437,7 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 		return true, err
 	}
 	if broadcastStatus == dto.BroadcastScheduleCancelled {
-		u.zsLog.Infof("[SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
+		u.zsLog.Errorf("[SendBroadcast] broadcast with ID %s has no recipients, marking as cancelled", broadcastID)
 		return false, nil
 	}
 	type broadcastSend struct {
@@ -472,12 +472,10 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 					continue
 				}
 				inputData := dto.MessageSendRequest{
-					PhoneNumberId: req.Broadcast.PhoneNumberId,
-					RecipientId:   req.Recipient.RecipientId,
-					RecipientName: req.Recipient.RecipientName,
-					SenderName:    "Broadcast: " + req.Broadcast.Name,
-					Type:          "template",
-					Payload:       payloadMap["template"],
+					ChatID:     req.Recipient.RecipientId + "-" + req.Broadcast.PhoneNumberId, // TODO: support group recipient type
+					SenderName: "Broadcast: " + req.Broadcast.Name,
+					Type:       "template",
+					Payload:    payloadMap["template"],
 				}
 				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, req.Broadcast.TenantID, inputData)
 				if err != nil {
@@ -579,11 +577,11 @@ func (u *BroadcastUsecase) CancelBroadcast(ctx context.Context, tenantID string,
 		return true, err
 	}
 	if broadcast.Status != string(dto.BroadcastScheduleScheduled) {
-		u.zsLog.Infof("[CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
+		u.zsLog.Errorf("[CancelBroadcast] broadcast with ID %s is not in scheduled status, cannot cancel", inputData.ID)
 		return false, fmt.Errorf("broadcast currently in %s status, only broadcast in scheduled status can be cancelled", broadcast.Status)
 	}
 	if broadcast.TenantID != tenantID {
-		u.zsLog.Infof("[CancelBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot cancel", inputData.ID, tenantID)
+		u.zsLog.Errorf("[CancelBroadcast] broadcast with ID %s does not belong to tenant with ID %s, cannot cancel", inputData.ID, tenantID)
 		return false, errs.ErrGenericForbidden
 	}
 	err = u.googleTaskService.DeleteBroadcastTask(inputData.ID)

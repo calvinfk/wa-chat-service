@@ -460,7 +460,6 @@ func (u *StorageMediaUsecase) GenerateEncryptedLink(ctx context.Context, inputDa
 		u.zsLog.Errorf("[GenerateEncryptedLink] URL points to an HTML content, which is not allowed: %s", inputData.Link)
 		return "", false, fmt.Errorf("URL points to an HTML content, which is not allowed")
 	}
-	fmt.Println(contentType)
 	mediaToken, err := u.encryptService.Encrypt(fmt.Sprintf("%d:%s", time.Now().Add(u.mediaUrlExpiryDuration).Unix(), inputData.Link))
 	if err != nil {
 		u.zsLog.Errorf("[GenerateEncryptedLink] Failed to encrypt media link: %v", err)

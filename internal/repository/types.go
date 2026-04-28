@@ -13,7 +13,8 @@ type (
 	// Chat defines persistence operations for chat data.
 	Chat interface {
 		// Upsert inserts or updates a chat entry.
-		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, error)
+		// returns the upserted chat, a boolean indicating whether it was created (true) or updated (false), and an error if any.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, bool, error)
 		// GetChatByPhoneNumberID gets chat entries filtered by phone number ID.
 		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
 		// GetOpenedTicketChatByPhoneNumberID gets opened ticket chat entries filtered by phone number ID.
@@ -26,8 +27,10 @@ type (
 	Message interface {
 		// Upsert inserts or updates a message entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
-		// GetMessageByChatID gets message entries filtered by chat ID.
-		GetMessageByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error)
+		// GetByChatID gets message entries filtered by chat ID.
+		GetByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error)
+		// GetByWamid gets a message entry by WAMID and chat ID.
+		GetByWamid(ctx context.Context, chatID string, wamid string) (model.Message, error)
 	}
 
 	// StorageMedia defines persistence operations for media storage metadata.
@@ -115,8 +118,8 @@ type (
 	}
 	// SearchMessage defines indexing and query operations for message search.
 	SearchMessage interface {
-		// AddDocuments adds message documents to the search index.
-		AddDocuments(ctx context.Context, document []model.Message) error
+		// AddDocumentsAsync adds message documents to the search index. This method is designed to be called asynchronously and does not block the caller while the indexing operation is performed.
+		AddDocumentsAsync(ctx context.Context, document []model.Message) error
 		// GetFiltered gets indexed messages by filter criteria with pagination metadata.
 		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
 	}

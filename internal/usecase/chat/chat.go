@@ -50,7 +50,7 @@ func (uc *ChatUsecase) CloseTicket(ctx context.Context, requestData dto.ChatClos
 	chat.ChatStatus = model.ChatStatusClosed
 	chat.AgentID = nil
 	chat.UpdatedAt = time.Now()
-	_, err = uc.chatRepository.Upsert(ctx, nil, chat)
+	_, _, err = uc.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
 		uc.zsLog.Errorf("[CloseTicket] error while upserting chat: %v", err)
 		return true, err
@@ -72,10 +72,22 @@ func (uc *ChatUsecase) AssignAgent(ctx context.Context, requestData dto.ChatAssi
 	}
 	chat.AgentID = &requestData.AgentID
 	chat.UpdatedAt = time.Now()
-	_, err = uc.chatRepository.Upsert(ctx, nil, chat)
+	_, _, err = uc.chatRepository.Upsert(ctx, nil, chat)
 	if err != nil {
 		uc.zsLog.Errorf("[AssignAgent] error while upserting chat: %v", err)
 		return true, err
 	}
 	return false, nil
+}
+
+func (uc *ChatUsecase) GetByID(ctx context.Context, chatID string) (model.Chat, bool, error) {
+	chat, err := uc.chatRepository.GetByID(ctx, chatID)
+	if err != nil {
+		uc.zsLog.Errorf("[GetByID] error while getting chat by id: %v", err)
+		if err == errs.ErrGenericNotFound {
+			return model.Chat{}, false, err
+		}
+		return model.Chat{}, true, err
+	}
+	return chat, false, nil
 }

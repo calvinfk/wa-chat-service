@@ -16,6 +16,7 @@ type MessageGRPC struct {
 	v1.UnimplementedMessageServer
 	messageUsecase           usecase.Message
 	waBusinessAccountUsecase usecase.WaBusinessAccount
+	chatUsecase              usecase.Chat
 	zsLog                    *zap.SugaredLogger
 }
 
@@ -28,7 +29,7 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 		Wamid:           message.Wamid,
 		PhoneNumberId:   phoneNumberId,
 		RecipientId:     recipientId,
-		DisplayName:     req.GetDisplayName(),
+		RecipientName:   req.GetRecipientName(),
 		LastMessage:     req.GetLastMessage(),
 		MessageType:     message.MessageType,
 		MessageCategory: message.MessageCategory,
@@ -59,6 +60,52 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 	whatsappBusinessAccount, serverError, err := h.waBusinessAccountUsecase.GetByPhoneNumberId(ctx, phoneNumberId)
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
+	if err != nil {
+		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *MessageGRPC) UpdateMessageStatus(ctx context.Context, req *v1.UpdateMessageStatusRequest) (*emptypb.Empty, error) {
+	whatsappBusinessAccount, serverError, err := h.waBusinessAccountUsecase.GetByPhoneNumberId(ctx, req.GetPhoneNumberId())
+	if err != nil {
+		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	message, serverError, err := h.messageUsecase.GetByWamid(ctx, whatsappBusinessAccount.TenantID, req.GetPhoneNumberId(), req.GetRecipientId(), req.GetWamid())
+	if err != nil {
+		return nil, api_response.NewGRPCErrorResponse(serverError, err)
+	}
+	inputData := dto.MessageSaveRequest{
+		ID:              &message.DocumentID,
+		ChatID:          &message.ChatID,
+		StorageMediaID:  message.StorageMediaID,
+		Wamid:           message.Wamid,
+		PhoneNumberId:   req.PhoneNumberId,
+		RecipientId:     req.RecipientId,
+		MessageType:     message.MessageType,
+		MessageCategory: req.MessageCategory,
+		SenderName:      message.SenderName,
+		Payload:         message.Payload,
+		Status:          req.Status,
+		Error:           req.Error,
+		SentAt:          message.SentAt,
+		DeliveredAt:     message.DeliveredAt,
+		ReadAt:          message.ReadAt,
+		CreatedAt:       req.Timestamp.AsTime(),
+	}
+	switch req.GetStatus() {
+	case "sent":
+		inputData.SentAt = &inputData.CreatedAt
+	case "delivered":
+		inputData.DeliveredAt = &inputData.CreatedAt
+	case "read":
+		inputData.ReadAt = &inputData.CreatedAt
+	}
+	validator := utils.NewValidator()
+	if err := validator.Struct(inputData); err != nil {
+		return nil, api_response.NewGRPCErrorResponse(false, err)
 	}
 	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
