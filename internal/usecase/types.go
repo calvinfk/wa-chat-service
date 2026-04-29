@@ -79,9 +79,9 @@ type (
 
 	// Chat defines chat querying operations for conversation-level views.
 	Chat interface {
-		// GetChatByPhoneNumberID retrieves chat sessions for a phone number with filter options.
+		// GetChatByPhoneNumberId retrieves chat sessions for a phone number with filter options.
 		// Returns a filtered chat response, a server-error flag (true if error is from server), and an error.
-		GetChatByPhoneNumberID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error)
+		GetChatByPhoneNumberId(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error)
 		// GetByID retrieves a chat session by its unique identifier.
 		// Returns the chat model, a server-error flag (true if error is from server), and an error.
 		GetByID(ctx context.Context, chatID string) (model.Chat, bool, error)
@@ -91,6 +91,9 @@ type (
 		// AssignAgent assigns a chat ticket to an agent, updating relevant records and associations.
 		// Returns a server-error flag (true if error is from server) and an error.
 		AssignAgent(ctx context.Context, tenantID string, requestData dto.ChatAssignAgentRequest) (bool, error)
+		// CreateChat creates a new chat session for a given phone number
+		// Returns the created chat model, a server-error flag (true if error is from server), and an error.
+		CreateChat(ctx context.Context, tenantID string, requestData dto.ChatCreateRequest) (model.Chat, bool, error)
 	}
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.

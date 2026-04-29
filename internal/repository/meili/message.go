@@ -105,12 +105,12 @@ func NewMeiliMessageRepository(db meilisearch.ServiceManager, zsLog *zap.Sugared
 	}
 }
 
-func (r *MeiliMessageRepository) AddDocuments(ctx context.Context, messages []model.Message) error {
+func (r *MeiliMessageRepository) AddDocuments(ctx context.Context, messages []model.Message) (*meilisearch.TaskInfo, error) {
 	primaryKey := r.message.PKName()
-	_, err := r.db.Index("messages").AddDocuments(messages, &meilisearch.DocumentOptions{
+	taskInfo, err := r.db.Index("messages").AddDocuments(messages, &meilisearch.DocumentOptions{
 		PrimaryKey: &primaryKey,
 	})
-	return err
+	return taskInfo, err
 }
 
 func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error) {
@@ -141,4 +141,9 @@ func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest 
 		messages = append(messages, message)
 	}
 	return messages, searched.TotalHits, paginate, err
+}
+
+func (r *MeiliMessageRepository) GetTaskStatus(ctx context.Context, taskUID int64) (*meilisearch.Task, error) {
+	task, err := r.db.GetTask(taskUID)
+	return task, err
 }

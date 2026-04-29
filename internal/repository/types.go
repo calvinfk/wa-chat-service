@@ -7,6 +7,7 @@ import (
 	"wa_chat_service/pkg/filter_request"
 
 	"cloud.google.com/go/firestore"
+	"github.com/meilisearch/meilisearch-go"
 )
 
 type (
@@ -15,17 +16,17 @@ type (
 		// Upsert inserts or updates a chat entry.
 		// returns the upserted chat, a boolean indicating whether it was created (true) or updated (false), and an error if any.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, bool, error)
-		// GetChatByPhoneNumberID gets chat entries filtered by phone number ID.
-		GetChatByPhoneNumberID(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
-		// GetOpenedTicketChatByPhoneNumberID gets opened ticket chat entries filtered by phone number ID.
-		GetOpenedTicketChatByPhoneNumberID(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
+		// GetChatByPhoneNumberId gets chat entries filtered by phone number ID.
+		GetChatByPhoneNumberId(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
+		// GetOpenedTicketChatByPhoneNumberId gets opened ticket chat entries filtered by phone number ID.
+		GetOpenedTicketChatByPhoneNumberId(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
 		// GetByID gets a chat entry by chat ID.
 		GetByID(ctx context.Context, chatID string) (model.Chat, error)
 	}
 
 	// Message defines persistence operations for message data.
 	Message interface {
-		// Upsert inserts or updates a message entry.
+		// Upsert inserts or updates a message entry. also updates the search index accordingly.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
 		// GetByChatID gets message entries filtered by chat ID.
 		GetByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error)
@@ -119,9 +120,11 @@ type (
 	// SearchMessage defines indexing and query operations for message search.
 	SearchMessage interface {
 		// AddDocuments adds message documents to the search index.
-		AddDocuments(ctx context.Context, document []model.Message) error
+		AddDocuments(ctx context.Context, document []model.Message) (*meilisearch.TaskInfo, error)
 		// GetFiltered gets indexed messages by filter criteria with pagination metadata.
 		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
+		// GetTaskStatus gets the status of an indexing task by task UID.
+		GetTaskStatus(ctx context.Context, taskUID int64) (*meilisearch.Task, error)
 	}
 
 	User interface {

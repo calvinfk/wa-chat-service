@@ -65,7 +65,7 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 	return chat, created, err
 }
 
-func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error) {
+func (r *ChatRepository) GetChatByPhoneNumberId(ctx context.Context, filter filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error) {
 	var response filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]
 	filters, sort, paginate, err := filter_request.InitializeFilter(filter, r.chat.AllowedFilterFields(), r.chat.AllowedSortFields())
 	if err != nil {
@@ -92,7 +92,7 @@ func (r *ChatRepository) GetChatByPhoneNumberID(ctx context.Context, filter filt
 	return response, nil
 }
 
-func (r *ChatRepository) GetOpenedTicketChatByPhoneNumberID(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error) {
+func (r *ChatRepository) GetOpenedTicketChatByPhoneNumberId(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error) {
 	doc, err := r.db.Collection(r.chat.TableName()).
 		Where("phone_number_id", "==", phoneNumberId).
 		Where("recipient_id", "==", recipientId).

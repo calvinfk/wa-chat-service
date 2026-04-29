@@ -28,10 +28,11 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	chatGroup := api.Group("/chat")
 	{
 		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
-		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberID)
+		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberId)
 		chatGroup.Get("/messages", middleware.Protected(), middleware.Role("admin", "agent"), h.getMessagesByChatID)
 		chatGroup.Post("/close-ticket", middleware.Protected(), middleware.Role("admin"), h.closeTicket)
 		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role("admin"), h.assignAgent)
+		chatGroup.Post("/create", middleware.Protected(), h.createChat)
 	}
 }
 
@@ -70,7 +71,7 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
+func (h *ChatHandler) getChatByPhoneNumberId(ctx fiber.Ctx) error {
 	var requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]
 	if err := ctx.Bind().Query(&requestData.SpecificFilter); err != nil {
 		code, response := api_response.NewErrorApiResponse(false, err)
@@ -81,7 +82,7 @@ func (h *ChatHandler) getChatByPhoneNumberID(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	authData := ctx.Locals("token_sub").(dto.AuthData)
-	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberID(ctx.Context(), authData.TenantID, requestData)
+	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberId(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -139,5 +140,21 @@ func (h *ChatHandler) assignAgent(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Successfully assigned agent", nil)
+	return ctx.Status(code).JSON(response)
+}
+
+func (uc *ChatHandler) createChat(ctx fiber.Ctx) error {
+	var requestData dto.ChatCreateRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		code, response := api_response.NewErrorApiResponse(false, err)
+		return ctx.Status(code).JSON(response)
+	}
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	data, serverError, err := uc.chatUsecase.CreateChat(ctx.Context(), authData.TenantID, requestData)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully created chat", data)
 	return ctx.Status(code).JSON(response)
 }

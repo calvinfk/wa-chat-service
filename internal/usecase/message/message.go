@@ -296,7 +296,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 			u.zsLog.Errorf("[SaveMessage] Failed to upsert existing message: %v", err)
 			return true, err
 		}
-		err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
+		_, err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
 		if err != nil {
 			u.zsLog.Errorf("[SaveMessage] Failed to add existing message to search index: %v", err)
 		}
@@ -326,7 +326,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 	} else {
 		switch tenant.ChatType {
 		case "ticket":
-			chat, err = u.chatRepository.GetOpenedTicketChatByPhoneNumberID(ctx, inputData.PhoneNumberId, inputData.RecipientId)
+			chat, err = u.chatRepository.GetOpenedTicketChatByPhoneNumberId(ctx, inputData.PhoneNumberId, inputData.RecipientId)
 			switch err {
 			case nil:
 				chatID = chat.DocumentID
@@ -458,7 +458,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 		messagesToIndex = append(messagesToIndex, message)
 		return false, nil
 	})
-	err = u.searchMessageRepository.AddDocuments(ctx, messagesToIndex)
+	_, err = u.searchMessageRepository.AddDocuments(ctx, messagesToIndex)
 	if err != nil {
 		u.zsLog.Errorf("[SaveMessage] Failed to add message to search index: %v", err)
 	}
@@ -474,7 +474,7 @@ func (u *MessageUsecase) GetByWamid(ctx context.Context, tenantID string, phoneN
 	}
 	var chatID string
 	if tenant.ChatType == "ticket" {
-		chat, err := u.chatRepository.GetOpenedTicketChatByPhoneNumberID(ctx, phoneNumberId, recipientId)
+		chat, err := u.chatRepository.GetOpenedTicketChatByPhoneNumberId(ctx, phoneNumberId, recipientId)
 		if err != nil && err != errs.ErrGenericNotFound {
 			u.zsLog.Errorf("[GetByTenantIDAndWamid] Failed to get opened ticket chat: %v", err)
 			return model.Message{}, true, err
