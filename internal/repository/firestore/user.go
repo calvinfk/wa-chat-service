@@ -24,8 +24,7 @@ func NewUserRepository(db *firestore.Client) *UserRepository {
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (model.User, error) {
-	collection := r.db.Collection("users")
-	docRef, err := collection.Where("email", "==", email).Limit(1).Documents(ctx).Next()
+	docRef, err := r.db.Collection(r.user.TableName()).Where("email", "==", email).Limit(1).Documents(ctx).Next()
 	if err != nil {
 		if err == iterator.Done {
 			return model.User{}, errs.ErrGenericNotFound
@@ -43,7 +42,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (model.Us
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (model.User, error) {
-	doc, err := r.db.Collection("users").Doc(id).Get(ctx)
+	doc, err := r.db.Collection(r.user.TableName()).Doc(id).Get(ctx)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -63,8 +62,11 @@ func (r *UserRepository) GetByTenantIDFiltered(ctx context.Context, tenantID str
 	if err != nil {
 		return response, err
 	}
-	query := r.db.Collection("users").Where("tenant_id", "==", tenantID)
+	query := r.db.Collection(r.user.TableName()).Where("tenant_id", "==", tenantID)
 	docs, totalItems, err := filter_request.ApplyFilterFirestore(ctx, query, filter, sort, paginate)
+	if err != nil {
+		return response, err
+	}
 	var results []dto.UserResponse
 	for _, doc := range docs {
 		var user model.User
@@ -78,4 +80,21 @@ func (r *UserRepository) GetByTenantIDFiltered(ctx context.Context, tenantID str
 	}
 	response = filter_request.NewFilterResponse(results, paginate, totalItems)
 	return response, nil
+}
+
+func (r *UserRepository) Upsert(ctx context.Context, tx *firestore.Transaction, user model.User) (model.User, error) {
+	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
+		_, err := r.db.Collection(r.user.TableName()).Doc(user.DocumentID).Set(ctx, user)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	var err error
+	if tx != nil {
+		err = execDB(ctx, tx)
+	} else {
+		err = r.db.RunTransaction(ctx, execDB)
+	}
+	return user, err
 }

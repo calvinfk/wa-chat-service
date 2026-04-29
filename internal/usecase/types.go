@@ -161,5 +161,11 @@ type (
 		// GetByTenantIDFiltered retrieves users for a tenant with filter and pagination options.
 		// Returns a filtered user response, a server-error flag (true if error is from server), and an error.
 		GetByTenantIDFiltered(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.UserListRequest]) (filter_request.FilterResponse[dto.UserResponse], bool, error)
+		// GetByID retrieves a user by their unique identifier within a tenant.
+		// Returns the user response, a server-error flag (true if error is from server), and an error.
+		GetByID(ctx context.Context, tenantID string, requestData dto.UserGetByIDRequest) (dto.UserResponse, bool, error)
+		// Upsert creates or updates a user record within a tenant.
+		// Returns the upserted user response, a server-error flag (true if error is from server), and an error.
+		Upsert(ctx context.Context, tenantID string, requestData dto.UserUpsertRequest) (dto.UserResponse, bool, error)
 	}
 )

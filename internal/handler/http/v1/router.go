@@ -17,6 +17,7 @@ type HandlerHTTPV1 struct {
 	BroadcastUsecase    usecase.Broadcast
 	TenantUsecase       usecase.Tenant
 	AuthUsecase         usecase.Auth
+	UserUsecase         usecase.User
 	EncryptService      service.Encrypt
 	JWTService          service.JWT
 	AccessTokenService  service.AccessToken
@@ -40,4 +41,6 @@ func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
 	tenantHandler.RegisterRoute(api)
 	authHandler := NewAuthHandler(routerHandler.AuthUsecase, config)
 	authHandler.RegisterRoutes(api)
+	userHandler := NewUserHandler(routerHandler.UserUsecase)
+	userHandler.RegisterRoute(api)
 }

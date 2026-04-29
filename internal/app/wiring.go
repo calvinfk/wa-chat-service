@@ -29,6 +29,7 @@ import (
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
+	user_usecase "wa_chat_service/internal/usecase/user"
 	wa_business_account_usecase "wa_chat_service/internal/usecase/wa_business_account"
 	server_grpc "wa_chat_service/pkg/server/grpc"
 	grpc_middleware "wa_chat_service/pkg/server/grpc/middleware"
@@ -92,6 +93,7 @@ type usecases struct {
 	Broadcast         usecase.Broadcast
 	Auth              usecase.Auth
 	WaBusinessAccount usecase.WaBusinessAccount
+	User              usecase.User
 }
 
 func NewDefaultWiring(zsLog *zap.SugaredLogger, cfg *config.Config) servers {
@@ -188,6 +190,7 @@ func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, repositories.WaPhone, repositories.WaBusinessAccount, repositories.User, repositories.Message, repositories.Tenant, repositories.SearchMessage, clients.txManager, zsLog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, waBusinessAccountUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zsLog)
 	authUsecase := auth_usecase.NewAuthUsecase(repositories.User, repositories.Tenant, services.AccessToken, services.Encrypt, zsLog)
+	userUsecase := user_usecase.NewUserUsecase(repositories.User, zsLog)
 	return usecases{
 		Template:          templateUsecase,
 		Message:           messageUsecase,
@@ -197,6 +200,7 @@ func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 		Broadcast:         broadcastUsecase,
 		Auth:              authUsecase,
 		WaBusinessAccount: waBusinessAccountUsecase,
+		User:              userUsecase,
 	}
 }
 
@@ -244,6 +248,7 @@ func newDefaultServers(cfg *config.Config, zsLog *zap.SugaredLogger, services se
 		BroadcastUsecase:    usecases.Broadcast,
 		TenantUsecase:       usecases.Tenant,
 		AuthUsecase:         usecases.Auth,
+		UserUsecase:         usecases.User,
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
 		AccessTokenService:  services.AccessToken,
