@@ -2,35 +2,42 @@
 
 Go service built with Fiber v3 for WhatsApp chat operations, media handling, and Firestore-backed data access.
 
-## API Base URL
+## Features
+- Whatsapp message sending with support for various message types and templates
+- Media upload and streaming with range support
+- Broadcast scheduling and management
+- Tenant contact management
+- JWT-based authentication with AES-encrypted tokens
+- gRPC server with HMAC authentication for internal services
 
-All routes are mounted under:
 
-`/api`
+## API
 
-## API Endpoints
+There are two main categories of API endpoints: HTTP REST endpoints (handled by Fiber) and gRPC services. The HTTP API is organized under `/api`. The gRPC server exposes services for message sending and media management.
 
-### Health
+### Rest API Endpoints
+
+#### Health
 
 - `GET /api/ping` - public health check
 - `GET /api/ping-protected` - protected health check (see Authentication Notes)
 
-### Auth (`/api/v1/auth`)
+#### Auth (`/api/v1/auth`)
 
 - `POST /login`
   - Body (JSON): auth login payload (handled by `dto.AuthLoginRequest`)
   - On success, sets encrypted token cookie `access_token` (HttpOnly)
 
-### Chat (`/api/v1/chat`)
+#### Chat (`/api/v1/chat`)
+
+All endpoints require authentication (Bearer token).
 
 - `POST /send`
-  - Body (JSON): `phone_number_id`, `recipient_id`, `recipient_name`, `sender_name`, `type`, and payload keyed by `type`
+  - Body (JSON): `chat_id`, `sender_name` (optional), `type`, and payload keyed by `type`
   - Example for text message payload:
     ```json
     {
-      "phone_number_id": "123",
-      "recipient_id": "628123456789",
-      "recipient_name": "Recipient",
+      "chat_id": "00000000-0000-0000-0000-000000000000",
       "sender_name": "Agent",
       "type": "text",
       "text": {
@@ -45,25 +52,32 @@ All routes are mounted under:
   - Query: `chat_id`
   - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
 
-### Template (`/api/v1/template`)
+#### Template (`/api/v1/template`)
+
+All endpoints require authentication (Bearer token).
 
 - `GET /get`
-  - Query: `phone_number_id`
-  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+  - Query: `wa_business_account_id` (required)
+  - Optional query: `search`, `name`, `status` (APPROVED|REJECTED|PENDING), `category` (MARKETING|UTILITY|AUTHENTICATION), `page`, `page_size`, `sort_by`, `sort_order`
 - `POST /create`
+  - Body (JSON): `wa_business_account_id`, `name`, `language`, `category`, `parameter_format` (optional), `components` (array)
 - `POST /sync`
+  - Body (JSON): `wa_business_account_id`
 - `PUT /update`
+  - Body (JSON): `wa_business_account_id`, `id`, `name`, `language`, `category`, `parameter_format` (optional), `components` (array)
 - `DELETE /delete`
+  - Query: `wa_business_account_id`, `id`
 
-### Broadcast (`/api/v1/broadcast`)
+#### Broadcast (`/api/v1/broadcast`)
 
 - `POST /upsert`
   - Body (JSON): Broadcast configuration data
 - `POST /schedule`
   - Body (JSON): Broadcast scheduling data
 - `POST /send`
-  - Expects JWT token in `Authorization` header (JWT middleware validation)
-  - Endpoint returns `200` immediately and continues async send flow with valid `jwt_sub`
+  - Expects encrypted JWT token in `Authorization: Bearer <token>` header
+  - Endpoint returns `200` immediately and continues async send flow in background with valid `jwt_sub`
+  - Token format: `jwt_sub` should be `broadcast_<broadcast_id>` to trigger send
 - `PUT /cancel`
   - Body (JSON): Broadcast ID to cancel
 - `GET /get-filtered`
@@ -71,28 +85,67 @@ All routes are mounted under:
 - `GET /get-recipients-filtered`
   - Supports filter/pagination query params for broadcast recipients
 
-### Tenant Contact (`/api/v1/tenant/contact`)
+#### Tenant Contact (`/api/v1/tenant/contact`)
+
+All endpoints require authentication (Bearer token).
 
 - `POST /create`
+  - Body (JSON): Contact data
 - `GET /filter`
-  - Supports filter/pagination query params
+  - Optional query: filter params and pagination (`page`, `page_size`, `sort_by`, `sort_order`)
 - `PUT /update`
+  - Body (JSON): Updated contact data
 
-### Storage Media (`/api/v1/storage-media`)
+#### Storage Media (`/api/v1/storage-media`)
 
-- `POST /upload`
+- `POST /upload` (requires authentication)
   - Multipart form-data: `file` (single file), `phone_number_id`
-- `GET /get`
+- `GET /get` (public)
   - Query: `media` (encrypted media token)
   - Optional header: `Range: bytes=...` for browser/video playback and seek support
   - Returns streamed media bytes (`Content-Type` from stored object metadata)
   - Supports `206 Partial Content` when a valid range is requested
-- `POST /encrypt-link`
+- `POST /encrypt-link` (public)
   - Body (JSON): Media link/URL to encrypt
-- `DELETE /delete`
+- `DELETE /delete` (requires authentication)
   - Query: `phone_number_id` and `id`
-- `GET /list`
+- `GET /list` (requires authentication)
   - Optional query: filter/pagination params
+
+
+### gRPC Services
+
+**Purpose**: Internal server-to-server communication for webhook processing and async operations. All gRPC endpoints require HMAC authentication via the interceptor.
+
+#### Message Service (`package v1`)
+- **Proto**: `docs/proto/v1/message.proto`
+- `SaveMessage(SaveMessageRequest) -> Empty`
+  - Saves an incoming message with associated metadata (used by webhook processor)
+  - Request fields: `message` (MessageModel), `phone_number_id`, `recipient_id`, `recipient_name`, `last_message`
+  - MessageModel fields: `id`, `wamid`, `chat_id`, `message_type`, `message_category`, `sender_name`, `payload`, `storage_media_id` (optional), `status`, `created_at`, `sent_at` (optional), `delivered_at` (optional), `read_at` (optional), `error` (optional)
+
+- `UpdateMessageStatus(UpdateMessageStatusRequest) -> Empty`
+  - Updates message status (sent, delivered, read, failed) and timestamps
+  - Request fields: `wamid`, `phone_number_id`, `recipient_id`, `status`, `message_category`, `error` (optional), `timestamp`
+
+#### Storage Media Service (`package grpc.v1`)
+- **Proto**: `docs/proto/v1/storage-media.proto`
+- `SaveMediaID(SaveMediaIDRequest) -> SaveMediaIDResponse`
+  - Stores a media ID reference for a phone number (used by webhook processor)
+  - Request fields: `media_id`, `phone_number_id`
+  - Response fields: `id` (saved media storage ID)
+
+### HMAC gRPC Interceptor
+
+All gRPC requests require HMAC authentication via custom interceptor middleware:
+- Clients **must** include an `x-signature` metadata header with an HMAC signature of the request payload
+- Clients **must** include an `x-timestamp` metadata header to prevent replay attacks
+- Body is JSON-marshaled with 1 space indentation before signing
+- Uses SHA256 as the hashing algorithm
+- Signature format: HMAC-SHA256(payload, shared_secret)
+- Shared secret configured via `HMAC_SECRET` environment variable
+- Reference: [HMAC header tutorial](https://learn.microsoft.com/en-us/azure/communication-services/tutorials/hmac-header-tutorial?pivots=programming-language-csharp)
+
 
 ## Authentication Notes
 
@@ -116,30 +169,6 @@ All routes are mounted under:
 - Request body/file-size guard at 16 MB (`413` when exceeded)
 - Access token parsing and validation
 - Protected route authorization
-
-## gRPC Infrastructure
-
-The service exposes a gRPC server on the same port as the HTTP (Fiber) server with the following services:
-
-### gRPC Services
-
-#### Message Service
-- `SendMessage` - Send WhatsApp messages via gRPC
-- Proto definition: `docs/proto/v1/message.proto`
-
-#### Storage Media Service
-- Media asset management via gRPC
-- Proto definition: `docs/proto/v1/storage-media.proto`
-
-### HMAC gRPC Interceptor
-
-The gRPC interceptor implements custom HMAC-based authentication:
-- Expects clients to include an `x-signature` metadata containing an HMAC signature of the request payload
-- Body is JSON-marshaled with 1 space indentation
-- Checks for a timestamp in `x-timestamp` metadata to prevent replay attacks ([replay prevention reference](https://webhooks.fyi/security/replay-prevention))
-- Uses SHA256 as the hashing algorithm for good balance between security and performance
-- Signature generated from URI + content ([reference](https://learn.microsoft.com/en-us/azure/communication-services/tutorials/hmac-header-tutorial?pivots=programming-language-csharp))
-- Uses shared secret configured via `HMAC_SECRET`
 
 ## Standard JSON Response Shape
 
@@ -315,8 +344,9 @@ make docker
 
 Default compose services:
 
-- `wa-chat-service` on `8120`
+- `wa-chat-service` on `8121`
 - `Meilisearch` (optional search backend)
+
 
 ## Project Structure
 
@@ -332,6 +362,7 @@ Default compose services:
 |   |-- dto/          # Data transfer objects with validation
 |   |-- handler/
 |   |   |-- grpc/     # gRPC service handlers
+|   |   |   `-- v1/   # gRPC service handlers for version 1
 |   |   `-- http/     # HTTP handlers (Fiber)
 |   |       |-- middleware/  # HTTP middleware (access_token, jwt, etc.)
 |   |       `-- v1/   # API v1 handlers
@@ -345,9 +376,11 @@ Default compose services:
 |   |   |-- encrypt/       # Encryption/decryption
 |   |   |-- google/        # Google Cloud services
 |   |   |-- jose/          # JWT signing
-|   |   `-- whatsapp/      # WhatsApp API integration
+|   |   |-- whatsapp/      # WhatsApp API integration
+|   |   `-- types.go       # Service interfaces
 |   `-- usecase/      # Use case orchestration
-|-- pkg/              # Shared utilities
+|       `-- auth/         # Authentication use cases (login, token validation, etc.)
+|-- pkg/              # Shared utilities that can be imported by internal packages
 |   |-- api_response/ # Standard response envelopes
 |   |-- errs/         # Error handling and types
 |   |-- filter_request/ # Query filtering and pagination
