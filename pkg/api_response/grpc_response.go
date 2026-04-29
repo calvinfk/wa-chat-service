@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// https://grpc.io/docs/guides/status-codes/
 func NewGRPCErrorResponse(serverError bool, err error) error {
 	var code codes.Code
 	var msg string

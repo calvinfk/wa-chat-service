@@ -1,10 +1,13 @@
 syntax = "proto3";
 
+// https://protobuf.dev/reference/protobuf/google.protobuf/
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 package v1;
 
+// Go-specific instruction for the protoc compiler.
+// It tells the compiler where to put the generated Go source code when you run the command to build your project.
 option go_package = "docs/proto/v1";
 
 // Message defines the gRPC service for managing messages.

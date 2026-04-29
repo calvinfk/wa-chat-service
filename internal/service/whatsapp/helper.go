@@ -96,6 +96,7 @@ func parseTemplateValidationInput(templateDB model.Template, templateSend whatsa
 	}, nil
 }
 
+// Extract parameter values from the send components based on the parameter format
 func parseDBTemplateComponents(components []map[string]any) (map[string]map[string]string, error) {
 	parsedParameter := map[string]map[string]string{
 		"HEADER": {},
@@ -115,6 +116,8 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 				return nil, err
 			}
 			componentFormat = strings.ToLower(componentFormat)
+			// if the format is text, we will extract the parameter from the text field
+			// otherwise we will extract the parameter from the media type
 			if componentFormat == "text" {
 				componentText, err := extractStringField(component, "text")
 				if err != nil {
@@ -153,6 +156,7 @@ func parseDBTemplateComponents(components []map[string]any) (map[string]map[stri
 	return parsedParameter, nil
 }
 
+// validates the number of parameters and if component payload is valid
 func validateSendComponents(whatsappClient *whatsapp_business.Client, parameterFormat string, sendComponents []map[string]any) error {
 	if parameterFormat == "" {
 		return fmt.Errorf("parameter format is required when components are present")
@@ -315,6 +319,7 @@ func validateParameterMatch(dbParsedParameter, sendParsedParameter map[string]ma
 			}
 			for paramName := range parameters {
 				if _, exists := sendParsedParameter[componentType][paramName]; !exists {
+					// check if the missing parameter is media type parameter, if yes we will return error message indicating which media is missing
 					if mediaType, ok := strings.CutPrefix(paramName, "mediatype_db_"); ok {
 						return fmt.Errorf("missing media '%s' for %s in the payload", mediaType, componentType)
 					}

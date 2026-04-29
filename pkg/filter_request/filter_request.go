@@ -87,6 +87,7 @@ func InitializeFilter[T Validatable](filterRequest FilterRequest[T], allowedFilt
 	if isEmpty(sort.SortOrder) {
 		sort.SortOrder = DEFAULT_SORT_ORDER
 	}
+	// Check if field is allowed to be sorted
 	sortFieldMap := map[string]bool{}
 	for _, f := range allowedSortFields {
 		sortFieldMap[f] = true
@@ -104,6 +105,7 @@ func InitializeFilter[T Validatable](filterRequest FilterRequest[T], allowedFilt
 	if err != nil {
 		return nil, filterRequest.Sort, filterRequest.Paginate, err
 	}
+	// Create a map for allowed filter fields for easy lookup
 	filterFieldMap := map[string]bool{}
 	for _, f := range allowedFilterFields {
 		filterFieldMap[f] = true

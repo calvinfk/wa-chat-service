@@ -13,8 +13,7 @@ type ApiResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    any    `json:"data"`
-	// Errors  map[string]string `json:"errors"`
-	Errors any `json:"errors"`
+	Errors  any    `json:"errors"`
 }
 
 // NewApiResponse creates a standardized API response based on the provided parameters.

@@ -17,6 +17,7 @@ build:
 clean:
 	@if exist $(APP_NAME).exe del $(APP_NAME).exe
 
+# --proto_path=./docs/proto/ for base path,  ./docs/proto/**/*.proto for all proto files in subdirectories
 proto:
 	protoc --go_out=. --go-grpc_out=. --proto_path=./docs/proto/ ./docs/proto/**/*.proto
 
