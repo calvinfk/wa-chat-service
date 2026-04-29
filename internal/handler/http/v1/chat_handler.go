@@ -29,7 +29,9 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	{
 		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
 		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberID)
-		chatGroup.Get("/messages", middleware.Protected(), h.getMessagesByChatID)
+		chatGroup.Get("/messages", middleware.Protected(), middleware.Role("admin", "agent"), h.getMessagesByChatID)
+		chatGroup.Post("/close-ticket", middleware.Protected(), middleware.Role("admin"), h.closeTicket)
+		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role("admin"), h.assignAgent)
 	}
 }
 
@@ -105,5 +107,37 @@ func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Successfully retrieved messages", messages)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) closeTicket(ctx fiber.Ctx) error {
+	var requestData dto.ChatCloseTicketRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		code, response := api_response.NewErrorApiResponse(false, err)
+		return ctx.Status(code).JSON(response)
+	}
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.chatUsecase.CloseTicket(ctx.Context(), authData.TenantID, requestData)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully closed ticket", nil)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) assignAgent(ctx fiber.Ctx) error {
+	var requestData dto.ChatAssignAgentRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		code, response := api_response.NewErrorApiResponse(false, err)
+		return ctx.Status(code).JSON(response)
+	}
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.chatUsecase.AssignAgent(ctx.Context(), authData.TenantID, requestData)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully assigned agent", nil)
 	return ctx.Status(code).JSON(response)
 }

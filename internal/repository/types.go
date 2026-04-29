@@ -127,6 +127,10 @@ type (
 	User interface {
 		// GetByEmail gets a user by email.
 		GetByEmail(ctx context.Context, email string) (model.User, error)
+		// GetByID gets a user by ID.
+		GetByID(ctx context.Context, id string) (model.User, error)
+		// GetByTenantIDFiltered gets users by tenant ID with filtering options.
+		GetByTenantIDFiltered(ctx context.Context, tenantID string, filter filter_request.FilterRequest[dto.UserListRequest]) (filter_request.FilterResponse[dto.UserResponse], error)
 	}
 
 	WaBusinessAccount interface {

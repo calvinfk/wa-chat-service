@@ -44,6 +44,8 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 		}
 
 		updateErr := tx.Update(doc, []firestore.Update{
+			{Path: "chat_status", Value: chat.ChatStatus},
+			{Path: "agent_id", Value: chat.AgentID},
 			{Path: "last_message", Value: chat.LastMessage},
 			{Path: "updated_at", Value: chat.UpdatedAt},
 		})

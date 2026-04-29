@@ -87,10 +87,10 @@ type (
 		GetByID(ctx context.Context, chatID string) (model.Chat, bool, error)
 		// CloseTicket performs operations to close a chat ticket, such as updating chat status and recording closure metadata.
 		// Returns a server-error flag (true if error is from server) and an error.
-		CloseTicket(ctx context.Context, requestData dto.ChatCloseTicketRequest) (bool, error)
+		CloseTicket(ctx context.Context, tenantID string, requestData dto.ChatCloseTicketRequest) (bool, error)
 		// AssignAgent assigns a chat ticket to an agent, updating relevant records and associations.
 		// Returns a server-error flag (true if error is from server) and an error.
-		AssignAgent(ctx context.Context, requestData dto.ChatAssignAgentRequest) (bool, error)
+		AssignAgent(ctx context.Context, tenantID string, requestData dto.ChatAssignAgentRequest) (bool, error)
 	}
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.
@@ -151,5 +151,12 @@ type (
 		// This method is useful when the caller has the WABA ID but not the phone number ID, and needs to resolve the WhatsApp client for API interactions.
 		// Returns the WhatsApp client, wabaID, and an error when resolution fails.
 		GetWhatsappClientByWaBusinessAccountID(ctx context.Context, tenantID string, waBusinessAccountID string) (*whatsapp_business.Client, string, error)
+	}
+
+	// User defines user retrieval operations for tenant-level user management.
+	User interface {
+		// GetByTenantIDFiltered retrieves users for a tenant with filter and pagination options.
+		// Returns a filtered user response, a server-error flag (true if error is from server), and an error.
+		GetByTenantIDFiltered(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.UserListRequest]) (filter_request.FilterResponse[dto.UserResponse], bool, error)
 	}
 )
