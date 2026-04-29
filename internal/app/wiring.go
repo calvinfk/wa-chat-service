@@ -183,10 +183,10 @@ func newDefaultRepositories(clients clients, services services, zsLog *zap.Sugar
 
 func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
 	waBusinessAccountUsecase := wa_business_account_usecase.NewWaBusinessAccountUsecase(repositories.WaBusinessAccount, services.Encrypt, repositories.WaPhone, zsLog)
-	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, repositories.WaBusinessAccount, repositories.WaPhone, services.Encrypt, zsLog)
+	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zsLog)
 	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, repositories.WaBusinessAccount, waBusinessAccountUsecase, services.WhatsappBusiness, clients.txManager, zsLog)
 	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, waBusinessAccountUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zsLog, cfg.App.PublicURL)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, repositories.Tenant, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, clients.txManager, zsLog)
+	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, repositories.Tenant, repositories.User, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, clients.txManager, zsLog)
 	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, repositories.WaPhone, repositories.WaBusinessAccount, repositories.User, repositories.Message, repositories.Tenant, repositories.SearchMessage, clients.txManager, zsLog)
 	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, waBusinessAccountUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zsLog)
 	authUsecase := auth_usecase.NewAuthUsecase(repositories.User, repositories.Tenant, services.AccessToken, services.Encrypt, zsLog)

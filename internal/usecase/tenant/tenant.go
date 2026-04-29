@@ -15,20 +15,16 @@ import (
 )
 
 type TenantUsecase struct {
-	tenantRepository            repository.Tenant
-	waBusinessAccountRepository repository.WaBusinessAccount
-	waPhoneNumberRepository     repository.WaPhone
-	encryptService              service.Encrypt
-	zsLog                       *zap.SugaredLogger
+	tenantRepository repository.Tenant
+	encryptService   service.Encrypt
+	zsLog            *zap.SugaredLogger
 }
 
-func NewTenantUsecase(tenantRepository repository.Tenant, waBusinessAccountRepository repository.WaBusinessAccount, waPhoneNumberRepository repository.WaPhone, encryptService service.Encrypt, zsLog *zap.SugaredLogger) *TenantUsecase {
+func NewTenantUsecase(tenantRepository repository.Tenant, encryptService service.Encrypt, zsLog *zap.SugaredLogger) *TenantUsecase {
 	return &TenantUsecase{
-		tenantRepository:            tenantRepository,
-		waBusinessAccountRepository: waBusinessAccountRepository,
-		waPhoneNumberRepository:     waPhoneNumberRepository,
-		encryptService:              encryptService,
-		zsLog:                       zsLog,
+		tenantRepository: tenantRepository,
+		encryptService:   encryptService,
+		zsLog:            zsLog,
 	}
 }
 

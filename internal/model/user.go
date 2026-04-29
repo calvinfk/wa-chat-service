@@ -13,12 +13,20 @@ type (
 		DocumentID   string    `json:"id" firestore:"-"`
 		TenantID     string    `json:"tenant_id" firestore:"tenant_id"`                             // foreign key to tenant
 		SupervisorID *string   `json:"supervisor_id,omitempty" firestore:"supervisor_id,omitempty"` // foreign key to supervisor, nullable
-		Role         string    `json:"role" firestore:"role"`
+		Role         UserRole  `json:"role" firestore:"role"`
 		Name         string    `json:"name" firestore:"name"`
 		Email        string    `json:"email" firestore:"email"`
 		Password     string    `json:"password" firestore:"password"` // stored as a hash in the database, do not include in JSON responses
 		CreatedAt    time.Time `json:"created_at" firestore:"created_at"`
 	}
+)
+
+type UserRole string
+
+const (
+	UserRoleAdmin      UserRole = "admin"
+	UserRoleSupervisor UserRole = "supervisor"
+	UserRoleAgent      UserRole = "agent"
 )
 
 func (User) TableName() string {

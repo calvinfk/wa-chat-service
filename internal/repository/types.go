@@ -136,6 +136,8 @@ type (
 		GetByTenantIDFiltered(ctx context.Context, tenantID string, filter filter_request.FilterRequest[dto.UserListRequest]) (filter_request.FilterResponse[dto.UserResponse], error)
 		// Upsert inserts or updates a user entry.
 		Upsert(ctx context.Context, tx *firestore.Transaction, user model.User) (model.User, error)
+		// GetBySupervisorID gets users by supervisor ID.
+		GetBySupervisorID(ctx context.Context, supervisorID string) ([]model.User, error)
 	}
 
 	WaBusinessAccount interface {

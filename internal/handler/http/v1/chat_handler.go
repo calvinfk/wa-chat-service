@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/handler/http/middleware"
+	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -29,9 +30,9 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 	{
 		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
 		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberId)
-		chatGroup.Get("/messages", middleware.Protected(), middleware.Role("admin", "agent"), h.getMessagesByChatID)
-		chatGroup.Post("/close-ticket", middleware.Protected(), middleware.Role("admin"), h.closeTicket)
-		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role("admin"), h.assignAgent)
+		chatGroup.Get("/messages", middleware.Protected(), h.getMessagesByChatID)
+		chatGroup.Post("/close-ticket", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.closeTicket)
+		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 		chatGroup.Post("/create", middleware.Protected(), h.createChat)
 	}
 }
@@ -82,7 +83,7 @@ func (h *ChatHandler) getChatByPhoneNumberId(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	authData := ctx.Locals("token_sub").(dto.AuthData)
-	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberId(ctx.Context(), authData.TenantID, requestData)
+	chats, serverError, err := h.chatUsecase.GetChatByPhoneNumberId(ctx.Context(), authData, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -102,7 +103,7 @@ func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	authData := ctx.Locals("token_sub").(dto.AuthData)
-	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), authData.TenantID, requestData)
+	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), authData, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)

@@ -16,7 +16,7 @@ type (
 		SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error)
 		// GetMessagesByChatID fetches paginated messages for a chat.
 		// Returns a filtered response payload, a server-error flag (true if error is from server), and an error.
-		GetMessagesByChatID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error)
+		GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error)
 		// SaveMessage stores an inbound or outbound message without sending it.
 		// Returns a server-error flag (true if error is from server) and an error.
 		SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error)
@@ -81,7 +81,7 @@ type (
 	Chat interface {
 		// GetChatByPhoneNumberId retrieves chat sessions for a phone number with filter options.
 		// Returns a filtered chat response, a server-error flag (true if error is from server), and an error.
-		GetChatByPhoneNumberId(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error)
+		GetChatByPhoneNumberId(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error)
 		// GetByID retrieves a chat session by its unique identifier.
 		// Returns the chat model, a server-error flag (true if error is from server), and an error.
 		GetByID(ctx context.Context, chatID string) (model.Chat, bool, error)

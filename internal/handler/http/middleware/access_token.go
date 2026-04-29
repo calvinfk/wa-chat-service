@@ -3,6 +3,7 @@ package middleware
 import (
 	"strings"
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/errs"
 
@@ -32,7 +33,7 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 		authData := dto.AuthData{
 			TenantID: splits[0],
 			UserID:   splits[1],
-			Role:     splits[2],
+			Role:     model.UserRole(splits[2]),
 		}
 		if err != nil {
 			if err == errs.ErrAuthExpiredAccessToken {

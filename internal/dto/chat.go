@@ -9,8 +9,9 @@ import (
 type (
 	ChatGetByPhoneNumberIdRequest struct {
 		PhoneNumberId string  `json:"phone_number_id" query:"phone_number_id" validate:"required"`
-		ChatType      *string `json:"chat_type" query:"chat_type" validate:"omitempty,oneof=individual group ticket"`
-		ChatStatus    *string `json:"chat_status" query:"chat_status" validate:"omitempty,oneof=open closed"`
+		AgentID       *string `json:"agent_id"`
+		ChatType      *string `json:"chat_type" query:"chat_type" validate:"omitempty,filter_options=individual group ticket"`
+		ChatStatus    *string `json:"chat_status" query:"chat_status" validate:"omitempty,filter_options=open closed"`
 	}
 	ChatGetByPhoneNumberIdResponse struct {
 		ID            string    `json:"id"`          // {recipient_id}-{phone_number_id}

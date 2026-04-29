@@ -27,6 +27,7 @@ type MessageUsecase struct {
 	storageMediaRepository   repository.StorageMedia
 	searchMessageRepository  repository.SearchMessage
 	tenantRepository         repository.Tenant
+	userRepository           repository.User
 	storageMediaUsecase      usecase.StorageMedia
 	waBusinessAccountUsecase usecase.WaBusinessAccount
 	whatsappService          service.WhatsappBusiness
@@ -41,6 +42,7 @@ func NewMessageUsecase(
 	storageMediaRepository repository.StorageMedia,
 	searchMessageRepository repository.SearchMessage,
 	tenantRepository repository.Tenant,
+	userRepository repository.User,
 	storageMediaUsecase usecase.StorageMedia,
 	waBusinessAccountUsecase usecase.WaBusinessAccount,
 	whatsappService service.WhatsappBusiness,
@@ -54,6 +56,7 @@ func NewMessageUsecase(
 		storageMediaRepository:   storageMediaRepository,
 		tenantRepository:         tenantRepository,
 		searchMessageRepository:  searchMessageRepository,
+		userRepository:           userRepository,
 		storageMediaUsecase:      storageMediaUsecase,
 		waBusinessAccountUsecase: waBusinessAccountUsecase,
 		whatsappService:          whatsappService,
@@ -218,8 +221,48 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 	return response, false, nil
 }
 
-func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
-	// TODO: check if chat belongs to tenant
+func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
+	chat, err := u.chatRepository.GetByID(ctx, requestData.SpecificFilter.ChatID)
+	if err != nil {
+		u.zsLog.Errorf("[GetMessagesByChatID] Failed to get chat by ID: %v", err)
+		return filter_request.FilterResponse[dto.MessageResponse]{}, true, err
+	}
+	if chat.TenantID != authData.TenantID {
+		u.zsLog.Warnf("[GetMessagesByChatID] WhatsApp business tenant ID %s does not match auth tenant ID %s", chat.TenantID, authData.TenantID)
+		return filter_request.FilterResponse[dto.MessageResponse]{}, false, fmt.Errorf("no chat found for ID %s", requestData.SpecificFilter.ChatID)
+	}
+	switch authData.Role {
+	case model.UserRoleAdmin:
+		// Admin can view all messages
+	case model.UserRoleAgent:
+		// Agent can only view messages if they are assigned to the chat
+		if chat.AgentID != nil && *chat.AgentID != authData.UserID {
+			u.zsLog.Warnf("[GetMessagesByChatID] Agent user ID %s is not assigned to chat ID %s", authData.UserID, chat.DocumentID)
+			return filter_request.FilterResponse[dto.MessageResponse]{}, false, errs.ErrGenericForbidden
+		}
+	case model.UserRoleSupervisor:
+		if chat.AgentID == nil {
+			u.zsLog.Warnf("[GetMessagesByChatID] Chat ID %s is not assigned to any agent, supervisor user ID %s cannot view the messages", chat.DocumentID, authData.UserID)
+			return filter_request.FilterResponse[dto.MessageResponse]{}, false, errs.ErrGenericForbidden
+		}
+		// Supervisor can view all messages in the chats that they supervise
+		agents, err := u.userRepository.GetBySupervisorID(ctx, authData.UserID)
+		if err != nil {
+			u.zsLog.Errorf("[GetMessagesByChatID] Failed to get agents by supervisor ID: %v", err)
+			return filter_request.FilterResponse[dto.MessageResponse]{}, true, err
+		}
+		agentIDs := make(map[string]bool)
+		for _, agent := range agents {
+			agentIDs[agent.DocumentID] = true
+		}
+		if !agentIDs[*chat.AgentID] {
+			u.zsLog.Warnf("[GetMessagesByChatID] Supervisor user ID %s does not supervise agent assigned to chat ID %s", authData.UserID, chat.DocumentID)
+			return filter_request.FilterResponse[dto.MessageResponse]{}, false, errs.ErrGenericForbidden
+		}
+	default:
+		u.zsLog.Warnf("[GetMessagesByChatID] Unauthorized role %s for getting messages by chat ID", authData.Role)
+		return filter_request.FilterResponse[dto.MessageResponse]{}, false, fmt.Errorf("unauthorized role %s for getting messages by chat ID", authData.Role)
+	}
 	var response filter_request.FilterResponse[dto.MessageResponse]
 	messages, totalItems, paginate, err := u.searchMessageRepository.GetFiltered(ctx, requestData)
 	if err != nil {
@@ -349,6 +392,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 		// create new chat if not exist
 		chat = model.Chat{
 			DocumentID:    chatID,
+			TenantID:      tenantID,
 			PhoneNumberId: inputData.PhoneNumberId,
 			RecipientId:   inputData.RecipientId,
 			RecipientName: inputData.RecipientName,

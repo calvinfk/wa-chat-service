@@ -3,6 +3,7 @@ package chat_usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -43,8 +44,43 @@ func NewChatUsecase(chatRepository repository.Chat, waPhoneRepository repository
 	}
 }
 
-func (uc *ChatUsecase) GetChatByPhoneNumberId(ctx context.Context, tenantID string, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error) {
-	// TODO: check if phone number belongs to tenant
+func (uc *ChatUsecase) GetChatByPhoneNumberId(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], bool, error) {
+	switch authData.Role {
+	case model.UserRoleAdmin:
+		// no additional filter needed, admins can see all chats
+	case model.UserRoleAgent:
+		requestData.SpecificFilter.AgentID = &authData.UserID
+	case model.UserRoleSupervisor:
+		// get all agents under the supervisor
+		agents, err := uc.userRepository.GetBySupervisorID(ctx, authData.UserID)
+		if err != nil {
+			uc.zsLog.Errorf("[GetChatByPhoneNumberId] error while getting agents by supervisor id: %v", err)
+			return filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]{}, true, err
+		}
+		var agentIDs []string
+		for _, agent := range agents {
+			agentIDs = append(agentIDs, agent.DocumentID)
+		}
+		filter := fmt.Sprintf("in:[%s]", strings.Join(agentIDs, ","))
+		requestData.SpecificFilter.AgentID = &filter
+	default:
+		uc.zsLog.Errorf("[GetChatByPhoneNumberId] unauthorized role: %s", authData.Role)
+		return filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]{}, false, errs.ErrGenericForbidden
+	}
+	phone, err := uc.waPhoneRepository.GetByPhoneNumberId(ctx, requestData.SpecificFilter.PhoneNumberId)
+	if err != nil {
+		uc.zsLog.Errorf("[GetChatByPhoneNumberId] error while getting phone by id: %v", err)
+		return filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]{}, true, err
+	}
+	waba, err := uc.waBusinessAccountRepository.GetByID(ctx, phone.WaBusinessAccountID)
+	if err != nil {
+		uc.zsLog.Errorf("[GetChatByPhoneNumberId] error while getting wa business account by id: %v", err)
+		return filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]{}, true, err
+	}
+	if waba.TenantID != authData.TenantID {
+		uc.zsLog.Errorf("[GetChatByPhoneNumberId] tenant id mismatch: %s vs %s", waba.TenantID, authData.TenantID)
+		return filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse]{}, false, errs.ErrGenericForbidden
+	}
 	response, err := uc.chatRepository.GetChatByPhoneNumberId(ctx, requestData)
 	if err != nil {
 		uc.zsLog.Errorf("[GetChatByPhoneNumberId] error while getting chat by phone number id: %v", err)
@@ -62,18 +98,8 @@ func (uc *ChatUsecase) CloseTicket(ctx context.Context, tenantID string, request
 		}
 		return true, err
 	}
-	phone, err := uc.waPhoneRepository.GetByPhoneNumberId(ctx, chat.PhoneNumberId)
-	if err != nil {
-		uc.zsLog.Errorf("[CloseTicket] error while getting phone by id: %v", err)
-		return true, err
-	}
-	waba, err := uc.waBusinessAccountRepository.GetByID(ctx, phone.WaBusinessAccountID)
-	if err != nil {
-		uc.zsLog.Errorf("[CloseTicket] error while getting wa business account by id: %v", err)
-		return true, err
-	}
-	if waba.TenantID != tenantID {
-		uc.zsLog.Errorf("[CloseTicket] tenant id mismatch: %s vs %s", waba.TenantID, tenantID)
+	if chat.TenantID != tenantID {
+		uc.zsLog.Errorf("[CloseTicket] tenant id mismatch: %s vs %s", chat.TenantID, tenantID)
 		return false, errs.ErrGenericForbidden
 	}
 
@@ -156,18 +182,8 @@ func (uc *ChatUsecase) AssignAgent(ctx context.Context, tenantID string, request
 	if chat.AgentID != nil && *chat.AgentID == requestData.AgentID {
 		return false, nil
 	}
-	phone, err := uc.waPhoneRepository.GetByPhoneNumberId(ctx, chat.PhoneNumberId)
-	if err != nil {
-		uc.zsLog.Errorf("[AssignAgent] error while getting phone by id: %v", err)
-		return true, err
-	}
-	waba, err := uc.waBusinessAccountRepository.GetByID(ctx, phone.WaBusinessAccountID)
-	if err != nil {
-		uc.zsLog.Errorf("[AssignAgent] error while getting wa business account by id: %v", err)
-		return true, err
-	}
-	if waba.TenantID != tenantID {
-		uc.zsLog.Errorf("[AssignAgent] tenant id mismatch: %s vs %s", waba.TenantID, tenantID)
+	if chat.TenantID != tenantID {
+		uc.zsLog.Errorf("[AssignAgent] tenant id mismatch: %s vs %s", chat.TenantID, tenantID)
 		return false, errs.ErrGenericForbidden
 	}
 	agent, err := uc.userRepository.GetByID(ctx, requestData.AgentID)
@@ -317,6 +333,7 @@ func (uc *ChatUsecase) CreateChat(ctx context.Context, tenantID string, requestD
 	}
 	// create new chat
 	newChat := model.Chat{
+		TenantID:      tenantID,
 		PhoneNumberId: requestData.PhoneNumberId,
 		RecipientId:   requestData.RecipientId,
 		RecipientName: requestData.RecipientName,

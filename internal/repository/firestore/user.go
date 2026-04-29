@@ -98,3 +98,26 @@ func (r *UserRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 	}
 	return user, err
 }
+
+func (r *UserRepository) GetBySupervisorID(ctx context.Context, supervisorID string) ([]model.User, error) {
+	var users []model.User
+	iter := r.db.Collection(r.user.TableName()).Where("supervisor_id", "==", supervisorID).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return users, err
+		}
+		var user model.User
+		docData := doc.Data()
+		docData["id"] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &user)
+		if err != nil {
+			return users, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
