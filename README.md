@@ -30,27 +30,84 @@ There are two main categories of API endpoints: HTTP REST endpoints (handled by 
 
 #### Chat (`/api/v1/chat`)
 
-All endpoints require authentication (Bearer token).
+All endpoints require authentication (Bearer token). The `chat_id` format is `{recipient_id}-{phone_number_id}` for individual chats, or a UUID v7 for group chats and tickets.
 
+**Send Message**
 - `POST /send`
-  - Body (JSON): `chat_id`, `sender_name` (optional), `type`, and payload keyed by `type`
-  - Example for text message payload:
+  - Body (JSON):
+    - `chat_id` (required): Chat identifier
+    - `sender_name` (optional): Sender display name; defaults to current logged-in user if not provided
+    - `type` (required): Message type (e.g., `text`, `image`, `video`)
+    - `[type]` (required): Payload object keyed by the message type
+  - Example for text message:
     ```json
     {
-      "chat_id": "00000000-0000-0000-0000-000000000000",
-      "sender_name": "Agent",
+      "chat_id": "recipient123-1234567890",
+      "sender_name": "Agent Name",
       "type": "text",
       "text": {
-        "body": "Hello"
+        "body": "Hello, how can I help you?"
       }
     }
     ```
+  - Returns: Standard JSON response with message confirmation
+
+**Get Chats by Phone Number**
 - `GET /by-phone-number-id`
-  - Query: `phone_number_id`
-  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+  - Query parameters:
+    - `phone_number_id` (required): WhatsApp Business phone number ID
+    - `agent_id` (optional): Filter chats assigned to a specific agent
+    - `chat_type` (optional): Filter by chat type (`individual`, `group`, or `ticket`)
+    - `chat_status` (optional): Filter by chat status (`open` or `closed`)
+    - `page`, `page_size` (optional): Pagination
+    - `sort_by`, `sort_order` (optional): Sorting
+  - Response: Array of chat objects with:
+    - `id`: Chat identifier
+    - `chat_type`: Type of chat (individual, group, ticket)
+    - `chat_status`: Status of chat (open, closed)
+    - `recipient_name`: Name of the chat recipient/group
+    - `last_message`: Last message text
+    - `created_at`, `updated_at`: Timestamps
+
+**Get Messages by Chat**
 - `GET /messages`
-  - Query: `chat_id`
-  - Optional query: `page`, `page_size`, `sort_by`, `sort_order`
+  - Query parameters:
+    - `chat_id` (required): Chat identifier
+    - `search` (optional): Search for messages by content
+    - `page`, `page_size` (optional): Pagination
+    - `sort_by`, `sort_order` (optional): Sorting
+  - Response: Array of message objects with:
+    - `id`: Message ID from WhatsApp
+    - `chat_id`: Reference to chat
+    - `message_type`: Type of message (text, image, video, etc.)
+    - `message_category`: Category (marketing, authentication, utility, service, system_flag)
+    - `sender_name`: Sender name
+    - `payload`: Raw message payload (JSON stringified)
+    - `storage_media`: Associated media object (if applicable)
+    - `status`: Message status (sent, delivered, read, -)
+    - `created_at`, `sent_at`, `delivered_at`, `read_at`: Timestamps
+    - `error`: Error message if delivery failed
+
+**Create Chat**
+- `POST /create`
+  - Body (JSON):
+    - `phone_number_id` (required): WhatsApp Business phone number ID
+    - `recipient_id` (required): Recipient identifier
+    - `recipient_name` (required): Recipient display name
+  - Returns: Chat object with created chat details
+
+**Close Ticket** *(Admin only)*
+- `POST /close-ticket`
+  - Body (JSON):
+    - `chat_id` (required): Chat/ticket identifier
+  - Returns: Success confirmation
+
+**Assign Agent** *(Admin only)*
+- `POST /assign-agent`
+  - Body (JSON):
+    - `chat_id` (required): Chat identifier
+    - `agent_id` (required): UUID of agent to assign
+  - Returns: Success confirmation
 
 #### Template (`/api/v1/template`)
 
