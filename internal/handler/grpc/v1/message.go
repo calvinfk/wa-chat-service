@@ -2,6 +2,7 @@ package grpc_v1
 
 import (
 	"context"
+	"time"
 	v1 "wa_chat_service/docs/proto/v1"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/usecase"
@@ -24,21 +25,27 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 	message := req.GetMessage()
 	phoneNumberId := req.GetPhoneNumberId()
 	recipientId := req.GetRecipientId()
+	var userLastMessageAt *time.Time
+	if req.GetUserLastMessageAt() != nil {
+		createdAt := req.GetUserLastMessageAt().AsTime()
+		userLastMessageAt = &createdAt
+	}
 	inputData := dto.MessageSaveRequest{
-		ID:              &message.Id,
-		Wamid:           message.Wamid,
-		PhoneNumberId:   phoneNumberId,
-		RecipientId:     recipientId,
-		RecipientName:   req.GetRecipientName(),
-		LastMessage:     req.GetLastMessage(),
-		MessageType:     message.MessageType,
-		MessageCategory: message.MessageCategory,
-		SenderName:      message.SenderName,
-		Payload:         message.Payload,
-		StorageMediaID:  message.StorageMediaId,
-		Status:          message.Status,
-		Error:           message.Error,
-		CreatedAt:       message.CreatedAt.AsTime(),
+		ID:                &message.Id,
+		Wamid:             message.Wamid,
+		PhoneNumberId:     phoneNumberId,
+		RecipientId:       recipientId,
+		RecipientName:     req.GetRecipientName(),
+		LastMessage:       req.GetLastMessage(),
+		UserLastMessageAt: userLastMessageAt,
+		MessageType:       message.MessageType,
+		MessageCategory:   message.MessageCategory,
+		SenderName:        message.SenderName,
+		Payload:           message.Payload,
+		StorageMediaID:    message.StorageMediaId,
+		Status:            message.Status,
+		Error:             message.Error,
+		CreatedAt:         message.CreatedAt.AsTime(),
 	}
 	if message.SentAt != nil {
 		timeAt := message.SentAt.AsTime()
@@ -105,10 +112,12 @@ func (h *MessageGRPC) UpdateMessageStatus(ctx context.Context, req *v1.UpdateMes
 	}
 	validator := utils.NewValidator()
 	if err := validator.Struct(inputData); err != nil {
+		h.zsLog.Errorf("[UpdateMessageStatus] Validation error: %v", err)
 		return nil, api_response.NewGRPCErrorResponse(false, err)
 	}
 	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
+		h.zsLog.Errorf("[UpdateMessageStatus] Failed to update message status: %v", err)
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
 	return &emptypb.Empty{}, nil

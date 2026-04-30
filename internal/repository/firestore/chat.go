@@ -2,6 +2,7 @@ package repository_firestore
 
 import (
 	"context"
+	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/errs"
@@ -47,6 +48,7 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 			{Path: "chat_status", Value: chat.ChatStatus},
 			{Path: "agent_id", Value: chat.AgentID},
 			{Path: "last_message", Value: chat.LastMessage},
+			{Path: "user_last_message_at", Value: chat.UserLastMessageAt},
 			{Path: "updated_at", Value: chat.UpdatedAt},
 		})
 		if updateErr != nil {
@@ -91,25 +93,26 @@ func (r *ChatRepository) GetChatByPhoneNumberId(ctx context.Context, filter filt
 	return response, nil
 }
 
-func (r *ChatRepository) GetOpenedTicketChatByPhoneNumberId(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error) {
+func (r *ChatRepository) GetRunningTicketChat(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error) {
 	doc, err := r.db.Collection(r.chat.TableName()).
 		Where("phone_number_id", "==", phoneNumberId).
 		Where("recipient_id", "==", recipientId).
 		Where("chat_type", "==", "ticket").
-		Where("chat_status", "==", model.ChatStatusOpen).
+		Where("chat_status", "in", []model.ChatStatus{model.ChatStatusOpen, model.ChatStatusInProgress}).
+		OrderBy("created_at", firestore.Desc).
 		Limit(1).Documents(ctx).Next()
 	if err != nil {
 		if err == iterator.Done {
-			return model.Chat{}, errs.ErrGenericNotFound
+			return r.chat, errs.ErrGenericNotFound
 		}
-		return model.Chat{}, err
+		return r.chat, err
 	}
 	var chat model.Chat
 	docData := doc.Data()
 	docData["id"] = doc.Ref.ID
 	err = utils.MapToStruct(docData, &chat)
 	if err != nil {
-		return model.Chat{}, err
+		return r.chat, err
 	}
 	return chat, nil
 }
@@ -118,16 +121,44 @@ func (r *ChatRepository) GetByID(ctx context.Context, chatID string) (model.Chat
 	doc, err := r.db.Collection(r.chat.TableName()).Doc(chatID).Get(ctx)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return model.Chat{}, errs.ErrGenericNotFound
+			return r.chat, errs.ErrGenericNotFound
 		}
-		return model.Chat{}, err
+		return r.chat, err
 	}
 	var chat model.Chat
 	docData := doc.Data()
 	docData["id"] = doc.Ref.ID
 	err = utils.MapToStruct(docData, &chat)
 	if err != nil {
-		return model.Chat{}, err
+		return r.chat, err
 	}
 	return chat, nil
+}
+
+func (r *ChatRepository) GetChatTicketDataAnalytics(ctx context.Context, phoneNumberIds []string, startTime time.Time, endTime time.Time) ([]model.Chat, error) {
+	var chats []model.Chat
+	iter := r.db.Collection(r.chat.TableName()).
+		Where("phone_number_id", "in", phoneNumberIds).
+		Where("created_at", ">=", startTime).
+		Where("created_at", "<=", endTime).
+		OrderBy("created_at", firestore.Desc).
+		Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var chat model.Chat
+		docData := doc.Data()
+		docData["id"] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &chat)
+		if err != nil {
+			return nil, err
+		}
+		chats = append(chats, chat)
+	}
+	return chats, nil
 }

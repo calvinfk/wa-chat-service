@@ -36,24 +36,25 @@ type (
 	}
 
 	MessageSaveRequest struct {
-		ID              *string    `json:"id"`
-		ChatID          *string    `json:"chat_id"`
-		Wamid           string     `json:"wamid" validate:"required"`
-		PhoneNumberId   string     `json:"phone_number_id" validate:"required"`
-		RecipientId     string     `json:"recipient_id" validate:"required"`
-		RecipientName   string     `json:"recipient_name"`
-		LastMessage     string     `json:"last_message"` //
-		MessageType     string     `json:"message_type" validate:"required"`
-		MessageCategory string     `json:"message_category" validate:"required"`
-		SenderName      string     `json:"sender_name" validate:"required"`
-		Payload         string     `json:"payload" validate:"required"`
-		StorageMediaID  *string    `json:"storage_media_id"`
-		Status          string     `json:"status" validate:"required"`
-		CreatedAt       time.Time  `json:"created_at" validate:"required"`
-		SentAt          *time.Time `json:"sent_at"`
-		DeliveredAt     *time.Time `json:"delivered_at"`
-		ReadAt          *time.Time `json:"read_at"`
-		Error           *string    `json:"error"`
+		ID                *string    `json:"id"`
+		ChatID            *string    `json:"chat_id"`
+		Wamid             string     `json:"wamid" validate:"required"`
+		PhoneNumberId     string     `json:"phone_number_id" validate:"required"`
+		RecipientId       string     `json:"recipient_id" validate:"required"`
+		RecipientName     string     `json:"recipient_name"`
+		LastMessage       string     `json:"last_message"`
+		UserLastMessageAt *time.Time `json:"user_last_message_at"`
+		MessageType       string     `json:"message_type" validate:"required"`
+		MessageCategory   string     `json:"message_category" validate:"required"`
+		SenderName        string     `json:"sender_name" validate:"required"`
+		Payload           string     `json:"payload" validate:"required"`
+		StorageMediaID    *string    `json:"storage_media_id"`
+		Status            string     `json:"status" validate:"required"`
+		CreatedAt         time.Time  `json:"created_at" validate:"required"`
+		SentAt            *time.Time `json:"sent_at"`
+		DeliveredAt       *time.Time `json:"delivered_at"`
+		ReadAt            *time.Time `json:"read_at"`
+		Error             *string    `json:"error"`
 	}
 )
 

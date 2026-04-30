@@ -174,14 +174,15 @@ func (x *MessageModel) GetError() string {
 
 // SaveMessageRequest contains the message details to be saved and the associated phone number ID.
 type SaveMessageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *MessageModel          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	PhoneNumberId string                 `protobuf:"bytes,2,opt,name=phone_number_id,json=phoneNumberId,proto3" json:"phone_number_id,omitempty"`
-	RecipientId   string                 `protobuf:"bytes,3,opt,name=recipient_id,json=recipientId,proto3" json:"recipient_id,omitempty"`
-	RecipientName string                 `protobuf:"bytes,4,opt,name=recipient_name,json=recipientName,proto3" json:"recipient_name,omitempty"`
-	LastMessage   string                 `protobuf:"bytes,5,opt,name=last_message,json=lastMessage,proto3" json:"last_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Message           *MessageModel          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	PhoneNumberId     string                 `protobuf:"bytes,2,opt,name=phone_number_id,json=phoneNumberId,proto3" json:"phone_number_id,omitempty"`
+	RecipientId       string                 `protobuf:"bytes,3,opt,name=recipient_id,json=recipientId,proto3" json:"recipient_id,omitempty"`
+	RecipientName     string                 `protobuf:"bytes,4,opt,name=recipient_name,json=recipientName,proto3" json:"recipient_name,omitempty"`
+	LastMessage       string                 `protobuf:"bytes,5,opt,name=last_message,json=lastMessage,proto3" json:"last_message,omitempty"`
+	UserLastMessageAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=user_last_message_at,json=userLastMessageAt,proto3,oneof" json:"user_last_message_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SaveMessageRequest) Reset() {
@@ -247,6 +248,13 @@ func (x *SaveMessageRequest) GetLastMessage() string {
 		return x.LastMessage
 	}
 	return ""
+}
+
+func (x *SaveMessageRequest) GetUserLastMessageAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UserLastMessageAt
+	}
+	return nil
 }
 
 type UpdateMessageStatusRequest struct {
@@ -370,13 +378,15 @@ const file_v1_message_proto_rawDesc = "" +
 	"\r_delivered_atB\n" +
 	"\n" +
 	"\b_read_atB\b\n" +
-	"\x06_error\"\xd5\x01\n" +
+	"\x06_error\"\xc0\x02\n" +
 	"\x12SaveMessageRequest\x12*\n" +
 	"\amessage\x18\x01 \x01(\v2\x10.v1.MessageModelR\amessage\x12&\n" +
 	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId\x12!\n" +
 	"\frecipient_id\x18\x03 \x01(\tR\vrecipientId\x12%\n" +
 	"\x0erecipient_name\x18\x04 \x01(\tR\rrecipientName\x12!\n" +
-	"\flast_message\x18\x05 \x01(\tR\vlastMessage\"\x9f\x02\n" +
+	"\flast_message\x18\x05 \x01(\tR\vlastMessage\x12P\n" +
+	"\x14user_last_message_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x11userLastMessageAt\x88\x01\x01B\x17\n" +
+	"\x15_user_last_message_at\"\x9f\x02\n" +
 	"\x1aUpdateMessageStatusRequest\x12\x14\n" +
 	"\x05wamid\x18\x01 \x01(\tR\x05wamid\x12&\n" +
 	"\x0fphone_number_id\x18\x02 \x01(\tR\rphoneNumberId\x12!\n" +
@@ -416,16 +426,17 @@ var file_v1_message_proto_depIdxs = []int32{
 	3, // 2: v1.MessageModel.delivered_at:type_name -> google.protobuf.Timestamp
 	3, // 3: v1.MessageModel.read_at:type_name -> google.protobuf.Timestamp
 	0, // 4: v1.SaveMessageRequest.message:type_name -> v1.MessageModel
-	3, // 5: v1.UpdateMessageStatusRequest.timestamp:type_name -> google.protobuf.Timestamp
-	1, // 6: v1.Message.SaveMessage:input_type -> v1.SaveMessageRequest
-	2, // 7: v1.Message.UpdateMessageStatus:input_type -> v1.UpdateMessageStatusRequest
-	4, // 8: v1.Message.SaveMessage:output_type -> google.protobuf.Empty
-	4, // 9: v1.Message.UpdateMessageStatus:output_type -> google.protobuf.Empty
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	3, // 5: v1.SaveMessageRequest.user_last_message_at:type_name -> google.protobuf.Timestamp
+	3, // 6: v1.UpdateMessageStatusRequest.timestamp:type_name -> google.protobuf.Timestamp
+	1, // 7: v1.Message.SaveMessage:input_type -> v1.SaveMessageRequest
+	2, // 8: v1.Message.UpdateMessageStatus:input_type -> v1.UpdateMessageStatusRequest
+	4, // 9: v1.Message.SaveMessage:output_type -> google.protobuf.Empty
+	4, // 10: v1.Message.UpdateMessageStatus:output_type -> google.protobuf.Empty
+	9, // [9:11] is the sub-list for method output_type
+	7, // [7:9] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_v1_message_proto_init() }
@@ -434,6 +445,7 @@ func file_v1_message_proto_init() {
 		return
 	}
 	file_v1_message_proto_msgTypes[0].OneofWrappers = []any{}
+	file_v1_message_proto_msgTypes[1].OneofWrappers = []any{}
 	file_v1_message_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

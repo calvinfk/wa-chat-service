@@ -6,6 +6,7 @@ import (
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type WaPhoneRepository struct {
@@ -30,4 +31,27 @@ func (r *WaPhoneRepository) GetByPhoneNumberId(ctx context.Context, phoneNumberI
 		return model.WaPhone{}, err
 	}
 	return phone, nil
+}
+
+func (r *WaPhoneRepository) GetByWaBusinessAccountID(ctx context.Context, waBusinessAccountID string) ([]model.WaPhone, error) {
+	var phones []model.WaPhone
+	iter := r.db.Collection(r.waPhone.TableName()).Where("wa_business_account_id", "==", waBusinessAccountID).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+		var phone model.WaPhone
+		docData := doc.Data()
+		docData["id"] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &phone)
+		if err != nil {
+			return nil, err
+		}
+		phones = append(phones, phone)
+	}
+	return phones, nil
 }

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/pkg/filter_request"
@@ -18,10 +19,12 @@ type (
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, bool, error)
 		// GetChatByPhoneNumberId gets chat entries filtered by phone number ID.
 		GetChatByPhoneNumberId(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
-		// GetOpenedTicketChatByPhoneNumberId gets opened ticket chat entries filtered by phone number ID.
-		GetOpenedTicketChatByPhoneNumberId(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
+		// GetRunningTicketChat gets running ticket chat entries (open or in-progress) filtered by phone number Id and recipient Id.
+		GetRunningTicketChat(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
 		// GetByID gets a chat entry by chat ID.
 		GetByID(ctx context.Context, chatID string) (model.Chat, error)
+		// GetChatTicketDataAnalytics gets chat entries for ticket data analytics filtered by phone number IDs and created at range.
+		GetChatTicketDataAnalytics(ctx context.Context, phoneNumberIds []string, startTime time.Time, endTime time.Time) ([]model.Chat, error)
 	}
 
 	// Message defines persistence operations for message data.
@@ -121,10 +124,10 @@ type (
 	SearchMessage interface {
 		// AddDocuments adds message documents to the search index.
 		AddDocuments(ctx context.Context, document []model.Message) (*meilisearch.TaskInfo, error)
+		// AddDocumentsSync adds message documents to the search index and waits for the operation to complete.
+		AddDocumentsSync(ctx context.Context, document []model.Message) error
 		// GetFiltered gets indexed messages by filter criteria with pagination metadata.
 		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error)
-		// GetTaskStatus gets the status of an indexing task by task UID.
-		GetTaskStatus(ctx context.Context, taskUID int64) (*meilisearch.Task, error)
 	}
 
 	User interface {
@@ -143,9 +146,13 @@ type (
 	WaBusinessAccount interface {
 		// GetByID gets a WhatsApp Business Account by ID
 		GetByID(ctx context.Context, id string) (model.WaBusinessAccount, error)
+		// GetByTenantID gets WhatsApp Business Accounts by tenant ID
+		GetByTenantID(ctx context.Context, tenantID string) ([]model.WaBusinessAccount, error)
 	}
 	WaPhone interface {
 		// GetByPhoneNumberId gets a WhatsApp Business Account phone data by phone number ID from meta.
 		GetByPhoneNumberId(ctx context.Context, phoneNumberId string) (model.WaPhone, error)
+		// GetByWaBusinessAccountID gets WhatsApp Business Account phone data by WhatsApp Business Account ID from meta.
+		GetByWaBusinessAccountID(ctx context.Context, waBusinessAccountID string) ([]model.WaPhone, error)
 	}
 )

@@ -42,6 +42,7 @@ message SaveMessageRequest {
   string recipient_id = 3;
   string recipient_name = 4;
   string last_message = 5;
+  optional google.protobuf.Timestamp user_last_message_at = 6;
 }
 
 message UpdateMessageStatusRequest {

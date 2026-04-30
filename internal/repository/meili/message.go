@@ -2,6 +2,7 @@ package repository_meili
 
 import (
 	"context"
+	"fmt"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -113,6 +114,32 @@ func (r *MeiliMessageRepository) AddDocuments(ctx context.Context, messages []mo
 	return taskInfo, err
 }
 
+func (r *MeiliMessageRepository) AddDocumentsSync(ctx context.Context, messages []model.Message) error {
+	taskInfo, err := r.AddDocuments(ctx, messages)
+	if err != nil {
+		return err
+	}
+	// Wait for the indexing task to complete
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			task, err := r.db.GetTask(taskInfo.TaskUID)
+			if err != nil {
+				return err
+			}
+			if task.Status != meilisearch.TaskStatusProcessing {
+				if task.Status == meilisearch.TaskStatusFailed {
+					return fmt.Errorf("search index task failed: %v", task.Error)
+				}
+				return nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
 func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) ([]model.Message, int64, filter_request.Paginate, error) {
 	var messages []model.Message
 	filters, sort, paginate, err := filter_request.InitializeFilter(filterRequest, r.message.AllowedFilterFields(), r.message.AllowedSortFields())
@@ -141,9 +168,4 @@ func (r *MeiliMessageRepository) GetFiltered(ctx context.Context, filterRequest 
 		messages = append(messages, message)
 	}
 	return messages, searched.TotalHits, paginate, err
-}
-
-func (r *MeiliMessageRepository) GetTaskStatus(ctx context.Context, taskUID int64) (*meilisearch.Task, error) {
-	task, err := r.db.GetTask(taskUID)
-	return task, err
 }

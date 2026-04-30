@@ -25,6 +25,9 @@ type (
 		// if not, it will search in the default chat associated with the phone number
 		// Returns the message model, a server-error flag (true if error is from server), and an error.
 		GetByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error)
+		// CheckCanSendMessage checks if a message can be sent to the chat based on the chat state and tenant's chat type.
+		// Returns a boolean indicating if the message can be sent, a server-error flag (true if error is from server), and an error.
+		CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID string) (bool, bool, error)
 	}
 
 	// Template defines template lifecycle operations such as create, sync, update, delete, and filtered retrieval.
@@ -94,6 +97,9 @@ type (
 		// CreateChat creates a new chat session for a given phone number
 		// Returns the created chat model, a server-error flag (true if error is from server), and an error.
 		CreateChat(ctx context.Context, tenantID string, requestData dto.ChatCreateRequest) (model.Chat, bool, error)
+		// GetTicketAnalytics retrieves analytics data for chat tickets based on specified criteria.
+		// Returns the analytics response, a server-error flag (true if error is from server), and an error.
+		GetTicketAnalytics(ctx context.Context, tenantID string, requestData dto.ChatGetTicketAnalyticsRequest) (dto.ChatGetTicketAnalyticsResponse, bool, error)
 	}
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.

@@ -74,16 +74,11 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		u.zsLog.Errorf("[SendMessage] Failed to get tenant: %v", err)
 		return response, true, err
 	}
+	var chatExists bool
 	chat, err := u.chatRepository.GetByID(ctx, inputData.ChatID)
 	if err != nil && err != errs.ErrGenericNotFound {
 		u.zsLog.Errorf("[SendMessage] Failed to get chat by ID: %v", err)
 		return response, true, err
-	}
-	var senderName string
-	if inputData.SenderName != "" {
-		senderName = inputData.SenderName
-	} else {
-		senderName = tenant.Name
 	}
 	var phoneNumberId string
 	var recipientId string
@@ -113,6 +108,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		phoneNumberId = chat.PhoneNumberId
 		recipientId = chat.RecipientId
 		recipientName = chat.RecipientName
+		chatExists = true
 	}
 	if whatsappClient == nil {
 		whatsappClient, _, err = u.waBusinessAccountUsecase.GetWhatsappClient(ctx, tenantID, chat.PhoneNumberId)
@@ -199,7 +195,13 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		storageMediaID = &sto.DocumentID
 	}
 
+	// create a new chat for the message if chat does not exist and associate the message with the new chat
+	var chatID *string
+	if chatExists {
+		chatID = &chat.DocumentID
+	}
 	serverError, err := u.SaveMessage(ctx, tenantID, dto.MessageSaveRequest{
+		ChatID:          chatID,
 		Wamid:           sendResponse.Messages[0].ID,
 		PhoneNumberId:   phoneNumberId,
 		RecipientId:     recipientId,
@@ -207,7 +209,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		LastMessage:     component.GetMessage(),
 		MessageType:     string(component.GetType()),
 		MessageCategory: "-",
-		SenderName:      senderName,
+		SenderName:      inputData.SenderName,
 		Payload:         payloadData,
 		StorageMediaID:  storageMediaID,
 		Status:          "-",
@@ -369,7 +371,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 	} else {
 		switch tenant.ChatType {
 		case "ticket":
-			chat, err = u.chatRepository.GetOpenedTicketChatByPhoneNumberId(ctx, inputData.PhoneNumberId, inputData.RecipientId)
+			chat, err = u.chatRepository.GetRunningTicketChat(ctx, inputData.PhoneNumberId, inputData.RecipientId)
 			switch err {
 			case nil:
 				chatID = chat.DocumentID
@@ -411,12 +413,15 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 	if chat.RecipientName == "" {
 		chat.RecipientName = inputData.RecipientId
 	}
+	if inputData.UserLastMessageAt != nil {
+		chat.UserLastMessageAt = inputData.UserLastMessageAt
+	}
 	chat.LastMessage = inputData.LastMessage
 	chat.UpdatedAt = time.Now()
 
 	messageLogID, err := uuid.NewV7()
 	if err != nil {
-		u.zsLog.Errorf("[SendMessage] Failed to generate message log ID: %v", err)
+		u.zsLog.Errorf("[SaveMessage] Failed to generate message log ID: %v", err)
 		return true, err
 	}
 	// create system log message for new chat if chat is new, or chat type is ticket but no opened ticket chat found
@@ -431,7 +436,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 	}
 	logPayload, err := utils.AnyToJsonString(logData)
 	if err != nil {
-		u.zsLog.Errorf("[SendMessage] Failed to convert log payload to JSON: %v", err)
+		u.zsLog.Errorf("[SaveMessage] Failed to convert log payload to JSON: %v", err)
 		return true, err
 	}
 	messageLog := model.Message{
@@ -491,7 +496,7 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 		if isNewChat {
 			messageLog, err = u.messageRepository.Upsert(ctx, txFirestore, messageLog)
 			if err != nil {
-				u.zsLog.Errorf("[SendMessage] Failed to upsert message: %v", err)
+				u.zsLog.Errorf("[SaveMessage] Failed to upsert message: %v", err)
 				return true, err
 			}
 		}
@@ -513,14 +518,14 @@ func (u *MessageUsecase) GetByWamid(ctx context.Context, tenantID string, phoneN
 	var message model.Message
 	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
 	if err != nil {
-		u.zsLog.Errorf("[GetByPhoneNumberId] Failed to get tenant by phone number ID: %v", err)
+		u.zsLog.Errorf("[GetByWamid] Failed to get tenant by phone number ID: %v", err)
 		return model.Message{}, true, err
 	}
 	var chatID string
 	if tenant.ChatType == "ticket" {
-		chat, err := u.chatRepository.GetOpenedTicketChatByPhoneNumberId(ctx, phoneNumberId, recipientId)
+		chat, err := u.chatRepository.GetRunningTicketChat(ctx, phoneNumberId, recipientId)
 		if err != nil && err != errs.ErrGenericNotFound {
-			u.zsLog.Errorf("[GetByTenantIDAndWamid] Failed to get opened ticket chat: %v", err)
+			u.zsLog.Errorf("[GetByWamid] Failed to get running ticket chat: %v", err)
 			return model.Message{}, true, err
 		}
 		if err == nil {
@@ -548,4 +553,49 @@ func (u *MessageUsecase) GetByWamid(ctx context.Context, tenantID string, phoneN
 		chatID = defaultChatID
 	}
 	return message, false, nil
+}
+
+func (u *MessageUsecase) CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID string) (bool, bool, error) {
+	chat, err := u.chatRepository.GetByID(ctx, chatID)
+	if err != nil {
+		u.zsLog.Errorf("[CheckCanSendMessage] Failed to get chat by ID: %v", err)
+		return false, true, err
+	}
+	if chat.TenantID != authData.TenantID {
+		u.zsLog.Warnf("[CheckCanSendMessage] WhatsApp business tenant ID %s does not match auth tenant ID %s", chat.TenantID, authData.TenantID)
+		return false, false, fmt.Errorf("no chat found for ID %s", chatID)
+	}
+	switch authData.Role {
+	case model.UserRoleAdmin:
+		// Admin can send message to all chats
+		return true, false, nil
+	case model.UserRoleAgent:
+		// Agent can only send message if they are assigned to the chat
+		if chat.AgentID != nil && *chat.AgentID == authData.UserID {
+			return true, false, nil
+		}
+		u.zsLog.Warnf("[CheckCanSendMessage] Agent user ID %s is not assigned to chat ID %s", authData.UserID, chat.DocumentID)
+		return false, false, errs.ErrGenericForbidden
+	case model.UserRoleSupervisor:
+		if chat.AgentID == nil {
+			u.zsLog.Warnf("[CheckCanSendMessage] Chat ID %s is not assigned to any agent, supervisor user ID %s cannot send message", chat.DocumentID, authData.UserID)
+			return false, false, errs.ErrGenericForbidden
+		}
+		// Supervisor can send message in the chats that they supervise
+		agents, err := u.userRepository.GetBySupervisorID(ctx, authData.UserID)
+		if err != nil {
+			u.zsLog.Errorf("[CheckCanSendMessage] Failed to get agents by supervisor ID: %v", err)
+			return false, true, err
+		}
+		for _, agent := range agents {
+			if agent.DocumentID == *chat.AgentID {
+				return true, false, nil
+			}
+		}
+		u.zsLog.Warnf("[CheckCanSendMessage] Supervisor user ID %s does not supervise agent assigned to chat ID %s", authData.UserID, chat.DocumentID)
+		return false, false, errs.ErrGenericForbidden
+	default:
+		u.zsLog.Warnf("[CheckCanSendMessage] Unauthorized role %s for checking can send message", authData.Role)
+		return false, false, fmt.Errorf("unauthorized role %s for checking can send message", authData.Role)
+	}
 }

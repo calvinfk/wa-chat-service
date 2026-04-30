@@ -29,7 +29,7 @@ type HandlerV1 interface {
 }
 
 func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
-	chatHandler := NewChatHandler(routerHandler.MessageUsecase, routerHandler.ChatUsecase)
+	chatHandler := NewChatHandler(routerHandler.MessageUsecase, routerHandler.ChatUsecase, routerHandler.UserUsecase)
 	chatHandler.RegisterRoute(api)
 	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase, routerHandler.EncryptService, routerHandler.ZSLog)
 	storageMediaHandler.RegisterRoutes(api)

@@ -27,6 +27,8 @@ func NewApiResponse(successMessage string, data any) (int, ApiResponse) {
 	return response.Code, response
 }
 
+// TODO: Refactor this function to handle different types of errors more elegantly
+// possibly by defining custom error types or using error wrapping to provide more context about the errors.
 func NewErrorApiResponse(serverError bool, err any) (int, ApiResponse) {
 	var response ApiResponse
 	if serverError {
