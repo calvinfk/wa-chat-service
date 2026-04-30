@@ -7,8 +7,6 @@ Go service built with Fiber v3 for WhatsApp chat operations, media handling, and
 - Media upload and streaming with range support
 - Broadcast scheduling and management
 - Tenant contact management
-- JWT-based authentication with AES-encrypted tokens
-- gRPC server with HMAC authentication for internal services
 
 
 ## API
@@ -96,7 +94,7 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
     - `recipient_name` (required): Recipient display name
   - Returns: Chat object with created chat details
 
-**Close Ticket** *(Admin only)*
+**Close Ticket** *(Agent only)*
 - `POST /close-ticket`
   - Body (JSON):
     - `chat_id` (required): Chat/ticket identifier
@@ -206,7 +204,7 @@ All gRPC requests require HMAC authentication via custom interceptor middleware:
 
 ## Authentication Notes
 
-- Login endpoint (`POST /api/v1/auth/login`) returns an AES-encrypted JWT token in a cookie `access_token` (HttpOnly).
+- Login endpoint (`POST /api/v1/auth/login`) returns an AES-encrypted token in a cookie `access_token` (HttpOnly).
 - For protected routes, clients can send the encrypted token in the `Authorization: Bearer <encrypted_token>` header.
 - Token parsing middleware exists globally and expects an AES-encrypted token.
 - The protected guard (most `/api/v1/*` routes) checks for `token_sub` context value.
@@ -261,12 +259,14 @@ Required variables:
 - `DATABASE_URL`
 - `AES_ENCRYPTION_KEY` - Token encryption key
 - `GCP_PROJECT_ID`
-- `GCP_APP_BASE_URL`
 - `GCP_TASK_BROADCAST_PARENT`
 - `JOSE_RSA_PRIVATE_KEY` - Path to RSA private key file
 - `JOSE_ACCESS_TOKEN_EXPIRY` - Go duration format (e.g., `24h`)
 - `CORS_ENABLED`
 - `HMAC_SECRET` - Shared secret for gRPC HMAC authentication
+- `META_APP_ID`
+- `MEILISEARCH_HOST` - Meilisearch server URL
+- `MEILISEARCH_API_KEY` - Meilisearch API key
 
 Optional/common variables:
 
@@ -276,11 +276,8 @@ Optional/common variables:
 - `CORS_ALLOW_HEADERS`
 - `CORS_EXPOSE_HEADERS`
 - `CORS_ALLOW_CREDENTIALS`
-- `META_APP_ID`
-- `META_GRAPH_API_VERSION`
 - `GOOGLE_APPLICATION_CREDENTIALS` - Recommended for local/dev if using Application Default Credentials
-- `MEILISEARCH_HOST` - Meilisearch server URL
-- `MEILISEARCH_API_KEY` - Meilisearch API key
+- `META_GRAPH_API_VERSION`
 
 ## Proto Code Generation
 
