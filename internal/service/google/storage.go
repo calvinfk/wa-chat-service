@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 	"wa_chat_service/config"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/pkg/errs"
@@ -30,15 +29,19 @@ func NewGoogleStorageService(client *storage.Client, config *config.GCP, zsLog *
 }
 
 func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, fileURL string) (*storage.ObjectAttrs, error) {
+	// Check if file data is empty before proceeding with upload
 	if len(fileData) == 0 {
 		s.zsLog.Error("[UploadFile] file data is empty")
 		return nil, errs.ErrGenericEmptyFile
 	}
+	// Parse the file URL to extract bucket name and file path
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
 		s.zsLog.Errorf("[UploadFile] failed to parse Google Storage URL: %v", err)
 		return nil, err
 	}
+
+	// Check if the bucket exists before attempting to upload the file
 	bucket := s.client.Bucket(bucketName).UserProject(s.config.ProjectID)
 	if _, err := bucket.Attrs(ctx); err != nil {
 		if err == storage.ErrBucketNotExist {
@@ -48,15 +51,15 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 		s.zsLog.Errorf("[UploadFile] failed to get bucket: %v", err)
 		return nil, err
 	}
+	// Use the If condition to ensure that the file is only uploaded if it does not already exist in the bucket. This prevents overwriting existing files and ensures data integrity.
 	obj := bucket.Object(filePath).If(storage.Conditions{DoesNotExist: true})
+	// Create a new writer for the object and write the file data to it. The writer will automatically handle the upload process.
+	// After writing the data, we close the writer to finalize the upload and return the attributes of the uploaded object.
 	writer := obj.NewWriter(ctx)
-	// writer.ContentType = contentType
-
 	if _, err := writer.Write(fileData); err != nil {
 		s.zsLog.Errorf("[UploadFile] failed to write file: %v", err)
 		return nil, err
 	}
-
 	if err := writer.Close(); err != nil {
 		s.zsLog.Errorf("[UploadFile] failed to close file writer: %v", err)
 		return nil, err
@@ -66,17 +69,21 @@ func (s *GoogleStorageService) UploadFile(ctx context.Context, fileData []byte, 
 
 func (s *GoogleStorageService) GetFile(ctx context.Context, fileURL string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
 	var response dto.StorageMediaGetMediaResponse
+	// Parse the file URL to extract bucket name and file path.
 	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
 	if err != nil {
 		s.zsLog.Errorf("[GetFileAttrs] failed to parse Google Storage URL: %v", err)
 		return response, false, err
 	}
+	// Create a reference to the object in Google Cloud Storage using the bucket name and file path.
 	obj := s.client.Bucket(bucketName).UserProject(s.config.ProjectID).Object(filePath)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
 		s.zsLog.Errorf("[GetFileAttrs] failed to get file attributes: %v", err)
 		return response, true, err
 	}
+	// Parse the Range header to determine if a partial content response is needed. If the Range header is valid and specifies a byte range, we will return only that portion of the file.
+	// If the Range header is invalid or not provided, we will return the entire file.
 	startRange, endRange, hasRange, err := utils.ParseRangeHeader(rangeHeader, attrs.Size)
 	if err != nil {
 		s.zsLog.Warnf("[GetMedia] Invalid range header: %q (size=%d)", rangeHeader, attrs.Size)
@@ -118,32 +125,6 @@ func (s *GoogleStorageService) DeleteFile(ctx context.Context, fileURL string) e
 	return obj.Delete(ctx)
 }
 
-func (s *GoogleStorageService) GenerateV4GetObjectSignedURL(fileURL string, expiration time.Duration) (string, error) {
-	bucketName, filePath, err := s.ParseGoogleStorageURL(fileURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse Google Storage URL: %w", err)
-	}
-	// 1. Define the permissions and duration
-	maxV4 := 7 * 24 * time.Hour
-	if expiration <= 0 || expiration > maxV4 {
-		expiration = maxV4
-	}
-
-	opts := &storage.SignedURLOptions{
-		Scheme:  storage.SigningSchemeV4,
-		Method:  "GET",
-		Expires: time.Now().Add(expiration),
-	}
-
-	// 2. Generate the URL
-	url, err := s.client.Bucket(bucketName).SignedURL(filePath, opts)
-	if err != nil {
-		s.zsLog.Errorf("[GenerateV4GetObjectSignedURL] error generating signed URL for file %q in bucket %q: %v", filePath, bucketName, err)
-		return "", err
-	}
-
-	return url, nil
-}
 func (s *GoogleStorageService) GetDefaultFileURL(filePath string) string {
 	return fmt.Sprintf("gs://%s/%s", s.config.DefaultBucket, filePath)
 }

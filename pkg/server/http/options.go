@@ -17,13 +17,7 @@ func Port(port string) Option {
 	}
 }
 
-// Prefork -.
-func Prefork(prefork bool) Option {
-	return func(s *Server) {
-		s.prefork = prefork
-	}
-}
-
+// BodyLimit -.
 func BodyLimit(limit int) Option {
 	return func(s *Server) {
 		s.bodyLimit = limit

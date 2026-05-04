@@ -4,7 +4,6 @@ import (
 	"context"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
@@ -14,14 +13,13 @@ import (
 )
 
 type MessageRepository struct {
-	chat                 model.Chat
-	message              model.Message
-	db                   *firestore.Client
-	googleStorageService service.GoogleStorage
+	chat    model.Chat
+	message model.Message
+	db      *firestore.Client
 }
 
-func NewMessageRepository(db *firestore.Client, googleStorageService service.GoogleStorage) *MessageRepository {
-	return &MessageRepository{db: db, googleStorageService: googleStorageService}
+func NewMessageRepository(db *firestore.Client) *MessageRepository {
+	return &MessageRepository{db: db}
 }
 
 func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
@@ -78,13 +76,6 @@ func (r *MessageRepository) GetByChatID(ctx context.Context, requestData filter_
 		if message.StorageMedia != nil {
 			var accessURL *string
 			accessURL = message.StorageMedia.URL
-			if message.StorageMedia.IsURLFromStorage {
-				signedURL, err := r.googleStorageService.GenerateV4GetObjectSignedURL(*message.StorageMedia.URL, 0)
-				if err != nil {
-					return response, err
-				}
-				accessURL = &signedURL
-			}
 			storageMediaResponse := dto.StorageMediaResponse{}.FromModel(*message.StorageMedia, accessURL)
 			sto = &storageMediaResponse
 		}

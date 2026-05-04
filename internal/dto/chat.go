@@ -11,12 +11,12 @@ type (
 		PhoneNumberId string  `json:"phone_number_id" query:"phone_number_id" validate:"required"`
 		AgentID       *string `json:"agent_id"`
 		ChatType      *string `json:"chat_type" query:"chat_type" validate:"omitempty,filter_options=individual group ticket"`
-		ChatStatus    *string `json:"chat_status" query:"chat_status" validate:"omitempty,filter_options=open closed"`
+		ChatStatus    *string `json:"chat_status" query:"chat_status" validate:"omitempty,filter_options=open in_progress closed"`
 	}
 	ChatGetByPhoneNumberIdResponse struct {
 		ID            string    `json:"id"`          // {recipient_id}-{phone_number_id}
 		ChatType      string    `json:"chat_type"`   // individual, group, ticket
-		ChatStatus    string    `json:"chat_status"` // open, closed
+		ChatStatus    string    `json:"chat_status"` // open, in_progress, closed
 		RecipientName string    `json:"recipient_name"`
 		LastMessage   string    `json:"last_message"`
 		CreatedAt     time.Time `json:"created_at"`

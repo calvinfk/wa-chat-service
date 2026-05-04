@@ -45,11 +45,7 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (stri
 		return "", true, errs.ErrGenericUnauthorized
 	}
 	sub := fmt.Sprintf("%s:%s:%s", user.TenantID, user.DocumentID, user.Role)
-	accessToken, err := u.accessTokenService.GenerateAccessToken(sub)
-	if err != nil {
-		u.zsLog.Errorf("[Login] accessTokenService.GenerateAccessToken error : %v", err)
-		return "", true, err
-	}
+	accessToken := u.accessTokenService.GenerateAccessToken(sub)
 	encryptedToken, err := u.encryptService.Encrypt(accessToken)
 	if err != nil {
 		u.zsLog.Errorf("[Login] encryptService.Encrypt error : %v", err)

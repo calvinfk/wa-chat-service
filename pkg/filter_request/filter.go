@@ -1,11 +1,9 @@
 package filter_request
 
 import (
-	"fmt"
 	"strings"
 
 	"cloud.google.com/go/firestore"
-	"gorm.io/gorm"
 )
 
 // Operator defines the type for supported filter operators in query parameters. These operators allow clients to specify how they want to filter results when making API requests.
@@ -129,37 +127,4 @@ func parseSortOrder(order string) firestore.Direction {
 		return firestore.Desc
 	}
 	return firestore.Asc
-}
-
-// FilterScope takes a slice of Filter structs and returns a GORM scope function that applies the corresponding WHERE conditions to a database query based on the specified filters. This allows for dynamic filtering of database queries based on client-provided filter parameters in API requests.
-func FilterScope(filters []Filter) func(*gorm.DB) *gorm.DB {
-	return func(db *gorm.DB) *gorm.DB {
-		for _, filter := range filters {
-			var condition string
-			switch filter.Operator {
-			case OpEq:
-				condition = fmt.Sprintf("%s = ?", filter.Field)
-			case OpNeq:
-				condition = fmt.Sprintf("%s <> ?", filter.Field)
-			case OpGt:
-				condition = fmt.Sprintf("%s > ?", filter.Field)
-			case OpGte:
-				condition = fmt.Sprintf("%s >= ?", filter.Field)
-			case OpLt:
-				condition = fmt.Sprintf("%s < ?", filter.Field)
-			case OpLte:
-				condition = fmt.Sprintf("%s <= ?", filter.Field)
-			case OpLike:
-				condition = fmt.Sprintf("%s LIKE ?", filter.Field)
-				filter.Value = fmt.Sprintf("%%%v%%", filter.Value)
-			case OpIlike:
-				condition = fmt.Sprintf("%s ILIKE ?", filter.Field)
-				filter.Value = fmt.Sprintf("%%%v%%", filter.Value)
-			default:
-				continue
-			}
-			db = db.Where(condition, filter.Value)
-		}
-		return db
-	}
 }

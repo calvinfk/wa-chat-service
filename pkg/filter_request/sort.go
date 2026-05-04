@@ -1,10 +1,7 @@
 package filter_request
 
 import (
-	"fmt"
 	"strings"
-
-	"gorm.io/gorm"
 )
 
 const (
@@ -25,15 +22,4 @@ func (r Sort) Validate() map[string]string {
 		errors["sort_order"] = "must be 'asc' or 'desc'"
 	}
 	return errors
-}
-
-// SortScope takes a Sort struct and returns a GORM scope function that applies the corresponding ORDER BY clause to a database query based on the specified sorting parameters. This allows for dynamic sorting of database queries based on client-provided sorting parameters in API requests.
-func SortScope(sort Sort) func(*gorm.DB) *gorm.DB {
-	return func(db *gorm.DB) *gorm.DB {
-		dir := strings.ToLower(sort.SortOrder)
-		if dir != "asc" && dir != "desc" {
-			dir = "asc"
-		}
-		return db.Order(fmt.Sprintf("%s %s", sort.SortBy, dir))
-	}
 }

@@ -1,7 +1,5 @@
 package filter_request
 
-import "gorm.io/gorm"
-
 const (
 	DEFAULT_LIMIT = 100
 	MAX_LIMIT     = 100
@@ -23,12 +21,4 @@ func (r Paginate) Validate() map[string]string {
 		errors["page_size"] = "page_size must be greater than or equal to -1"
 	}
 	return errors
-}
-
-// PaginateScope takes a Paginate struct and returns a GORM scope function that applies the corresponding OFFSET and LIMIT clauses to a database query based on the specified pagination parameters. This allows for dynamic pagination of database queries based on client-provided pagination parameters in API requests.
-func PaginateScope(p Paginate) func(*gorm.DB) *gorm.DB {
-	offset := (p.Page - 1) * p.PageSize
-	return func(db *gorm.DB) *gorm.DB {
-		return db.Offset(offset).Limit(p.PageSize)
-	}
 }

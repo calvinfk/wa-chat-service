@@ -12,6 +12,11 @@ type (
 		SenderName string `json:"sender_name"`                 // optional, if not provided, will use current logged in user
 		Type       string `json:"type" validate:"required"`    // text, image, video, etc
 		Payload    any
+		// Test       Test `json:"test" validate:"required"` // if true, will not actually send message to whatsapp, only save to database for testing purposes
+	}
+
+	Test struct {
+		ID string `json:"id" validate:"required"`
 	}
 
 	MessageGetByChatIDRequest struct {

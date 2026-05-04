@@ -53,6 +53,8 @@ func (txm *TxManager) Do(ctx context.Context, fn func(ctx context.Context, txGor
 	return false, nil
 }
 
+// DoFirestore executes the provided function within a Firestore transaction context. It checks if the Firestore client is initialized and if the function is valid, then runs the transaction using the Firestore client's RunTransaction method.
+// The function passed to RunTransaction receives a transaction context and a Firestore transaction object, allowing it to perform operations within that transaction. The method returns a boolean indicating if there was a server error and any error that occurred during the transaction execution.
 func (txm *TxManager) DoFirestore(ctx context.Context, fn func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error)) (bool, error) {
 	var serverError bool
 	var err error

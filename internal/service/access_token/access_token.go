@@ -24,10 +24,10 @@ func NewAccessTokenService(config *config.Config, zsLog *zap.SugaredLogger) *acc
 	}
 }
 
-func (s *accessTokenService) GenerateAccessToken(sub string) (string, error) {
+func (s *accessTokenService) GenerateAccessToken(sub string) string {
 	exp := time.Now().Add(s.config.JOSE.AccessTokenExpiry).Unix()
 	token := sub + "." + strconv.FormatInt(exp, 10)
-	return token, nil
+	return token
 }
 
 func (s *accessTokenService) ParseAccessTokenSub(tokenStr string) (string, error) {

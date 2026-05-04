@@ -155,7 +155,7 @@ func newDefaultServices(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 }
 
 func newDefaultRepositories(clients clients, services services, zsLog *zap.SugaredLogger) repositories {
-	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient, services.GoogleStorage)
+	messageRepository := repository_firestore.NewMessageRepository(clients.firestoreClient)
 	chatRepository := repository_firestore.NewChatRepository(clients.firestoreClient)
 	storageMediaRepository := repository_firestore.NewStorageMediaRepository(clients.firestoreClient, services.GoogleStorage)
 	tenantRepository := repository_firestore.NewTenantRepository(clients.firestoreClient)

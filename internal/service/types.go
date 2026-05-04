@@ -14,8 +14,8 @@ type (
 	// AccessToken is an interface that defines methods for generating and parsing access tokens.
 	AccessToken interface {
 		// GenerateAccessToken generates an access token string for a given subject (sub).
-		// It returns the generated access token string or an error if there is an issue during token generation.
-		GenerateAccessToken(sub string) (string, error)
+		// It returns the generated access token string.
+		GenerateAccessToken(sub string) string
 		// ParseAccessToken parses a AccessToken access token string and extracts the user ID (subject) from the token claims.
 		// It validates the token using the configured JWK and returns the sub as string even if the token is expired.
 		// If the token is expired, it returns an error indicating that the token has expired and the sub.
@@ -39,9 +39,6 @@ type (
 		// DeleteFile deletes a file from Google Cloud Storage. It takes the file URL as a parameter
 		// It returns an error if there is an issue during the deletion process.
 		DeleteFile(ctx context.Context, fileURL string) error
-		// Generates a signed URL for accessing a file in Google Cloud Storage. It takes the file URL and the expiration duration for the signed URL as parameters. If the duration is 0, the signed URL will use the max duration.
-		// It returns the generated signed URL if successful, or an error if there is an issue during the URL generation process.
-		GenerateV4GetObjectSignedURL(fileURL string, expiration time.Duration) (string, error)
 		// GetDefaultFileURL generates a default file URL for accessing a file in Google Cloud Storage. It takes the file path as a parameter and returns the generated file URL.
 		// This method is used to generate a default file URL to access files using this service.
 		GetDefaultFileURL(filePath string) string

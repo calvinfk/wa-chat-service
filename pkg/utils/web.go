@@ -31,8 +31,7 @@ func DownloadFile(fileURL string) ([]byte, http.Header, error) {
 	}
 	defer resp.Body.Close()
 
-	fileData := make([]byte, resp.ContentLength)
-	_, err = resp.Body.Read(fileData)
+	fileData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,6 +61,10 @@ func GetFileNameFromURL(urlHeaders http.Header, fileURL string) string {
 	return ""
 }
 
+// ParseRangeHeader parses the Range header from an HTTP request and returns the start and end byte positions for the requested range.
+// It also returns a boolean indicating whether a valid range was specified and an error if the range is not satisfiable.
+// The function handles both standard byte ranges (e.g., "bytes=0-499") and suffix byte ranges (e.g., "bytes=-500").
+// If the Range header is empty, it returns default values indicating that the entire content should be returned.
 func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, error) {
 	rangeHeader = strings.TrimSpace(rangeHeader)
 	if rangeHeader == "" {
@@ -72,12 +75,15 @@ func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, 
 	}
 	lowerHeader := strings.ToLower(rangeHeader)
 	rangeSpec := rangeHeader
+	// Trim the "bytes=" prefix if it exists
 	if strings.HasPrefix(lowerHeader, "bytes=") {
 		rangeSpec = strings.TrimSpace(rangeHeader[len("bytes="):])
 	}
+	// Handle multiple ranges (e.g., "bytes=0-499,500-999") by taking only the first range specified
 	if idx := strings.Index(rangeSpec, ","); idx >= 0 {
 		rangeSpec = rangeSpec[:idx]
 	}
+	// Trim whitespace and split the range specification into start and end parts using the "-" delimiter
 	rangeSpec = strings.TrimSpace(rangeSpec)
 	parts := strings.SplitN(rangeSpec, "-", 2)
 	if len(parts) != 2 {
@@ -85,6 +91,8 @@ func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, 
 	}
 	parts[0] = strings.TrimSpace(parts[0])
 	parts[1] = strings.TrimSpace(parts[1])
+	// Handle suffix byte range (e.g., "bytes=-500") where the start part is empty.
+	// In this case, we calculate the start position based on the total size and the specified suffix length.
 	if parts[0] == "" {
 		suffixLength, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil || suffixLength <= 0 {
@@ -100,6 +108,7 @@ func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, 
 		return 0, 0, false, errs.ErrGenericRangeNotSatisfiable
 	}
 	var end int64
+	// Handle the case where the end part is empty (e.g., "bytes=500-") which means the range extends to the end of the content.
 	if parts[1] == "" {
 		end = totalSize - 1
 	} else {
@@ -114,6 +123,9 @@ func ParseRangeHeader(rangeHeader string, totalSize int64) (int64, int64, bool, 
 	return start, end, true, nil
 }
 
+// ProgressReader is a custom io.Reader that wraps another io.Reader and provides progress logging functionality.
+// It tracks the number of bytes read and logs the progress at regular intervals (e.g., every second) using the provided Log function.
+// The reader also checks for context cancellation to allow for graceful termination of long-running read operations.
 type ProgressReader struct {
 	Ctx     context.Context
 	Reader  io.Reader
@@ -123,6 +135,10 @@ type ProgressReader struct {
 	Log     func(string, ...any)
 }
 
+// Read reads data from the underlying io.Reader and updates the progress tracking.
+// It checks for context cancellation before reading and logs the progress at regular intervals.
+// If the context is canceled, it returns an error to allow for graceful termination of the read operation.
+// Chunk size is determined by the length of the provided byte slice, and the number of bytes read is accumulated to track overall progress.
 func (p *ProgressReader) Read(b []byte) (int, error) {
 	if p.Ctx.Err() != nil {
 		return 0, p.Ctx.Err()

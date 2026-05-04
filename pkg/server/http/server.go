@@ -13,7 +13,6 @@ import (
 
 const (
 	_defaultAddr            = ":80"
-	_defaultPrefork         = false
 	_defaultBodyLimit       = 16 * 1024 * 1024 // 16MB
 	_defaultReadTimeout     = 5 * time.Second
 	_defaultWriteTimeout    = 5 * time.Second
@@ -29,7 +28,6 @@ type Server struct {
 	notify chan error
 
 	address         string
-	prefork         bool
 	bodyLimit       int
 	readTimeout     time.Duration
 	writeTimeout    time.Duration
@@ -51,7 +49,6 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 		App:             nil,
 		notify:          make(chan error, 1),
 		address:         _defaultAddr,
-		prefork:         _defaultPrefork,
 		bodyLimit:       _defaultBodyLimit,
 		readTimeout:     _defaultReadTimeout,
 		writeTimeout:    _defaultWriteTimeout,
@@ -91,9 +88,7 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 // Start -.
 func (s *Server) Start() {
 	s.eg.Go(func() error {
-		err := s.App.Listen(s.address, fiber.ListenConfig{
-			EnablePrefork: s.prefork,
-		})
+		err := s.App.Listen(s.address)
 		if err != nil {
 			s.notify <- err
 

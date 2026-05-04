@@ -134,14 +134,14 @@ func InitializeFilter[T Validatable](filterRequest FilterRequest[T], allowedFilt
 func ApplyFilterGorm[T any](query *gorm.DB, data *[]T, filters []Filter, paginate Paginate, sort Sort) (int64, error) {
 	var totalData int64
 	query.Scopes(
-		FilterScope(filters),
+		filterScope(filters),
 	)
 	if err := query.Count(&totalData).Error; err != nil {
 		return 0, err
 	}
 	query.Scopes(
-		SortScope(sort),
-		PaginateScope(paginate),
+		sortScope(sort),
+		paginateScope(paginate),
 	)
 	err := query.Find(data).Error
 	if err != nil {
@@ -222,5 +222,57 @@ func formatFilterValue(field, op string, value any) string {
 		// Fallback: treat as string
 		escaped := strings.ReplaceAll(fmt.Sprintf("%v", v), `"`, `\"`)
 		return fmt.Sprintf(`%s %s "%s"`, field, op, escaped)
+	}
+}
+
+// sortScope takes a Sort struct and returns a GORM scope function that applies the corresponding ORDER BY clause to a database query based on the specified sorting parameters. This allows for dynamic sorting of database queries based on client-provided sorting parameters in API requests.
+func sortScope(sort Sort) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		dir := strings.ToLower(sort.SortOrder)
+		if dir != "asc" && dir != "desc" {
+			dir = "asc"
+		}
+		return db.Order(fmt.Sprintf("%s %s", sort.SortBy, dir))
+	}
+}
+
+// filterScope takes a slice of Filter structs and returns a GORM scope function that applies the corresponding WHERE conditions to a database query based on the specified filters. This allows for dynamic filtering of database queries based on client-provided filter parameters in API requests.
+func filterScope(filters []Filter) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		for _, filter := range filters {
+			var condition string
+			switch filter.Operator {
+			case OpEq:
+				condition = fmt.Sprintf("%s = ?", filter.Field)
+			case OpNeq:
+				condition = fmt.Sprintf("%s <> ?", filter.Field)
+			case OpGt:
+				condition = fmt.Sprintf("%s > ?", filter.Field)
+			case OpGte:
+				condition = fmt.Sprintf("%s >= ?", filter.Field)
+			case OpLt:
+				condition = fmt.Sprintf("%s < ?", filter.Field)
+			case OpLte:
+				condition = fmt.Sprintf("%s <= ?", filter.Field)
+			case OpLike:
+				condition = fmt.Sprintf("%s LIKE ?", filter.Field)
+				filter.Value = fmt.Sprintf("%%%v%%", filter.Value)
+			case OpIlike:
+				condition = fmt.Sprintf("%s ILIKE ?", filter.Field)
+				filter.Value = fmt.Sprintf("%%%v%%", filter.Value)
+			default:
+				continue
+			}
+			db = db.Where(condition, filter.Value)
+		}
+		return db
+	}
+}
+
+// paginateScope takes a Paginate struct and returns a GORM scope function that applies the corresponding OFFSET and LIMIT clauses to a database query based on the specified pagination parameters. This allows for dynamic pagination of database queries based on client-provided pagination parameters in API requests.
+func paginateScope(p Paginate) func(*gorm.DB) *gorm.DB {
+	offset := (p.Page - 1) * p.PageSize
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Offset(offset).Limit(p.PageSize)
 	}
 }

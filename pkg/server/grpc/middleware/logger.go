@@ -32,7 +32,7 @@ func UnaryRequestLogger() grpc.UnaryServerInterceptor {
 		codeStr := status.Code(err).String()
 		currentTime := time.Now().Format("15:04:05")
 		timeTakenStr := time.Since(start).String()
-		fmt.Printf("%s | %-3s | %13s | %15s | %-7s | %s\n\n",
+		fmt.Printf("%s | %-3s | %13s | %15s | %-7s | %s\n",
 			currentTime,
 			codeStr,
 			timeTakenStr,

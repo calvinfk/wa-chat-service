@@ -32,7 +32,7 @@ func (s *EncryptService) Encrypt(plaintext string) (string, error) {
 	}
 
 	// Wrap the block cipher in GCM mode.
-	// This adds the "Authenticated" part of AEAD, generating an auth tag.
+	// This adds the "Authenticated" part of AEAD (Authenticated Encryption with Associated Data), generating an auth tag.
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		s.zsLog.Errorf("[Encrypt] error creating GCM: %v", err)
@@ -81,7 +81,7 @@ func (s *EncryptService) Decrypt(cipherText string) (string, error) {
 		return "", err
 	}
 
-	//Validate that the payload is large enough to contain at least the nonce.
+	// Validate that the payload is large enough to contain at least the nonce.
 	// If it's smaller, it's malformed data.
 	nonceSize := gcm.NonceSize()
 	if len(cipherTextDecoded) < nonceSize {

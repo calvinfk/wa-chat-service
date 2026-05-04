@@ -66,6 +66,7 @@ func AnyToJsonString(v any) (string, error) {
 	return string(b), nil
 }
 
+// getJsonName retrieves the JSON field name for a given struct field, falling back to the lowercase of the field name if no JSON tag is present.
 func getJsonName(entity any, fieldName string) string {
 	t := reflect.TypeOf(entity)
 
