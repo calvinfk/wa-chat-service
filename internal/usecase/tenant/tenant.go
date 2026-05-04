@@ -56,7 +56,7 @@ func (u *TenantUsecase) CreateContact(ctx context.Context, tenantID string, inpu
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	err = u.tenantRepository.InsertContact(ctx, contact)
+	err = u.tenantRepository.UpsertContact(ctx, nil, contact)
 	if err != nil {
 		u.zsLog.Errorf("[CreateContact] Failed to create contact: %v", err)
 		return true, err
@@ -101,7 +101,7 @@ func (u *TenantUsecase) UpdateContact(ctx context.Context, tenantID string, inpu
 	contact.Name = inputData.Name
 	contact.PhoneNumber = inputData.PhoneNumber
 	contact.UpdatedAt = time.Now()
-	err = u.tenantRepository.UpdateContact(ctx, contact)
+	err = u.tenantRepository.UpsertContact(ctx, nil, contact)
 	if err != nil {
 		u.zsLog.Errorf("[UpdateContact] Failed to update contact: %v", err)
 		return true, err
@@ -115,7 +115,7 @@ func (u *TenantUsecase) DeleteContact(ctx context.Context, tenantID string, inpu
 		u.zsLog.Errorf("[DeleteContact] Failed to get tenant by ID: %v", err)
 		return true, err
 	}
-	err = u.tenantRepository.DeleteContact(ctx, tenant.DocumentID, inputData.ID)
+	err = u.tenantRepository.DeleteContact(ctx, nil, tenant.DocumentID, inputData.ID)
 	if err != nil {
 		u.zsLog.Errorf("[DeleteContact] Failed to delete contact: %v", err)
 		return true, err

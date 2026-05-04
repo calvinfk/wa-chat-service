@@ -18,6 +18,7 @@ type StorageMediaGRPC struct {
 }
 
 func (h *StorageMediaGRPC) SaveMediaID(ctx context.Context, in *v1.SaveMediaIDRequest) (*v1.SaveMediaIDResponse, error) {
+	// Map gRPC request to DTO for use case
 	inputData := dto.StorageMediaSaveMediaIDRequest{
 		MediaId:       in.MediaId,
 		PhoneNumberId: in.PhoneNumberId,

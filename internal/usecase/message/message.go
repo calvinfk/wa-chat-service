@@ -133,7 +133,7 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 					u.zsLog.Errorf("[SendMessage] Failed to parse media token: %v", err)
 					return response, serverError, err
 				}
-				storageMedia, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
+				storageMedia, err := u.storageMediaRepository.GetByID(ctx, storageMediaID)
 				if err != nil {
 					u.zsLog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
 					return response, true, err
@@ -172,9 +172,9 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 					MimeType:         mimeType,
 					CreatedAt:        time.Now(),
 				}
-				_, err = u.storageMediaRepository.Insert(ctx, nil, storageMedia)
+				_, err = u.storageMediaRepository.Upsert(ctx, nil, storageMedia)
 				if err != nil {
-					u.zsLog.Errorf("[SendMessage] Failed to create storage media: %v", err)
+					u.zsLog.Errorf("[SendMessage] Failed to upsert storage media: %v", err)
 					return response, true, err
 				}
 				sto = &storageMedia
@@ -287,7 +287,7 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, authData dto.A
 			}
 		}
 		if len(storageMediaIds) > 0 {
-			storageMediaMap, err = u.storageMediaRepository.GetByDocumentIDs(ctx, storageMediaIds)
+			storageMediaMap, err = u.storageMediaRepository.GetByIDs(ctx, storageMediaIds)
 			if err != nil {
 				u.zsLog.Errorf("[GetMessagesByChatID] Failed to get storage medias by IDs: %v", err)
 				return response, true, err

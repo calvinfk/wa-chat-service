@@ -30,6 +30,7 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 		createdAt := req.GetUserLastMessageAt().AsTime()
 		userLastMessageAt = &createdAt
 	}
+	// Map gRPC request to DTO for use case
 	inputData := dto.MessageSaveRequest{
 		ID:                &message.Id,
 		Wamid:             message.Wamid,
@@ -84,6 +85,7 @@ func (h *MessageGRPC) UpdateMessageStatus(ctx context.Context, req *v1.UpdateMes
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
+	// Map gRPC request to DTO for use case
 	inputData := dto.MessageSaveRequest{
 		ID:              &message.DocumentID,
 		ChatID:          &message.ChatID,

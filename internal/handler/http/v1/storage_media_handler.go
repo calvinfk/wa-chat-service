@@ -74,10 +74,10 @@ func (h *StorageMediaHandler) getMedia(ctx fiber.Ctx) error {
 	rangeHeader := ctx.Get(fiber.HeaderRange)
 	payload, serverError, err := h.storageMediaUsecase.ParseMediaToken(requestData.Media)
 	if err != nil {
-		// code, response := api_response.NewApiResponse(serverError, err, "", nil)
 		code, response := api_response.NewErrorApiResponse(false, errs.ErrGenericNotFound)
 		return ctx.Status(code).JSON(response)
 	}
+	// Check if payload is a valid UUID (media ID) or a valid URL, and set the appropriate field in the requestData for the use case
 	_, err = uuid.Parse(payload)
 	if err == nil {
 		requestData.StorageMediaID = &payload

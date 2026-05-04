@@ -8,6 +8,7 @@ import (
 )
 
 // Sets up CORS headers based on the provided configuration.
+// Cors is used for controlling cross-origin requests to the API
 func Cors(config *config.CORS) fiber.Handler {
 	if !config.CorsEnabled {
 		return func(ctx fiber.Ctx) error {

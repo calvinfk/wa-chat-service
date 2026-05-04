@@ -3,6 +3,7 @@ package http_v1
 import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/handler/http/middleware"
+	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 	"wa_chat_service/pkg/filter_request"
@@ -23,9 +24,9 @@ func NewUserHandler(userUsecase usecase.User) HandlerV1 {
 func (h *UserHandler) RegisterRoute(api fiber.Router) {
 	userGroup := api.Group("/user")
 	{
-		userGroup.Get("/list", middleware.Protected(), middleware.Role("admin"), h.getUsersByTenantID)
-		userGroup.Get("/get", middleware.Protected(), middleware.Role("admin"), h.getUserByID)
-		userGroup.Post("/upsert", middleware.Protected(), middleware.Role("admin"), h.upsertUser)
+		userGroup.Get("/list", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.getUsersByTenantID)
+		userGroup.Get("/get", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.getUserByID)
+		userGroup.Post("/upsert", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.upsertUser)
 	}
 }
 

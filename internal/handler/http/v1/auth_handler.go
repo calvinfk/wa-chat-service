@@ -40,10 +40,12 @@ func (h *AuthHandler) login(ctx fiber.Ctx) error {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
+	// Set the encrypted token in an HTTP-only cookie with the appropriate expiration time
 	ctx.Cookie(&fiber.Cookie{
 		Name:     "access_token",
 		Value:    encrypedToken,
 		Expires:  time.Now().Add(h.cfg.JOSE.AccessTokenExpiry),
+		Secure:   h.cfg.App.SecureCookie,
 		HTTPOnly: true,
 	})
 	code, response := api_response.NewApiResponse("Login successful", nil)

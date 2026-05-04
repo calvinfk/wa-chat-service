@@ -18,25 +18,17 @@ type HandlerGRPCV1 struct {
 }
 
 func NewRouterGRPCV1(handler HandlerGRPCV1) {
-	handler.newStorageMediaRoutes()
-	handler.newMessageRoutes()
-}
-
-func (h *HandlerGRPCV1) newStorageMediaRoutes() {
-	r := &StorageMediaGRPC{
-		storageMediaUsecase:      h.StorageMedia,
-		waBusinessAccountUsecase: h.WaBusinessAccount,
-		zsLog:                    h.ZSLog,
+	storageMediaGRPC := &StorageMediaGRPC{
+		storageMediaUsecase:      handler.StorageMedia,
+		waBusinessAccountUsecase: handler.WaBusinessAccount,
+		zsLog:                    handler.ZSLog,
 	}
-	v1.RegisterStorageMediaServer(h.App, r)
-}
-
-func (h *HandlerGRPCV1) newMessageRoutes() {
+	v1.RegisterStorageMediaServer(handler.App, storageMediaGRPC)
 	r := &MessageGRPC{
-		messageUsecase:           h.Message,
-		waBusinessAccountUsecase: h.WaBusinessAccount,
-		chatUsecase:              h.Chat,
-		zsLog:                    h.ZSLog,
+		messageUsecase:           handler.Message,
+		waBusinessAccountUsecase: handler.WaBusinessAccount,
+		chatUsecase:              handler.Chat,
+		zsLog:                    handler.ZSLog,
 	}
-	v1.RegisterMessageServer(h.App, r)
+	v1.RegisterMessageServer(handler.App, r)
 }

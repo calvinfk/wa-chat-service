@@ -4,10 +4,13 @@ import (
 	"context"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type BroadcastRepository struct {
@@ -23,10 +26,11 @@ func NewBroadcastRepository(db *firestore.Client) *BroadcastRepository {
 }
 
 func (r *BroadcastRepository) Insert(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error {
+	docRef := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID)
 	if tx != nil {
-		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID), broadcast)
+		return tx.Set(docRef, broadcast)
 	} else {
-		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
+		_, err := docRef.Set(ctx, broadcast)
 		return err
 	}
 }
@@ -34,6 +38,9 @@ func (r *BroadcastRepository) Insert(ctx context.Context, tx *firestore.Transact
 func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (model.Broadcast, error) {
 	docRef, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return r.broadcast, errs.ErrGenericNotFound
+		}
 		return r.broadcast, err
 	}
 	var broadcast model.Broadcast
@@ -47,38 +54,40 @@ func (r *BroadcastRepository) GetByID(ctx context.Context, broadcastID string) (
 }
 
 func (r *BroadcastRepository) Update(ctx context.Context, tx *firestore.Transaction, broadcast model.Broadcast) error {
+	docRef := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID)
 	if tx != nil {
-		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID), broadcast)
+		return tx.Set(docRef, broadcast)
 	} else {
-		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcast.DocumentID).Set(ctx, broadcast)
+		_, err := docRef.Set(ctx, broadcast)
 		return err
 	}
 }
 
 func (r *BroadcastRepository) Delete(ctx context.Context, tx *firestore.Transaction, broadcastID string) error {
+	docRef := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID)
 	if tx != nil {
-		return tx.Delete(r.db.Collection(r.broadcast.TableName()).Doc(broadcastID))
+		return tx.Delete(docRef)
 	} else {
-		_, err := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Delete(ctx)
+		_, err := docRef.Delete(ctx)
 		return err
 	}
 }
 
 func (r *BroadcastRepository) InsertRecipient(ctx context.Context, tx *firestore.Transaction, broadcastRecipient model.BroadcastRecipient) error {
+	docRef := r.db.Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID)
 	if tx != nil {
-		return tx.Set(r.db.Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID), broadcastRecipient)
+		return tx.Set(docRef, broadcastRecipient)
 	} else {
-		_, err := r.db.
-			Collection(r.broadcast.TableName()).Doc(broadcastRecipient.BroadcastID).
-			Collection(r.broadcastRecipient.TableName()).Doc(broadcastRecipient.DocumentID).
-			Set(ctx, broadcastRecipient)
+		_, err := docRef.Set(ctx, broadcastRecipient)
 		return err
 	}
 }
 
 func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, broadcastID string) ([]model.BroadcastRecipient, error) {
-	query := r.db.Collection(r.broadcast.TableName()).Doc(broadcastID).Collection(r.broadcastRecipient.TableName())
-	docs, err := query.Documents(ctx).GetAll()
+	docs, err := r.db.
+		Collection(r.broadcast.TableName()).Doc(broadcastID).
+		Collection(r.broadcastRecipient.TableName()).
+		Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -98,21 +107,16 @@ func (r *BroadcastRepository) GetRecipientsByBroadcastID(ctx context.Context, br
 }
 
 func (r *BroadcastRepository) UpdateRecipientStatus(ctx context.Context, tx *firestore.Transaction, data model.BroadcastRecipient) error {
+	docRef := r.db.Collection(r.broadcast.TableName()).Doc(data.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID)
+	updates := []firestore.Update{
+		{Path: "status", Value: data.Status},
+		{Path: "updated_at", Value: data.UpdatedAt},
+		{Path: "errors", Value: data.Errors},
+	}
 	if tx != nil {
-		return tx.Update(r.db.Collection(r.broadcast.TableName()).Doc(data.BroadcastID).Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID), []firestore.Update{
-			{Path: "status", Value: data.Status},
-			{Path: "updated_at", Value: data.UpdatedAt},
-			{Path: "errors", Value: data.Errors},
-		})
+		return tx.Update(docRef, updates)
 	} else {
-		_, err := r.db.
-			Collection(r.broadcast.TableName()).Doc(data.BroadcastID).
-			Collection(r.broadcastRecipient.TableName()).Doc(data.DocumentID).
-			Update(ctx, []firestore.Update{
-				{Path: "status", Value: data.Status},
-				{Path: "updated_at", Value: data.UpdatedAt},
-				{Path: "errors", Value: data.Errors},
-			})
+		_, err := docRef.Update(ctx, updates)
 		return err
 	}
 }

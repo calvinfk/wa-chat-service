@@ -3,6 +3,7 @@ package repository_firestore
 import (
 	"context"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
@@ -21,6 +22,9 @@ func NewWaPhoneRepository(db *firestore.Client) *WaPhoneRepository {
 func (r *WaPhoneRepository) GetByPhoneNumberId(ctx context.Context, phoneNumberId string) (model.WaPhone, error) {
 	doc, err := r.db.Collection(r.waPhone.TableName()).Where("phone_number_id", "==", phoneNumberId).Limit(1).Documents(ctx).Next()
 	if err != nil {
+		if err == iterator.Done {
+			return model.WaPhone{}, errs.ErrGenericNotFound
+		}
 		return model.WaPhone{}, err
 	}
 	var phone model.WaPhone
@@ -35,15 +39,11 @@ func (r *WaPhoneRepository) GetByPhoneNumberId(ctx context.Context, phoneNumberI
 
 func (r *WaPhoneRepository) GetByWaBusinessAccountID(ctx context.Context, waBusinessAccountID string) ([]model.WaPhone, error) {
 	var phones []model.WaPhone
-	iter := r.db.Collection(r.waPhone.TableName()).Where("wa_business_account_id", "==", waBusinessAccountID).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, err
-		}
+	docs, err := r.db.Collection(r.waPhone.TableName()).Where("wa_business_account_id", "==", waBusinessAccountID).Documents(ctx).GetAll()
+	if err != nil {
+		return phones, err
+	}
+	for _, doc := range docs {
 		var phone model.WaPhone
 		docData := doc.Data()
 		docData["id"] = doc.Ref.ID

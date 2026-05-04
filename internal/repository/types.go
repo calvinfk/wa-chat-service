@@ -39,20 +39,14 @@ type (
 
 	// StorageMedia defines persistence operations for media storage metadata.
 	StorageMedia interface {
-		// Insert inserts a media entry.
-		Insert(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) (model.StorageMedia, error)
-		// GetByDocumentID gets a media entry by document ID.
-		GetByDocumentID(ctx context.Context, documentID string) (model.StorageMedia, error)
-		// GetByDocumentIDs gets media entries by multiple document IDs.
-		GetByDocumentIDs(ctx context.Context, documentIDs []string) (map[string]model.StorageMedia, error)
-		// GetByURL gets a media entry by URL.
-		GetByURL(ctx context.Context, url string) (model.StorageMedia, error)
-		// GetByMediaID gets a media entry by media ID.
-		GetByMediaID(ctx context.Context, mediaID string) (model.StorageMedia, error)
+		// Upsert inserts or updates a media entry.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) (model.StorageMedia, error)
+		// GetByID gets a media entry by ID.
+		GetByID(ctx context.Context, ID string) (model.StorageMedia, error)
+		// GetByIDs gets media entries by multiple  IDs.
+		GetByIDs(ctx context.Context, IDs []string) (map[string]model.StorageMedia, error)
 		// Delete deletes a media entry by document ID.
 		Delete(ctx context.Context, tx *firestore.Transaction, documentID string) error
-		// Update updates an existing media entry.
-		Update(ctx context.Context, tx *firestore.Transaction, data model.StorageMedia) error
 		// GetFilteredByTenantID gets media entries by filter criteria with pagination metadata.
 		GetFilteredByTenantID(ctx context.Context, tenantID string, inputData filter_request.FilterRequest[dto.StorageMediaGetListRequest]) ([]model.StorageMedia, filter_request.Paginate, int64, error)
 	}
@@ -61,20 +55,18 @@ type (
 	Tenant interface {
 		// GetByID gets a tenant by tenant ID.
 		GetByID(ctx context.Context, tenantID string) (model.Tenant, error)
-		// InsertContact inserts a new contact for a tenant.
-		InsertContact(ctx context.Context, contact model.Contact) error
+		// UpsertContact inserts or updates a contact for a tenant.
+		UpsertContact(ctx context.Context, tx *firestore.Transaction, contact model.Contact) error
 		// GetContactsFiltered gets contacts by filter criteria.
 		GetContactsFiltered(ctx context.Context, tenantID string, filterRequest filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], error)
 		// GetContactByPhoneNumbers gets contacts mapped by provided phone numbers.
 		GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]map[string]string, error)
 		// GetContactByID gets a contact by contact ID.
 		GetContactByID(ctx context.Context, tenantID string, contactID string) (model.Contact, error)
-		// UpdateContact updates an existing contact.
-		UpdateContact(ctx context.Context, contact model.Contact) error
 		// GetTemplateFields gets template fields for a tenant.
 		GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error)
 		// DeleteContact deletes a contact by contact ID.
-		DeleteContact(ctx context.Context, tenantID string, contactID string) error
+		DeleteContact(ctx context.Context, tx *firestore.Transaction, tenantID string, contactID string) error
 	}
 
 	// Template defines persistence operations for template data.

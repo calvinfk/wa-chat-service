@@ -25,22 +25,14 @@ func NewMessageRepository(db *firestore.Client, googleStorageService service.Goo
 }
 
 func (r *MessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, message model.Message) (model.Message, error) {
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		docRef := r.db.
-			Collection(r.chat.TableName()).Doc(message.ChatID).
-			Collection(r.message.TableName()).Doc(message.DocumentID)
-		txErr := tx.Set(docRef, message)
-		if txErr != nil {
-			return txErr
-		}
-		return nil
-	}
-
+	docRef := r.db.
+		Collection(r.chat.TableName()).Doc(message.ChatID).
+		Collection(r.message.TableName()).Doc(message.DocumentID)
 	var err error
-	if tx == nil {
-		err = r.db.RunTransaction(ctx, execDB)
+	if tx != nil {
+		err = tx.Set(docRef, message)
 	} else {
-		err = execDB(ctx, tx)
+		_, err = docRef.Set(ctx, message)
 	}
 	return message, err
 }

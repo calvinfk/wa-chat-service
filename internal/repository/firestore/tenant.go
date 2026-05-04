@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type TenantRepository struct {
@@ -25,6 +28,9 @@ func NewTenantRepository(db *firestore.Client) *TenantRepository {
 func (r *TenantRepository) GetByID(ctx context.Context, tenantID string) (model.Tenant, error) {
 	doc, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.Tenant{}, errs.ErrGenericNotFound
+		}
 		return model.Tenant{}, err
 	}
 	// Unmarshal the document into a Tenant model
@@ -38,12 +44,14 @@ func (r *TenantRepository) GetByID(ctx context.Context, tenantID string) (model.
 	return tenant, nil
 }
 
-func (r *TenantRepository) InsertContact(ctx context.Context, contact model.Contact) error {
-	_, err := r.db.
-		Collection(r.tenant.TableName()).Doc(contact.TenantID).
-		Collection(r.contact.TableName()).Doc(contact.DocumentID).
-		Set(ctx, contact)
-	return err
+func (r *TenantRepository) UpsertContact(ctx context.Context, tx *firestore.Transaction, contact model.Contact) error {
+	docRef := r.db.Collection(r.tenant.TableName()).Doc(contact.TenantID).Collection(r.contact.TableName()).Doc(contact.DocumentID)
+	if tx != nil {
+		return tx.Set(docRef, contact)
+	} else {
+		_, err := docRef.Set(ctx, contact)
+		return err
+	}
 }
 
 func (r *TenantRepository) GetContactsFiltered(ctx context.Context, tenantID string, filterRequest filter_request.FilterRequest[dto.ContactGetFilteredRequest]) (filter_request.FilterResponse[dto.ContactResponse], error) {
@@ -73,7 +81,10 @@ func (r *TenantRepository) GetContactsFiltered(ctx context.Context, tenantID str
 }
 
 func (r *TenantRepository) GetContactByPhoneNumbers(ctx context.Context, tenantID string, phoneNumbers []string) (map[string]map[string]string, error) {
-	docs, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.contact.TableName()).Where("phone_number", "in", phoneNumbers).Documents(ctx).GetAll()
+	docs, err := r.db.
+		Collection(r.tenant.TableName()).Doc(tenantID).
+		Collection(r.contact.TableName()).Where("phone_number", "in", phoneNumbers).
+		Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +104,14 @@ func (r *TenantRepository) GetContactByPhoneNumbers(ctx context.Context, tenantI
 }
 
 func (r *TenantRepository) GetContactByID(ctx context.Context, tenantID string, contactID string) (model.Contact, error) {
-	docRef, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.contact.TableName()).Doc(contactID).Get(ctx)
+	docRef, err := r.db.
+		Collection(r.tenant.TableName()).Doc(tenantID).
+		Collection(r.contact.TableName()).Doc(contactID).
+		Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.Contact{}, errs.ErrGenericNotFound
+		}
 		return model.Contact{}, err
 	}
 	var contact model.Contact
@@ -106,14 +123,6 @@ func (r *TenantRepository) GetContactByID(ctx context.Context, tenantID string, 
 		return model.Contact{}, err
 	}
 	return contact, nil
-}
-
-func (r *TenantRepository) UpdateContact(ctx context.Context, contact model.Contact) error {
-	_, err := r.db.
-		Collection(r.tenant.TableName()).Doc(contact.TenantID).
-		Collection(r.contact.TableName()).Doc(contact.DocumentID).
-		Set(ctx, contact)
-	return err
 }
 
 func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error) {
@@ -136,10 +145,14 @@ func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID strin
 	return templateFields, nil
 }
 
-func (r *TenantRepository) DeleteContact(ctx context.Context, tenantID string, contactID string) error {
-	_, err := r.db.
+func (r *TenantRepository) DeleteContact(ctx context.Context, tx *firestore.Transaction, tenantID string, contactID string) error {
+	docRef := r.db.
 		Collection(r.tenant.TableName()).Doc(tenantID).
-		Collection(r.contact.TableName()).Doc(contactID).
-		Delete(ctx)
-	return err
+		Collection(r.contact.TableName()).Doc(contactID)
+	if tx != nil {
+		return tx.Delete(docRef)
+	} else {
+		_, err := docRef.Delete(ctx)
+		return err
+	}
 }

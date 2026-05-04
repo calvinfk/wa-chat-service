@@ -30,6 +30,7 @@ func AccessToken(accessTokenService service.AccessToken, encryptService service.
 		}
 		sub, err := accessTokenService.ParseAccessTokenSub(string(decryptedToken))
 		splits := strings.Split(sub, ":")
+		// sub is in the format tenantID:userID:role
 		authData := dto.AuthData{
 			TenantID: splits[0],
 			UserID:   splits[1],

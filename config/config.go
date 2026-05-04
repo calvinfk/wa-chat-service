@@ -178,6 +178,12 @@ func appEnv() (App, error) {
 		} else {
 			config.SecureCookie = secureCookie
 		}
+	} else {
+		if config.Environment == "production" {
+			config.SecureCookie = true
+		} else {
+			config.SecureCookie = false
+		}
 	}
 
 	if len(errors) > 0 {

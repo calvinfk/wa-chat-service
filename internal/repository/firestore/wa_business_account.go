@@ -3,10 +3,12 @@ package repository_firestore
 import (
 	"context"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/utils"
 
 	"cloud.google.com/go/firestore"
-	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type WhatsappBusinessAccountRepository struct {
@@ -21,6 +23,9 @@ func NewWhatsappBusinessAccountRepository(db *firestore.Client) *WhatsappBusines
 func (r *WhatsappBusinessAccountRepository) GetByID(ctx context.Context, id string) (model.WaBusinessAccount, error) {
 	doc, err := r.db.Collection(r.whatsappBusinessAccount.TableName()).Doc(id).Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.WaBusinessAccount{}, errs.ErrGenericNotFound
+		}
 		return model.WaBusinessAccount{}, err
 	}
 	var account model.WaBusinessAccount
@@ -35,15 +40,11 @@ func (r *WhatsappBusinessAccountRepository) GetByID(ctx context.Context, id stri
 
 func (r *WhatsappBusinessAccountRepository) GetByTenantID(ctx context.Context, tenantID string) ([]model.WaBusinessAccount, error) {
 	var accounts []model.WaBusinessAccount
-	iter := r.db.Collection(r.whatsappBusinessAccount.TableName()).Where("tenant_id", "==", tenantID).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, err
-		}
+	docs, err := r.db.Collection(r.whatsappBusinessAccount.TableName()).Where("tenant_id", "==", tenantID).Documents(ctx).GetAll()
+	if err != nil {
+		return accounts, err
+	}
+	for _, doc := range docs {
 		var account model.WaBusinessAccount
 		docData := doc.Data()
 		docData["id"] = doc.Ref.ID

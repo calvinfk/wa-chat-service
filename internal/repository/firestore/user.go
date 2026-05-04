@@ -10,6 +10,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type UserRepository struct {
@@ -44,6 +46,9 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (model.Us
 func (r *UserRepository) GetByID(ctx context.Context, id string) (model.User, error) {
 	doc, err := r.db.Collection(r.user.TableName()).Doc(id).Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.User{}, errs.ErrGenericNotFound
+		}
 		return model.User{}, err
 	}
 	var user model.User
@@ -83,33 +88,25 @@ func (r *UserRepository) GetByTenantIDFiltered(ctx context.Context, tenantID str
 }
 
 func (r *UserRepository) Upsert(ctx context.Context, tx *firestore.Transaction, user model.User) (model.User, error) {
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		_, err := r.db.Collection(r.user.TableName()).Doc(user.DocumentID).Set(ctx, user)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	var err error
+	docRef := r.db.Collection(r.user.TableName()).Doc(user.DocumentID)
 	if tx != nil {
-		err = execDB(ctx, tx)
+		return user, tx.Set(docRef, user)
 	} else {
-		err = r.db.RunTransaction(ctx, execDB)
+		_, err := docRef.Set(ctx, user)
+		if err != nil {
+			return model.User{}, err
+		}
+		return user, nil
 	}
-	return user, err
 }
 
 func (r *UserRepository) GetBySupervisorID(ctx context.Context, supervisorID string) ([]model.User, error) {
 	var users []model.User
-	iter := r.db.Collection(r.user.TableName()).Where("supervisor_id", "==", supervisorID).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return users, err
-		}
+	docs, err := r.db.Collection(r.user.TableName()).Where("supervisor_id", "==", supervisorID).Documents(ctx).GetAll()
+	if err != nil {
+		return users, err
+	}
+	for _, doc := range docs {
 		var user model.User
 		docData := doc.Data()
 		docData["id"] = doc.Ref.ID

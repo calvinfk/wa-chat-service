@@ -159,9 +159,9 @@ func (u *StorageMediaUsecase) UploadMedia(ctx context.Context, tenantID string, 
 			accessURL = &url
 		}
 	}
-	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
+	_, err = u.storageMediaRepository.Upsert(ctx, nil, media)
 	if err != nil {
-		u.zsLog.Errorf("[UploadMedia] Failed to insert media data to repository: %v", err)
+		u.zsLog.Errorf("[UploadMedia] Failed to upsert media data to repository: %v", err)
 		return response, true, err
 	}
 	response = response.FromModel(media, accessURL)
@@ -182,7 +182,7 @@ func (u *StorageMediaUsecase) GetMedia(ctx context.Context, inputData dto.Storag
 
 func (u *StorageMediaUsecase) getMediaStreamByID(ctx context.Context, storageMediaID string, rangeHeader string) (dto.StorageMediaGetMediaResponse, bool, error) {
 	var response dto.StorageMediaGetMediaResponse
-	media, err := u.storageMediaRepository.GetByDocumentID(ctx, storageMediaID)
+	media, err := u.storageMediaRepository.GetByID(ctx, storageMediaID)
 	if err != nil {
 		u.zsLog.Errorf("[GetMedia] Failed to get media data from repository: %v", err)
 		return response, true, err
@@ -295,7 +295,7 @@ func (u *StorageMediaUsecase) getMediaStreamByURL(ctx context.Context, url strin
 }
 
 func (u *StorageMediaUsecase) DeleteMedia(ctx context.Context, tenantID string, inputData dto.StorageMediaDeleteRequest) (bool, error) {
-	media, err := u.storageMediaRepository.GetByDocumentID(ctx, inputData.ID)
+	media, err := u.storageMediaRepository.GetByID(ctx, inputData.ID)
 	if err != nil {
 		u.zsLog.Errorf("[DeleteMedia] Failed to get media data from repository: %v", err)
 		if err == errs.ErrGenericNotFound {
@@ -371,9 +371,9 @@ func (u *StorageMediaUsecase) SaveMediaID(ctx context.Context, tenantID string, 
 		IsURLFromStorage: false,
 		CreatedAt:        time.Now(),
 	}
-	_, err = u.storageMediaRepository.Insert(ctx, nil, media)
+	_, err = u.storageMediaRepository.Upsert(ctx, nil, media)
 	if err != nil {
-		u.zsLog.Errorf("[SaveMediaID] Failed to create media record in repository: %v", err)
+		u.zsLog.Errorf("[SaveMediaID] Failed to upsert media record in repository: %v", err)
 		return emptyResponse, true, err
 	}
 	return dto.StorageMediaSaveMediaIDResponse{}.FromModel(media), false, nil

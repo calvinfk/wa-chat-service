@@ -28,41 +28,33 @@ func NewChatRepository(db *firestore.Client) *ChatRepository {
 
 func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, chat model.Chat) (model.Chat, bool, error) {
 	created := false
-	execDB := func(ctx context.Context, tx *firestore.Transaction) error {
-		doc := r.db.Collection("chats").Doc(chat.DocumentID)
-		_, getErr := tx.Get(doc)
-		if getErr != nil {
-			if status.Code(getErr) != codes.NotFound {
-				return getErr
-			}
-
-			setErr := tx.Set(doc, chat)
-			if setErr != nil {
-				return setErr
-			}
-			created = true
-			return nil
+	docRef := r.db.Collection(r.chat.TableName()).Doc(chat.DocumentID)
+	_, err := docRef.Get(ctx)
+	if err != nil {
+		if status.Code(err) != codes.NotFound {
+			return r.chat, created, err
 		}
-
-		updateErr := tx.Update(doc, []firestore.Update{
-			{Path: "chat_status", Value: chat.ChatStatus},
-			{Path: "agent_id", Value: chat.AgentID},
-			{Path: "last_message", Value: chat.LastMessage},
-			{Path: "user_last_message_at", Value: chat.UserLastMessageAt},
-			{Path: "updated_at", Value: chat.UpdatedAt},
-		})
-		if updateErr != nil {
-			return updateErr
-		}
-
-		return nil
+		created = true
 	}
-
-	var err error
-	if tx == nil {
-		err = r.db.RunTransaction(ctx, execDB)
+	updates := []firestore.Update{
+		{Path: "chat_status", Value: chat.ChatStatus},
+		{Path: "agent_id", Value: chat.AgentID},
+		{Path: "last_message", Value: chat.LastMessage},
+		{Path: "user_last_message_at", Value: chat.UserLastMessageAt},
+		{Path: "updated_at", Value: chat.UpdatedAt},
+	}
+	if tx != nil {
+		if created {
+			err = tx.Set(docRef, chat)
+		} else {
+			err = tx.Update(docRef, updates)
+		}
 	} else {
-		err = execDB(ctx, tx)
+		if created {
+			_, err = docRef.Set(ctx, chat)
+		} else {
+			_, err = docRef.Update(ctx, updates)
+		}
 	}
 	return chat, created, err
 }

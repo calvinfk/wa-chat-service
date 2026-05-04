@@ -28,7 +28,7 @@ func (h *TenantHandler) RegisterRoute(router fiber.Router) {
 			tenantContactRoutes.Post("/create", middleware.Protected(), h.createContact)
 			tenantContactRoutes.Get("/filter", middleware.Protected(), h.getFiltered)
 			tenantContactRoutes.Put("/update", middleware.Protected(), h.updateContact)
-			// tenantContactRoutes.Delete("/delete", middleware.Protected(), h.deleteContact)
+			tenantContactRoutes.Delete("/delete", middleware.Protected(), h.deleteContact)
 		}
 	}
 }
