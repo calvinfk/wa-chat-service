@@ -449,6 +449,14 @@ Default compose services:
 
 ## Important Notes
 
+### How to Develop New Features
+1. Define the models and repository interfaces needed for the new feature in `internal/model` and `internal/repository/types.go`.
+2. Implement the repository interfaces in `internal/repository/firestore` (and `internal/repository/meili` if search indexing is needed).
+3. Define any necessary services in `internal/service/types.go` and implement them in `internal/service/`.
+4. Create use cases in `internal/usecase/` that orchestrate the repositories and services to implement the business logic.
+5. Create HTTP handlers in `internal/handler/http/v1/` for the new API endpoints, and wire them up in the router.
+6. If gRPC services are needed, define the proto messages and services in `docs/proto/v1/`, generate the code, and implement the handlers in `internal/handler/grpc/v1/`.
+
 ### Template
 - When creating templates, if there's no parameter in the components, the `parameter_format` can be filled or left null, both are valid.
 - If there's parameter(s) in the components, the `parameter_format` must be filled with either "NAMED" or "POSITIONAL".
