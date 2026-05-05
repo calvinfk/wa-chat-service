@@ -20,6 +20,7 @@ type MeiliTemplateRepository struct {
 
 func NewMeiliTemplateRepository(db meilisearch.ServiceManager, zsLog *zap.SugaredLogger) *MeiliTemplateRepository {
 	var template model.Template
+	// Ensure the index exists and has the correct settings
 	index := db.Index(template.TableName())
 	_, err := index.FetchInfo()
 	if err != nil {
@@ -82,19 +83,19 @@ func NewMeiliTemplateRepository(db meilisearch.ServiceManager, zsLog *zap.Sugare
 	desiredSortable := template.AllowedSortFields()
 	currentSortable, err := db.Index(template.TableName()).GetSortableAttributes()
 	if err != nil {
-		zsLog.Fatalf("failed to get sortable attributes: %v", err)
+		zsLog.Fatalf("[NewMeiliTemplateRepository] failed to get sortable attributes: %v", err)
 	}
 	currentSortableSlice := []string{}
 	if currentSortable != nil {
 		currentSortableSlice, err = utils.AnySliceToStringSlice(*currentSortable)
 		if err != nil {
-			zsLog.Fatalf("failed to convert sortable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliTemplateRepository] failed to convert sortable attributes: %v", err)
 		}
 	}
 	if currentSortable == nil || !utils.SameStringSet(currentSortableSlice, desiredSortable) {
 		sortableAttributes := desiredSortable
 		if _, err := db.Index(template.TableName()).UpdateSortableAttributes(&sortableAttributes); err != nil {
-			zsLog.Fatalf("failed to update sortable attributes: %v", err)
+			zsLog.Fatalf("[NewMeiliTemplateRepository] failed to update sortable attributes: %v", err)
 		}
 	}
 

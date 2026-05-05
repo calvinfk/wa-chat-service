@@ -48,10 +48,8 @@ func (r *TemplateRepository) GetAll(ctx context.Context, whatsappBusinessAccount
 func (r *TemplateRepository) GetByID(ctx context.Context, whatsappBusinessAccountID string, documentID string) (model.Template, error) {
 	var template model.Template
 	doc, err := r.db.
-		Collection(r.WaBusinessAccount.TableName()).
-		Doc(whatsappBusinessAccountID).
-		Collection(r.template.TableName()).
-		Doc(documentID).Get(ctx)
+		Collection(r.WaBusinessAccount.TableName()).Doc(whatsappBusinessAccountID).
+		Collection(r.template.TableName()).Doc(documentID).Get(ctx)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return template, errs.ErrGenericNotFound
@@ -82,10 +80,8 @@ func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transacti
 		{Path: "updated_at", Value: inputData.UpdatedAt},
 	}
 	docRef := r.db.
-		Collection(r.WaBusinessAccount.TableName()).
-		Doc(inputData.WaBusinessAccountID).
-		Collection(r.template.TableName()).
-		Doc(inputData.DocumentID)
+		Collection(r.WaBusinessAccount.TableName()).Doc(inputData.WaBusinessAccountID).
+		Collection(r.template.TableName()).Doc(inputData.DocumentID)
 	_, err := docRef.Get(ctx)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {
@@ -116,10 +112,9 @@ func (r *TemplateRepository) Upsert(ctx context.Context, tx *firestore.Transacti
 }
 
 func (r *TemplateRepository) DeleteByID(ctx context.Context, tx *firestore.Transaction, whatsappBusinessAccountID string, templateID string) error {
-	docRef := r.db.Collection(r.WaBusinessAccount.TableName()).
-		Doc(whatsappBusinessAccountID).
-		Collection(r.template.TableName()).
-		Doc(templateID)
+	docRef := r.db.
+		Collection(r.WaBusinessAccount.TableName()).Doc(whatsappBusinessAccountID).
+		Collection(r.template.TableName()).Doc(templateID)
 	_, err := tx.Get(docRef)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {

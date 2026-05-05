@@ -10,7 +10,7 @@ import (
 	"google.golang.org/api/cloudtasks/v2"
 )
 
-type GoogleTaskService struct {
+type googleTaskService struct {
 	client         *cloudtasks.Service
 	cfg            *config.GCP
 	jwtService     service.JWT
@@ -19,8 +19,9 @@ type GoogleTaskService struct {
 	baseURL        string
 }
 
-func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zsLog *zap.SugaredLogger, baseURL string) *GoogleTaskService {
-	return &GoogleTaskService{
+// NewGoogleTaskService creates a new instance of googleTaskService with the provided dependencies.
+func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtService service.JWT, encryptService service.Encrypt, zsLog *zap.SugaredLogger, baseURL string) *googleTaskService {
+	return &googleTaskService{
 		client:         client,
 		cfg:            cfg,
 		jwtService:     jwtService,
@@ -30,7 +31,8 @@ func NewGoogleTaskService(client *cloudtasks.Service, cfg *config.GCP, jwtServic
 	}
 }
 
-func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error {
+func (s *googleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error {
+	// Generate a JWT token for the broadcast task with a unique identifier and an expiration time slightly after the scheduled time to ensure the task can execute successfully.
 	token, err := s.jwtService.GenerateJWT("broadcast_"+broadcastID, scheduleTime.Add(time.Second*20).Unix())
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func (s *GoogleTaskService) CreateBroadcastTask(broadcastID string, scheduleTime
 	return nil
 }
 
-func (s *GoogleTaskService) DeleteBroadcastTask(broadcastID string) error {
+func (s *googleTaskService) DeleteBroadcastTask(broadcastID string) error {
 	_, err := s.client.Projects.Locations.Queues.Tasks.Delete(s.cfg.BroadcastTaskParent + "/tasks/" + broadcastID).Do()
 	if err != nil {
 		s.zsLog.Errorf("[DeleteBroadcastTask] error deleting broadcast task: %v", err)

@@ -2,8 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"reflect"
-	"strings"
 )
 
 // StructToMap converts a struct to a map[string]any by first marshaling the struct to JSON and then unmarshaling it back into a map.
@@ -64,34 +62,4 @@ func AnyToJsonString(v any) (string, error) {
 		return "", err
 	}
 	return string(b), nil
-}
-
-// getJsonName retrieves the JSON field name for a given struct field, falling back to the lowercase of the field name if no JSON tag is present.
-func getJsonName(entity any, fieldName string) string {
-	t := reflect.TypeOf(entity)
-
-	// If it's a pointer, get the element
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-
-	// Handle the case where we are validating the wrapper struct
-	field, found := t.FieldByName(fieldName)
-	if !found {
-		return strings.ToLower(fieldName) // Fallback
-	}
-
-	jsonTag := field.Tag.Get("json")
-	if jsonTag == "" || jsonTag == "-" {
-		return strings.ToLower(fieldName)
-	}
-
-	// Return only the name part of the tag (before any commas)
-	return strings.Split(jsonTag, ",")[0]
-}
-
-func JsonStringToMap(jsonString string) (map[string]any, error) {
-	var result map[string]any
-	err := json.Unmarshal([]byte(jsonString), &result)
-	return result, err
 }

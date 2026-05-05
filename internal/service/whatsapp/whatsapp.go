@@ -9,17 +9,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type WhatsappBusiness struct {
+type whatsappBusinessService struct {
 	zsLog *zap.SugaredLogger
 }
 
-func NewWhatsappService(zsLog *zap.SugaredLogger) *WhatsappBusiness {
-	return &WhatsappBusiness{
+func NewWhatsappService(zsLog *zap.SugaredLogger) *whatsappBusinessService {
+	return &whatsappBusinessService{
 		zsLog: zsLog,
 	}
 }
 
-func (s *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error {
+func (s *whatsappBusinessService) ValidateTemplatePayload(client *whatsapp_business.Client, templateDB model.Template, templateSend whatsapp_business.MessageComponent) error {
 	validationInput, err := parseTemplateValidationInput(templateDB, templateSend)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (s *WhatsappBusiness) ValidateTemplatePayload(client *whatsapp_business.Cli
 	return nil
 }
 
-func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat string, sendComponents []map[string]any) (map[string]map[string]string, error) {
+func (s *whatsappBusinessService) ExtractSendComponentParameterValues(parameterFormat string, sendComponents []map[string]any) (map[string]map[string]string, error) {
 	parameterValues := map[string]map[string]string{
 		"HEADER": {},
 		"BODY":   {},
@@ -175,7 +175,7 @@ func (s *WhatsappBusiness) ExtractSendComponentParameterValues(parameterFormat s
 	return parameterValues, nil
 }
 
-func (s *WhatsappBusiness) ParseTemplateComponentParameter(value string) string {
+func (s *whatsappBusinessService) ParseTemplateComponentParameter(value string) string {
 	matches := templateParameterRegex.FindStringSubmatch(value)
 	if len(matches) < 2 {
 		return ""

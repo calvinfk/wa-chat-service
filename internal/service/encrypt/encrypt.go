@@ -11,18 +11,18 @@ import (
 	"go.uber.org/zap"
 )
 
-type EncryptService struct {
+type encryptService struct {
 	config *config.Encrypt
 	zsLog  *zap.SugaredLogger
 }
 
-func NewEncryptService(config *config.Encrypt, zsLog *zap.SugaredLogger) *EncryptService {
-	return &EncryptService{
+func NewEncryptService(config *config.Encrypt, zsLog *zap.SugaredLogger) *encryptService {
+	return &encryptService{
 		config: config,
 		zsLog:  zsLog,
 	}
 }
-func (s *EncryptService) Encrypt(plaintext string) (string, error) {
+func (s *encryptService) Encrypt(plaintext string) (string, error) {
 	// Initialize the AES block cipher using your secret key.
 	// The key length must be 16, 24, or 32 bytes for AES-128, 192, or 256.
 	block, err := aes.NewCipher(s.config.Key)
@@ -60,7 +60,7 @@ func (s *EncryptService) Encrypt(plaintext string) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(payload), nil
 }
 
-func (s *EncryptService) Decrypt(cipherText string) (string, error) {
+func (s *encryptService) Decrypt(cipherText string) (string, error) {
 	// Decode the Base64 string back into raw bytes.
 	cipherTextDecoded, err := base64.RawURLEncoding.DecodeString(cipherText)
 	if err != nil {

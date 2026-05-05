@@ -20,6 +20,7 @@ type MeiliMessageRepository struct {
 
 func NewMeiliMessageRepository(db meilisearch.ServiceManager, zsLog *zap.SugaredLogger) *MeiliMessageRepository {
 	var message model.Message
+	// Ensure the index exists and has the correct settings
 	index := db.Index(message.TableName())
 	_, err := index.FetchInfo()
 	if err != nil {

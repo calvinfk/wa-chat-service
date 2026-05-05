@@ -14,7 +14,7 @@ const (
 	_defaultAddr = ":80"
 )
 
-// Server -.
+// Server - represents a gRPC server instance.
 type Server struct {
 	ctx context.Context
 	eg  *errgroup.Group
@@ -27,7 +27,9 @@ type Server struct {
 	zlog *zap.Logger
 }
 
-// New -.
+// New - creates a new instance of the Server struct, initializing its fields and applying any provided options.
+// It sets up the gRPC server with the specified options and prepares it for handling incoming requests.
+// The server will listen on the specified address and log its activities using the provided zap.Logger instance.
 func New(zlog *zap.Logger, opts ...Option) *Server {
 	// Stop the server if any of the goroutines returns an error, or if the context is canceled.
 	group, ctx := errgroup.WithContext(context.Background())
@@ -49,7 +51,7 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 	return s
 }
 
-// Start -.
+// Start - starts the gRPC server in a separate goroutine, allowing it to handle incoming requests concurrently while the main program continues to execute.
 func (s *Server) Start() {
 	s.eg.Go(func() error {
 		var lc net.ListenConfig
@@ -78,12 +80,13 @@ func (s *Server) Start() {
 	s.zlog.Info("grpc - Server - Started on" + s.address)
 }
 
-// Notify -.
+// Notify - returns a channel that will receive an error if the server encounters an issue during startup or runtime.
+// The channel will be closed after sending the error, ensuring that it can only be read once.
 func (s *Server) Notify() <-chan error {
 	return s.notify
 }
 
-// Shutdown -.
+// Shutdown - shuts down the gRPC server gracefully, stopping it from accepting new requests and waiting for existing requests to complete.
 func (s *Server) Shutdown() error {
 	var shutdownErrors []error
 

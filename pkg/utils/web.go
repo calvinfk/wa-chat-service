@@ -23,21 +23,6 @@ func GetURLHeaders(fileURL string) (http.Header, error) {
 	return resp.Header, nil
 }
 
-func DownloadFile(fileURL string) ([]byte, http.Header, error) {
-	client := http.Client{}
-	resp, err := client.Get(fileURL)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer resp.Body.Close()
-
-	fileData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-	return fileData, resp.Header, nil
-}
-
 func GetFileNameFromURL(urlHeaders http.Header, fileURL string) string {
 	contentDisposition := urlHeaders.Get("Content-Disposition")
 	if contentDisposition != "" {

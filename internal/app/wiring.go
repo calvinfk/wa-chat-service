@@ -106,6 +106,7 @@ func NewDefaultWiring(zsLog *zap.SugaredLogger, cfg *config.Config) servers {
 }
 
 func newDefaultClients(cfg *config.Config, zsLog *zap.SugaredLogger) clients {
+	// Set a timeout for the client initialization to avoid hanging if there are issues connecting to external services
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	gcpStorageClient, err := storage.NewClient(ctx)

@@ -45,7 +45,9 @@ func (r *TenantRepository) GetByID(ctx context.Context, tenantID string) (model.
 }
 
 func (r *TenantRepository) UpsertContact(ctx context.Context, tx *firestore.Transaction, contact model.Contact) error {
-	docRef := r.db.Collection(r.tenant.TableName()).Doc(contact.TenantID).Collection(r.contact.TableName()).Doc(contact.DocumentID)
+	docRef := r.db.
+		Collection(r.tenant.TableName()).Doc(contact.TenantID).
+		Collection(r.contact.TableName()).Doc(contact.DocumentID)
 	if tx != nil {
 		return tx.Set(docRef, contact)
 	} else {
@@ -59,7 +61,9 @@ func (r *TenantRepository) GetContactsFiltered(ctx context.Context, tenantID str
 	if err != nil {
 		return filter_request.FilterResponse[dto.ContactResponse]{}, err
 	}
-	query := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.contact.TableName()).Query
+	query := r.db.
+		Collection(r.tenant.TableName()).Doc(tenantID).
+		Collection(r.contact.TableName()).Query
 	docs, totalData, err := filter_request.ApplyFilterFirestore(ctx, query, filters, sort, paginate)
 	if err != nil {
 		return filter_request.FilterResponse[dto.ContactResponse]{}, err
@@ -126,7 +130,9 @@ func (r *TenantRepository) GetContactByID(ctx context.Context, tenantID string, 
 }
 
 func (r *TenantRepository) GetTemplateFields(ctx context.Context, tenantID string) (map[string]model.TemplateField, error) {
-	docs, err := r.db.Collection(r.tenant.TableName()).Doc(tenantID).Collection(r.templateField.TableName()).Documents(ctx).GetAll()
+	docs, err := r.db.
+		Collection(r.tenant.TableName()).Doc(tenantID).
+		Collection(r.templateField.TableName()).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ const (
 	_defaultShutdownTimeout = 3 * time.Second
 )
 
-// Server -.
+// Server - represents an HTTP server instance.
 type Server struct {
 	ctx context.Context
 	eg  *errgroup.Group
@@ -38,7 +38,9 @@ type Server struct {
 	middleware []fiber.Handler
 }
 
-// New -.
+// New - creates a new instance of the Server struct, initializing its fields and applying any provided options.
+// It sets up the HTTP server with the specified options and prepares it for handling incoming requests.
+// The server will listen on the specified address and log its activities using the provided zap.Logger instance.
 func New(zlog *zap.Logger, opts ...Option) *Server {
 	group, ctx := errgroup.WithContext(context.Background())
 	group.SetLimit(1) // Run only one goroutine
@@ -85,7 +87,7 @@ func New(zlog *zap.Logger, opts ...Option) *Server {
 	return s
 }
 
-// Start -.
+// Start - starts the HTTP server in a separate goroutine, allowing it to handle incoming requests concurrently while the main program continues to execute.
 func (s *Server) Start() {
 	s.eg.Go(func() error {
 		err := s.App.Listen(s.address)
@@ -103,12 +105,12 @@ func (s *Server) Start() {
 	s.zlog.Info("http - Server - Started")
 }
 
-// Notify -.
+// Notify - returns a channel that will receive an error if the server encounters an issue while running. The channel will be closed when the server is shut down.
 func (s *Server) Notify() <-chan error {
 	return s.notify
 }
 
-// Shutdown -.
+// Shutdown - shuts down the HTTP server gracefully, stopping it from accepting new requests and waiting for existing requests to complete.
 func (s *Server) Shutdown() error {
 	var shutdownErrors []error
 

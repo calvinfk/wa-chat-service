@@ -15,6 +15,7 @@ type jwtService struct {
 	zsLog *zap.SugaredLogger
 }
 
+// NewJWTService creates a new instance of jwtService with the provided configuration and logger. This service is responsible for generating and parsing JWT tokens using RSA encryption based on the provided configuration.
 func NewJWTService(cfg *config.JOSE, zsLog *zap.SugaredLogger) *jwtService {
 	return &jwtService{
 		cfg:   cfg,

@@ -100,6 +100,8 @@ func (r *StorageMediaRepository) GetByIDs(ctx context.Context, IDs []string) (ma
 	}
 
 	// avoid firestore in query limit
+	// https://firebase.google.com/docs/firestore/query-data/queries#in_not-in_and_array-contains-any
+	// Use the in operator to combine up to 30 equality (==) clauses on the same field with a logical OR.
 	const maxInValues = 30
 	collection := r.db.Collection(r.storageMedia.TableName())
 	for i := 0; i < len(IDs); i += maxInValues {
