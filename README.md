@@ -450,7 +450,7 @@ Default compose services:
 ## Important Notes
 
 ### How to Develop New Features
-1. Define the models and repository interfaces needed for the new feature in `internal/model` and `internal/repository/types.go`.
+1. Define the models, dto, and repository interfaces needed for the new feature in `internal/model`, `internal/dto`, and `internal/repository/types.go`.
 2. Implement the repository interfaces in `internal/repository/firestore` (and `internal/repository/meili` if search indexing is needed).
 3. Define any necessary services in `internal/service/types.go` and implement them in `internal/service/`.
 4. Create use cases in `internal/usecase/` that orchestrate the repositories and services to implement the business logic.
