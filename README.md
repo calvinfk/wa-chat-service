@@ -33,7 +33,7 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
 **Send Message**
 - `POST /send`
   - Body (JSON):
-    - `chat_id` (required): Chat identifier
+    - `chat_id` (required): Chat identifier (`{recipient_id}-{phone_number_id}` for individual chats, or UUID v7 for groups/tickets)
     - `sender_name` (optional): Sender display name; defaults to current logged-in user if not provided
     - `type` (required): Message type (e.g., `text`, `image`, `video`)
     - `[type]` (required): Payload object keyed by the message type
@@ -56,13 +56,13 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
     - `phone_number_id` (required): WhatsApp Business phone number ID
     - `agent_id` (optional): Filter chats assigned to a specific agent
     - `chat_type` (optional): Filter by chat type (`individual`, `group`, or `ticket`)
-    - `chat_status` (optional): Filter by chat status (`open` or `closed`)
+    - `chat_status` (optional): Filter by chat status (`open`, `in_progress`, or `closed`)
     - `page`, `page_size` (optional): Pagination
     - `sort_by`, `sort_order` (optional): Sorting
   - Response: Array of chat objects with:
     - `id`: Chat identifier
     - `chat_type`: Type of chat (individual, group, ticket)
-    - `chat_status`: Status of chat (open, closed)
+    - `chat_status`: Status of chat (open, in_progress, closed)
     - `recipient_name`: Name of the chat recipient/group
     - `last_message`: Last message text
     - `created_at`, `updated_at`: Timestamps
@@ -94,7 +94,7 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
     - `recipient_name` (required): Recipient display name
   - Returns: Chat object with created chat details
 
-**Close Ticket** *(Agent only)*
+**Close Ticket** *(Admin only)*
 - `POST /close-ticket`
   - Body (JSON):
     - `chat_id` (required): Chat/ticket identifier
@@ -106,6 +106,22 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
     - `chat_id` (required): Chat identifier
     - `agent_id` (required): UUID of agent to assign
   - Returns: Success confirmation
+
+**Get Ticket Analytics** *(Admin only)*
+- `GET /ticket-analytics`
+  - Query parameters:
+    - `phone_number_ids` (optional): Comma-separated list of phone number IDs to filter by; if not provided, includes all
+    - `start_time` (required): ISO 8601 timestamp for start of date range
+    - `end_time` (required): ISO 8601 timestamp for end of date range (must be after start_time)
+  - Response: Analytics object with:
+    - `total_count`: Total number of tickets in date range
+    - `average_resolution_minutes`: Average time to close a ticket
+    - `median_resolution_minutes`: Median time to close a ticket
+    - `longest_resolution_minutes`: Longest time taken to close a ticket
+    - `shortest_resolution_minutes`: Shortest time taken to close a ticket
+    - `opened_count`: Count of tickets with status `open`
+    - `in_progress_count`: Count of tickets with status `in_progress`
+    - `closed_count`: Count of tickets with status `closed`
 
 #### Template (`/api/v1/template`)
 
@@ -175,9 +191,26 @@ All endpoints require authentication (Bearer token).
 #### Message Service (`package v1`)
 - **Proto**: `docs/proto/v1/message.proto`
 - `SaveMessage(SaveMessageRequest) -> Empty`
-  - Saves an incoming message with associated metadata (used by webhook processor)
-  - Request fields: `message` (MessageModel), `phone_number_id`, `recipient_id`, `recipient_name`, `last_message`
+  - Saves an incoming message with associated metadata and upserts chat (used by webhook processor)
+  - Request fields:
+    - `message` (MessageModel): Message data
+    - `phone_number_id` (string): WhatsApp Business phone number ID
+    - `recipient_id` (string): Recipient identifier
+    - `recipient_name` (string): Display name for the chat
+    - `last_message` (string): Last message text for chat update
+    - `user_last_message_at` (optional timestamp): When the user last sent a message
   - MessageModel fields: `id`, `wamid`, `chat_id`, `message_type`, `message_category`, `sender_name`, `payload`, `storage_media_id` (optional), `status`, `created_at`, `sent_at` (optional), `delivered_at` (optional), `read_at` (optional), `error` (optional)
+
+- `UpdateMessageStatus(UpdateMessageStatusRequest) -> Empty`
+  - Updates message status and timestamps based on webhook status events
+  - Request fields:
+    - `wamid` (string): WhatsApp message ID
+    - `phone_number_id` (string): WhatsApp Business phone number ID
+    - `recipient_id` (string): Recipient identifier
+    - `status` (string): Message status (sent, delivered, read, failed)
+    - `message_category` (string): Message category from pricing/status webhook
+    - `error` (optional string): Error details if message failed
+    - `timestamp` (Timestamp): Status event timestamp
 
 - `UpdateMessageStatus(UpdateMessageStatusRequest) -> Empty`
   - Updates message status (sent, delivered, read, failed) and timestamps
