@@ -189,7 +189,7 @@ func (uc *TicketUsecase) CloseTicket(ctx context.Context, tenantID string, reque
 			uc.zsLog.Errorf("[CloseTicket] error while upserting ticket: %v", err)
 			return true, err
 		}
-		_, err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, message)
+		err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, message)
 		if err != nil {
 			uc.zsLog.Errorf("[CloseTicket] error while creating system message: %v", err)
 			return true, err
@@ -293,14 +293,14 @@ func (uc *TicketUsecase) AssignAgent(ctx context.Context, tenantID string, reque
 			uc.zsLog.Errorf("[AssignAgent] error while upserting ticket: %v", err)
 			return true, err
 		}
-		_, err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, message)
+		err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, message)
 		if err != nil {
 			uc.zsLog.Errorf("[AssignAgent] error while creating system message: %v", err)
 			return true, err
 		}
 		err = uc.searchTicketMessageRepository.AddDocumentsSync(ctx, []model.TicketMessage{message})
 		if err != nil {
-			uc.zsLog.Errorf("[CloseTicket] error while adding message to search index: %v", err)
+			uc.zsLog.Errorf("[AssignAgent] error while adding message to search index: %v", err)
 			return true, err
 		}
 		return false, nil

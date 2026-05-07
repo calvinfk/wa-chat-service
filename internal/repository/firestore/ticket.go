@@ -40,6 +40,9 @@ func (r *TicketRepository) Upsert(ctx context.Context, tx *firestore.Transaction
 		{Path: "user_last_message_at", Value: ticket.UserLastMessageAt},
 		{Path: "updated_at", Value: ticket.UpdatedAt},
 	}
+	if ticket.TicketStatus != "" {
+		updates = append(updates, firestore.Update{Path: "ticket_status", Value: ticket.TicketStatus})
+	}
 	if tx != nil {
 		if created {
 			err = tx.Set(docRef, ticket)

@@ -32,8 +32,9 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
 		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberId)
 		chatGroup.Get("/messages", middleware.Protected(), h.getMessagesByChatID)
-		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 		chatGroup.Post("/create", middleware.Protected(), h.createChat)
+		chatGroup.Post("/close", middleware.Protected(), middleware.Role(model.UserRoleAgent), h.closeChat)
+		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 	}
 }
 
@@ -150,18 +151,34 @@ func (h *ChatHandler) assignAgent(ctx fiber.Ctx) error {
 	return ctx.Status(code).JSON(response)
 }
 
-func (uc *ChatHandler) createChat(ctx fiber.Ctx) error {
+func (h *ChatHandler) createChat(ctx fiber.Ctx) error {
 	var requestData dto.ChatCreateRequest
 	if err := ctx.Bind().Body(&requestData); err != nil {
 		code, response := api_response.NewErrorApiResponse(false, err)
 		return ctx.Status(code).JSON(response)
 	}
 	authData := ctx.Locals("token_sub").(dto.AuthData)
-	data, serverError, err := uc.chatUsecase.CreateChat(ctx.Context(), authData.TenantID, requestData)
+	data, serverError, err := h.chatUsecase.CreateChat(ctx.Context(), authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Successfully created chat", data)
+	return ctx.Status(code).JSON(response)
+}
+
+func (h *ChatHandler) closeChat(ctx fiber.Ctx) error {
+	var requestData dto.ChatCloseRequest
+	if err := ctx.Bind().Body(&requestData); err != nil {
+		code, response := api_response.NewErrorApiResponse(false, err)
+		return ctx.Status(code).JSON(response)
+	}
+	authData := ctx.Locals("token_sub").(dto.AuthData)
+	serverError, err := h.chatUsecase.CloseChat(ctx.Context(), authData.TenantID, requestData)
+	if err != nil {
+		code, response := api_response.NewErrorApiResponse(serverError, err)
+		return ctx.Status(code).JSON(response)
+	}
+	code, response := api_response.NewApiResponse("Successfully closed chat", nil)
 	return ctx.Status(code).JSON(response)
 }

@@ -160,7 +160,7 @@ type (
 
 	TicketMessage interface {
 		// Upsert inserts or updates a ticket message entry. also updates the search index accordingly.
-		Upsert(ctx context.Context, tx *firestore.Transaction, data model.TicketMessage) (model.TicketMessage, error)
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.TicketMessage) error
 		// GetTicketMessageByWamid gets a ticket message entry by WAMID and ticket ID.
 		GetTicketMessageByWamid(ctx context.Context, ticketID string, wamid string) (model.TicketMessage, error)
 	}

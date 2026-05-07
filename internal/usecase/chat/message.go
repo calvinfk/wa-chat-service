@@ -2,8 +2,10 @@ package chat_usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
@@ -334,7 +336,25 @@ func (u *ChatUsecase) SaveMessage(ctx context.Context, tenantID string, inputDat
 		u.zsLog.Errorf("[SaveMessage] Failed to get tenant: %v", err)
 		return true, err
 	}
-	if tenant.ChatType == "ticket" {
+	// check if message from a broadcast, if yes, don't save message to ticket, because broadcast message is not related to any ticket.
+	payloadMap := make(map[string]interface{})
+	err = json.Unmarshal([]byte(inputData.Payload), &payloadMap)
+	if err != nil {
+		u.zsLog.Errorf("[SaveMessage] Failed to unmarshal payload: %v", err)
+		return true, err
+	}
+	isBroadcast := false
+	if _, ok := payloadMap["button"]; ok {
+		buttonMap := payloadMap["button"].(map[string]interface{})
+		if payload, ok := buttonMap["payload"]; ok {
+			payloadStr := payload.(string)
+			if strings.HasPrefix(payloadStr, "broadcast_") {
+				isBroadcast = true
+			}
+		}
+	}
+
+	if tenant.ChatType == "ticket" && !isBroadcast {
 		return u.ticketUsecase.SaveTicketMessage(ctx, tenantID, inputData)
 	}
 	var chat model.Chat

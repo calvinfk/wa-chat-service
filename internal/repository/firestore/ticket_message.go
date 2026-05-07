@@ -22,22 +22,17 @@ func NewTicketMessageRepository(db *firestore.Client) *TicketMessageRepository {
 	}
 }
 
-func (r *TicketMessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, ticketMessage model.TicketMessage) (model.TicketMessage, error) {
+func (r *TicketMessageRepository) Upsert(ctx context.Context, tx *firestore.Transaction, ticketMessage model.TicketMessage) error {
 	docRef := r.db.
 		Collection(r.ticket.TableName()).Doc(ticketMessage.TicketID).
 		Collection(r.ticketMessage.TableName()).Doc(ticketMessage.DocumentID)
+	var err error
 	if tx != nil {
-		err := tx.Set(docRef, ticketMessage)
-		if err != nil {
-			return ticketMessage, err
-		}
+		err = tx.Set(docRef, ticketMessage)
 	} else {
-		_, err := docRef.Set(ctx, ticketMessage)
-		if err != nil {
-			return ticketMessage, err
-		}
+		_, err = docRef.Set(ctx, ticketMessage)
 	}
-	return ticketMessage, nil
+	return err
 }
 
 func (r *TicketMessageRepository) GetTicketMessageByWamid(ctx context.Context, ticketID string, wamid string) (model.TicketMessage, error) {

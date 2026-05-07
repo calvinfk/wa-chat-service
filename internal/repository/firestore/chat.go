@@ -40,6 +40,9 @@ func (r *ChatRepository) Upsert(ctx context.Context, tx *firestore.Transaction, 
 		{Path: "user_last_message_at", Value: chat.UserLastMessageAt},
 		{Path: "updated_at", Value: chat.UpdatedAt},
 	}
+	if chat.ChatStatus != "" {
+		updates = append(updates, firestore.Update{Path: "chat_status", Value: chat.ChatStatus})
+	}
 	if tx != nil {
 		if created {
 			err = tx.Set(docRef, chat)

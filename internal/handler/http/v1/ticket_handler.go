@@ -26,7 +26,7 @@ func NewTicketHandler(ticketUsecase usecase.Ticket, zsLog *zap.SugaredLogger) Ha
 func (h *TicketHandler) RegisterRoute(api fiber.Router) {
 	ticketGroup := api.Group("/ticket")
 	{
-		ticketGroup.Post("/close", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.closeTicket)
+		ticketGroup.Post("/close", middleware.Protected(), middleware.Role(model.UserRoleAgent), h.closeTicket)
 		ticketGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 		ticketGroup.Get("/analytics", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.getAnalytics)
 	}

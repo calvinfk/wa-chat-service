@@ -145,7 +145,7 @@ func (uc *TicketUsecase) SaveTicketMessage(ctx context.Context, tenantID string,
 			return true, err
 		}
 		if isNewChat {
-			ticketMessageLog, err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, ticketMessageLog)
+			err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, ticketMessageLog)
 			if err != nil {
 				uc.zsLog.Errorf("[SaveMessage] Failed to upsert ticket message: %v", err)
 				return true, err
@@ -153,7 +153,7 @@ func (uc *TicketUsecase) SaveTicketMessage(ctx context.Context, tenantID string,
 			// TODO: check if adding system log message to search index is necessary or not
 			messagesToIndex = append(messagesToIndex, ticketMessageLog)
 		}
-		_, err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, ticketMessage)
+		err = uc.ticketMessageRepository.Upsert(ctx, txFirestore, ticketMessage)
 		if err != nil {
 			uc.zsLog.Errorf("[SaveMessage] Failed to save ticket message: %v", err)
 			return true, err
