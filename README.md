@@ -3,7 +3,7 @@
 Go service built with Fiber v3 for WhatsApp chat operations, media handling, and Firestore-backed data access.
 
 ## Features
-- Whatsapp message sending with support for various message types and templates
+- WhatsApp message sending with support for text, media, and template payloads
 - Media upload and streaming with range support
 - Broadcast scheduling and management
 - Tenant contact management
@@ -11,7 +11,7 @@ Go service built with Fiber v3 for WhatsApp chat operations, media handling, and
 
 ## API
 
-There are two main categories of API endpoints: HTTP REST endpoints (handled by Fiber) and gRPC services. The HTTP API is organized under `/api`. The gRPC server exposes services for message sending and media management.
+There are two main categories of API endpoints: HTTP REST endpoints (handled by Fiber) and gRPC services. The HTTP API is organized under `/api`. The gRPC server exposes services for message status updates and media management.
 
 ### Rest API Endpoints
 
@@ -28,7 +28,9 @@ There are two main categories of API endpoints: HTTP REST endpoints (handled by 
 
 #### Chat (`/api/v1/chat`)
 
-All endpoints require authentication (Bearer token). The `chat_id` format is `{recipient_id}-{phone_number_id}` for individual chats, or a UUID v7 for group chats and tickets.
+All endpoints require authentication (Bearer token). The `chat_id` format is `{recipient_id}-{phone_number_id}` for individual chats.
+
+This group covers individual chat flows. Ticket-specific message handling and ticket lifecycle actions live under `/api/v1/ticket`.
 
 **Send Message**
 - `POST /send`
@@ -94,21 +96,27 @@ All endpoints require authentication (Bearer token). The `chat_id` format is `{r
     - `recipient_name` (required): Recipient display name
   - Returns: Chat object with created chat details
 
-**Close Ticket** *(Admin only)*
-- `POST /close-ticket`
+#### Ticket (`/api/v1/ticket`)
+
+All endpoints require authentication (Bearer token) and admin role.
+
+Ticket endpoints cover ticket lifecycle operations and message persistence for ticket-backed conversations.
+
+**Close Ticket**
+- `POST /close`
   - Body (JSON):
-    - `chat_id` (required): Chat/ticket identifier
+    - `ticket_id` (required): Ticket identifier
   - Returns: Success confirmation
 
-**Assign Agent** *(Admin only)*
+**Assign Agent**
 - `POST /assign-agent`
   - Body (JSON):
-    - `chat_id` (required): Chat identifier
+    - `ticket_id` (required): Ticket identifier
     - `agent_id` (required): UUID of agent to assign
   - Returns: Success confirmation
 
-**Get Ticket Analytics** *(Admin only)*
-- `GET /ticket-analytics`
+**Get Ticket Analytics**
+- `GET /analytics`
   - Query parameters:
     - `phone_number_ids` (optional): Comma-separated list of phone number IDs to filter by; if not provided, includes all
     - `start_time` (required): ISO 8601 timestamp for start of date range
@@ -166,6 +174,20 @@ All endpoints require authentication (Bearer token).
   - Optional query: filter params and pagination (`page`, `page_size`, `sort_by`, `sort_order`)
 - `PUT /update`
   - Body (JSON): Updated contact data
+- `DELETE /delete`
+  - Query parameters:
+    - `id` (required): Contact identifier
+
+#### User (`/api/v1/user`)
+
+All endpoints require authentication and admin role.
+
+- `GET /list`
+  - Query parameters: filter and pagination params for tenant users
+- `GET /get`
+  - Query: `id` (required)
+- `POST /upsert`
+  - Body (JSON): user data
 
 #### Storage Media (`/api/v1/storage-media`)
 
@@ -191,7 +213,7 @@ All endpoints require authentication (Bearer token).
 #### Message Service (`package v1`)
 - **Proto**: `docs/proto/v1/message.proto`
 - `SaveMessage(SaveMessageRequest) -> Empty`
-  - Saves an incoming message with associated metadata and upserts chat (used by webhook processor)
+  - Saves an incoming message with associated metadata and upserts the underlying chat or ticket record (used by the webhook processor)
   - Request fields:
     - `message` (MessageModel): Message data
     - `phone_number_id` (string): WhatsApp Business phone number ID
@@ -212,14 +234,10 @@ All endpoints require authentication (Bearer token).
     - `error` (optional string): Error details if message failed
     - `timestamp` (Timestamp): Status event timestamp
 
-- `UpdateMessageStatus(UpdateMessageStatusRequest) -> Empty`
-  - Updates message status (sent, delivered, read, failed) and timestamps
-  - Request fields: `wamid`, `phone_number_id`, `recipient_id`, `status`, `message_category`, `error` (optional), `timestamp`
-
 #### Storage Media Service (`package grpc.v1`)
 - **Proto**: `docs/proto/v1/storage-media.proto`
 - `SaveMediaID(SaveMediaIDRequest) -> SaveMediaIDResponse`
-  - Stores a media ID reference for a phone number (used by webhook processor)
+  - Stores a media ID reference for a phone number (used by the webhook processor)
   - Request fields: `media_id`, `phone_number_id`
   - Response fields: `id` (saved media storage ID)
 
