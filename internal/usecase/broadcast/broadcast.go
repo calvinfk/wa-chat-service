@@ -29,7 +29,7 @@ type BroadcastUsecase struct {
 	templateRepository       repository.Template
 	broadcastRepository      repository.Broadcast
 	tenantRepository         repository.Tenant
-	messageUsecase           usecase.Message
+	chatUsecase              usecase.Chat
 	waBusinessAccountUsecase usecase.WaBusinessAccount
 	googleTaskService        service.GoogleTask
 	whatsappService          service.WhatsappBusiness
@@ -41,7 +41,7 @@ func NewBroadcastUsecase(
 	templateRepository repository.Template,
 	broadcastRepository repository.Broadcast,
 	tenantRepository repository.Tenant,
-	messageUsecase usecase.Message,
+	chatUsecase usecase.Chat,
 	waBusinessAccountUsecase usecase.WaBusinessAccount,
 	googleTaskService service.GoogleTask,
 	whatsappService service.WhatsappBusiness,
@@ -52,7 +52,7 @@ func NewBroadcastUsecase(
 		templateRepository:       templateRepository,
 		broadcastRepository:      broadcastRepository,
 		tenantRepository:         tenantRepository,
-		messageUsecase:           messageUsecase,
+		chatUsecase:              chatUsecase,
 		waBusinessAccountUsecase: waBusinessAccountUsecase,
 		googleTaskService:        googleTaskService,
 		whatsappService:          whatsappService,
@@ -471,13 +471,14 @@ func (u *BroadcastUsecase) SendBroadcast(ctx context.Context, broadcastID string
 					u.zsLog.Errorf("[SendBroadcast] failed to unmarshal broadcast payload: %v", err)
 					continue
 				}
+				chatID := req.Recipient.RecipientId + "-" + req.Broadcast.PhoneNumberId
 				inputData := dto.MessageSendRequest{
-					ChatID:     req.Recipient.RecipientId + "-" + req.Broadcast.PhoneNumberId, // TODO: support group recipient type
+					ChatID:     &chatID,
 					SenderName: "Broadcast: " + req.Broadcast.Name,
 					Type:       "template",
 					Payload:    payloadMap["template"],
 				}
-				_, _, err = u.messageUsecase.SendMessage(ctx, whatsappClient, req.Broadcast.TenantID, inputData)
+				_, err = u.chatUsecase.SendMessage(ctx, whatsappClient, req.Broadcast.TenantID, inputData)
 				if err != nil {
 					u.zsLog.Errorf("[SendBroadcast] failed to send message to recipient: %v", err)
 					errStr := err.Error()

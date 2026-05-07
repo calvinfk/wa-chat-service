@@ -9,27 +9,6 @@ import (
 )
 
 type (
-	// Message defines chat message operations including send, read, and persistence flows.
-	Message interface {
-		// SendMessage sends a WhatsApp message and persists its state.
-		// Returns the saved message model, a server-error flag (true if error is from server), and an error.
-		SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error)
-		// GetMessagesByChatID fetches paginated messages for a chat.
-		// Returns a filtered response payload, a server-error flag (true if error is from server), and an error.
-		GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error)
-		// SaveMessage stores an inbound or outbound message without sending it.
-		// Returns a server-error flag (true if error is from server) and an error.
-		SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error)
-		// GetByWamid retrieves a message by WAMID
-		// if tenant uses ticketing, it will use the recent open ticket association first to find the message
-		// if not, it will search in the default chat associated with the phone number
-		// Returns the message model, a server-error flag (true if error is from server), and an error.
-		GetByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error)
-		// CheckCanSendMessage checks if a message can be sent to the chat based on the chat state and tenant's chat type.
-		// Returns a boolean indicating if the message can be sent, a server-error flag (true if error is from server), and an error.
-		CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID string) (bool, bool, error)
-	}
-
 	// Template defines template lifecycle operations such as create, sync, update, delete, and filtered retrieval.
 	Template interface {
 		// CreateTemplate creates a WhatsApp template and stores metadata in local storage.
@@ -80,7 +59,7 @@ type (
 		GeneratePublicURL(payload string) (string, error)
 	}
 
-	// Chat defines chat querying operations for conversation-level views.
+	// Chat defines chat session management, message handling, and chat-related operations.
 	Chat interface {
 		// GetChatByPhoneNumberId retrieves chat sessions for a phone number with filter options.
 		// Returns a filtered chat response, a server-error flag (true if error is from server), and an error.
@@ -88,18 +67,30 @@ type (
 		// GetByID retrieves a chat session by its unique identifier.
 		// Returns the chat model, a server-error flag (true if error is from server), and an error.
 		GetByID(ctx context.Context, chatID string) (model.Chat, bool, error)
-		// CloseTicket performs operations to close a chat ticket, such as updating chat status and recording closure metadata.
+		// CloseChat performs operations to close a chat session, such as updating chat status and recording closure metadata.
 		// Returns a server-error flag (true if error is from server) and an error.
-		CloseTicket(ctx context.Context, tenantID string, requestData dto.ChatCloseTicketRequest) (bool, error)
+		CloseChat(ctx context.Context, tenantID string, requestData dto.ChatCloseRequest) (bool, error)
 		// AssignAgent assigns a chat ticket to an agent, updating relevant records and associations.
 		// Returns a server-error flag (true if error is from server) and an error.
 		AssignAgent(ctx context.Context, tenantID string, requestData dto.ChatAssignAgentRequest) (bool, error)
 		// CreateChat creates a new chat session for a given phone number
 		// Returns the created chat model, a server-error flag (true if error is from server), and an error.
 		CreateChat(ctx context.Context, tenantID string, requestData dto.ChatCreateRequest) (model.Chat, bool, error)
-		// GetTicketAnalytics retrieves analytics data for chat tickets based on specified criteria.
-		// Returns the analytics response, a server-error flag (true if error is from server), and an error.
-		GetTicketAnalytics(ctx context.Context, tenantID string, requestData dto.ChatGetTicketAnalyticsRequest) (dto.ChatGetTicketAnalyticsResponse, bool, error)
+		// SendMessage sends a WhatsApp message and persists its state.
+		// Returns a server-error flag (true if error is from server), and an error.
+		SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (bool, error)
+		// GetMessagesByChatID fetches paginated messages for a chat.
+		// Returns a filtered response payload, a server-error flag (true if error is from server), and an error.
+		GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error)
+		// SaveMessage stores an inbound or outbound message without sending it.
+		// Returns a server-error flag (true if error is from server) and an error.
+		SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error)
+		// GetMessageByWamid retrieves a message by WAMID
+		// Returns the message model, a server-error flag (true if error is from server), and an error.
+		GetMessageByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error)
+		// CheckCanSendMessage checks if a message can be sent to the chat based on the chat state and tenant's chat type.
+		// Returns a boolean indicating if the message can be sent, a server-error flag (true if error is from server), and an error.
+		CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID *string, ticketID *string) (bool, bool, error)
 	}
 
 	// Tenant defines tenant-contact operations and tenant-specific WhatsApp client resolution.
@@ -116,6 +107,9 @@ type (
 		// DeleteContact deletes a tenant contact record.
 		// Returns a server-error flag (true if error is from server) and an error.
 		DeleteContact(ctx context.Context, tenantID string, inputData dto.ContactDeleteRequest) (bool, error)
+		// GetByID retrieves tenant details by tenant ID.
+		// Returns the contact response, a server-error flag (true if error is from server), and an error.
+		GetByID(ctx context.Context, tenantID string) (model.Tenant, bool, error)
 	}
 
 	// Broadcast defines broadcast scheduling, execution, update, cancelation, and read operations.
@@ -173,5 +167,24 @@ type (
 		// Upsert creates or updates a user record within a tenant.
 		// Returns the upserted user response, a server-error flag (true if error is from server), and an error.
 		Upsert(ctx context.Context, tenantID string, requestData dto.UserUpsertRequest) (dto.UserResponse, bool, error)
+	}
+
+	// Ticket defines operations for managing chat tickets, including creation, assignment, closure, and analytics.
+	Ticket interface {
+		// CloseTicket performs operations to close a chat ticket, such as updating ticket status and recording closure metadata.
+		// Returns a server-error flag (true if error is from server) and an error.
+		CloseTicket(ctx context.Context, tenantID string, requestData dto.TicketCloseRequest) (bool, error)
+		// AssignAgent assigns a chat ticket to an agent, updating relevant records and associations.
+		// Returns a server-error flag (true if error is from server) and an error.
+		AssignAgent(ctx context.Context, tenantID string, requestData dto.TicketAssignAgentRequest) (bool, error)
+		// GetTicketAnalytics retrieves analytics data for chat tickets based on specified criteria.
+		// Returns the analytics response, a server-error flag (true if error is from server), and an error.
+		GetTicketAnalytics(ctx context.Context, tenantID string, requestData dto.TicketGetAnalyticsRequest) (dto.TicketGetAnalyticsResponse, bool, error)
+		// SaveTicketMessage saves a message to a ticket, associating it with the correct ticket and ticket records.
+		// Returns a server-error flag (true if error is from server) and an error.
+		SaveTicketMessage(ctx context.Context, tenantID string, requestData dto.MessageSaveRequest) (bool, error)
+		// GetTicketMessageByWamid retrieves a ticket message by WAMID
+		// Returns the ticket message model, a server-error flag (true if error is from server), and an error.
+		GetTicketMessageByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.TicketMessage, bool, error)
 	}
 )

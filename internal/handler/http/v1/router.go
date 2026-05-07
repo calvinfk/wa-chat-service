@@ -10,7 +10,6 @@ import (
 )
 
 type HandlerHTTPV1 struct {
-	MessageUsecase      usecase.Message
 	StorageMediaUsecase usecase.StorageMedia
 	ChatUsecase         usecase.Chat
 	TemplateUsecase     usecase.Template
@@ -18,6 +17,7 @@ type HandlerHTTPV1 struct {
 	TenantUsecase       usecase.Tenant
 	AuthUsecase         usecase.Auth
 	UserUsecase         usecase.User
+	TicketUsecase       usecase.Ticket
 	EncryptService      service.Encrypt
 	JWTService          service.JWT
 	AccessTokenService  service.AccessToken
@@ -29,7 +29,7 @@ type HandlerV1 interface {
 }
 
 func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
-	chatHandler := NewChatHandler(routerHandler.MessageUsecase, routerHandler.ChatUsecase, routerHandler.UserUsecase)
+	chatHandler := NewChatHandler(routerHandler.ChatUsecase, routerHandler.UserUsecase)
 	chatHandler.RegisterRoute(api)
 	storageMediaHandler := NewStorageMediaHandler(routerHandler.StorageMediaUsecase, routerHandler.EncryptService, routerHandler.ZSLog)
 	storageMediaHandler.RegisterRoutes(api)
@@ -43,4 +43,6 @@ func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
 	authHandler.RegisterRoutes(api)
 	userHandler := NewUserHandler(routerHandler.UserUsecase)
 	userHandler.RegisterRoute(api)
+	ticketHandler := NewTicketHandler(routerHandler.TicketUsecase, routerHandler.ZSLog)
+	ticketHandler.RegisterRoute(api)
 }

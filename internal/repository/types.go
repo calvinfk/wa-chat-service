@@ -19,22 +19,18 @@ type (
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Chat) (model.Chat, bool, error)
 		// GetChatByPhoneNumberId gets chat entries filtered by phone number ID.
 		GetChatByPhoneNumberId(ctx context.Context, requestData filter_request.FilterRequest[dto.ChatGetByPhoneNumberIdRequest]) (filter_request.FilterResponse[dto.ChatGetByPhoneNumberIdResponse], error)
-		// GetRunningTicketChat gets running ticket chat entries (open or in-progress) filtered by phone number Id and recipient Id.
-		GetRunningTicketChat(ctx context.Context, phoneNumberId string, recipientId string) (model.Chat, error)
 		// GetByID gets a chat entry by chat ID.
 		GetByID(ctx context.Context, chatID string) (model.Chat, error)
-		// GetChatTicketDataAnalytics gets chat entries for ticket data analytics filtered by phone number IDs and created at range.
-		GetChatTicketDataAnalytics(ctx context.Context, phoneNumberIds []string, startTime time.Time, endTime time.Time) ([]model.Chat, error)
+		// Update chat last message info by chat ID.
+		UpdateLastMessage(ctx context.Context, tx *firestore.Transaction, chatID string, lastMessage string) error
 	}
 
 	// Message defines persistence operations for message data.
 	Message interface {
 		// Upsert inserts or updates a message entry. also updates the search index accordingly.
 		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Message) (model.Message, error)
-		// GetByChatID gets message entries filtered by chat ID.
-		GetByChatID(ctx context.Context, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], error)
-		// GetByWamid gets a message entry by WAMID and chat ID.
-		GetByWamid(ctx context.Context, chatID string, wamid string) (model.Message, error)
+		// GetMessageByWamid gets a message entry by WAMID and chat ID.
+		GetMessageByWamid(ctx context.Context, chatID string, wamid string) (model.Message, error)
 	}
 
 	// StorageMedia defines persistence operations for media storage metadata.
@@ -146,5 +142,35 @@ type (
 		GetByPhoneNumberId(ctx context.Context, phoneNumberId string) (model.WaPhone, error)
 		// GetByWaBusinessAccountID gets WhatsApp Business Account phone data by WhatsApp Business Account ID from meta.
 		GetByWaBusinessAccountID(ctx context.Context, waBusinessAccountID string) ([]model.WaPhone, error)
+	}
+
+	Ticket interface {
+		// Upsert inserts or updates a ticket entry.
+		// returns the upserted ticket, a boolean indicating whether it was created (true) or updated (false), and an error if any.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.Ticket) (model.Ticket, bool, error)
+		// GetRunningTicket gets a running ticket entry (open or in-progress) filtered by phone number Id and recipient Id.
+		GetRunningTicket(ctx context.Context, phoneNumberId string, recipientId string) (model.Ticket, error)
+		// GetByID gets a ticket entry by ticket ID.
+		GetByID(ctx context.Context, ticketID string) (model.Ticket, error)
+		// GetTicketDataAnalytics gets ticket entries for ticket data analytics filtered by phone number IDs and created at range.
+		GetTicketDataAnalytics(ctx context.Context, phoneNumberIds []string, startTime time.Time, endTime time.Time) ([]model.Ticket, error)
+		// Update last message info of a ticket by ticket ID.
+		UpdateLastMessage(ctx context.Context, tx *firestore.Transaction, ticketID string, lastMessage string) error
+	}
+
+	TicketMessage interface {
+		// Upsert inserts or updates a ticket message entry. also updates the search index accordingly.
+		Upsert(ctx context.Context, tx *firestore.Transaction, data model.TicketMessage) (model.TicketMessage, error)
+		// GetTicketMessageByWamid gets a ticket message entry by WAMID and ticket ID.
+		GetTicketMessageByWamid(ctx context.Context, ticketID string, wamid string) (model.TicketMessage, error)
+	}
+
+	SearchTicketMessage interface {
+		// AddDocuments adds ticket message documents to the search index.
+		AddDocuments(ctx context.Context, document []model.TicketMessage) (*meilisearch.TaskInfo, error)
+		// AddDocumentsSync adds ticket message documents to the search index and waits for the operation to complete.
+		AddDocumentsSync(ctx context.Context, document []model.TicketMessage) error
+		// GetFiltered gets indexed ticket messages by filter criteria with pagination metadata.
+		GetFiltered(ctx context.Context, filter filter_request.FilterRequest[dto.TicketMessageGetByTicketIDRequest]) ([]model.TicketMessage, int64, filter_request.Paginate, error)
 	}
 )

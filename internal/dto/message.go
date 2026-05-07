@@ -8,15 +8,11 @@ import (
 
 type (
 	MessageSendRequest struct {
-		ChatID     string `json:"chat_id" validate:"required"` // {recipient_id}-{phone_number_id}, or uuid v7 for group and ticket
-		SenderName string `json:"sender_name"`                 // optional, if not provided, will use current logged in user
-		Type       string `json:"type" validate:"required"`    // text, image, video, etc
+		ChatID     *string `json:"chat_id" validate:"required_without=TicketID"` // {recipient_id}-{phone_number_id}
+		TicketID   *string `json:"ticket_id" validate:"required_without=ChatID"` // only for ticket chat type, reference to ticket document ID
+		SenderName string  `json:"sender_name"`                                  // optional, if not provided, will use current logged in user
+		Type       string  `json:"type" validate:"required"`                     // text, image, video, etc
 		Payload    any
-		// Test       Test `json:"test" validate:"required"` // if true, will not actually send message to whatsapp, only save to database for testing purposes
-	}
-
-	Test struct {
-		ID string `json:"id" validate:"required"`
 	}
 
 	MessageGetByChatIDRequest struct {
@@ -43,6 +39,7 @@ type (
 	MessageSaveRequest struct {
 		ID                *string    `json:"id"`
 		ChatID            *string    `json:"chat_id"`
+		TicketID          *string    `json:"ticket_id"`
 		Wamid             string     `json:"wamid" validate:"required"`
 		PhoneNumberId     string     `json:"phone_number_id" validate:"required"`
 		RecipientId       string     `json:"recipient_id" validate:"required"`

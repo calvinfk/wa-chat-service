@@ -35,14 +35,14 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.AuthLoginRequest) (stri
 	if err != nil {
 		u.zsLog.Errorf("[Login] userRepository.GetByEmail error : %v", err)
 		if err == errs.ErrGenericNotFound {
-			return "", false, err
+			return "", false, errs.ErrAuthInvalidCredentials
 		}
 		return "", true, err
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
 		u.zsLog.Errorf("[Login] bcrypt.CompareHashAndPassword error : %v", err)
-		return "", true, errs.ErrGenericUnauthorized
+		return "", false, errs.ErrAuthInvalidCredentials
 	}
 	sub := fmt.Sprintf("%s:%s:%s", user.TenantID, user.DocumentID, user.Role)
 	accessToken := u.accessTokenService.GenerateAccessToken(sub)

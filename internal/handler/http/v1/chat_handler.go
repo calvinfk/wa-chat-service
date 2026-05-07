@@ -15,16 +15,14 @@ import (
 )
 
 type ChatHandler struct {
-	messageUsecase usecase.Message
-	chatUsecase    usecase.Chat
-	userUsecase    usecase.User
+	chatUsecase usecase.Chat
+	userUsecase usecase.User
 }
 
-func NewChatHandler(messageUsecase usecase.Message, chatUsecase usecase.Chat, userUsecase usecase.User) HandlerV1 {
+func NewChatHandler(chatUsecase usecase.Chat, userUsecase usecase.User) HandlerV1 {
 	return &ChatHandler{
-		messageUsecase: messageUsecase,
-		chatUsecase:    chatUsecase,
-		userUsecase:    userUsecase,
+		chatUsecase: chatUsecase,
+		userUsecase: userUsecase,
 	}
 }
 
@@ -34,10 +32,8 @@ func (h *ChatHandler) RegisterRoute(api fiber.Router) {
 		chatGroup.Post("/send", middleware.Protected(), h.sendMessage)
 		chatGroup.Get("/by-phone-number-id", middleware.Protected(), h.getChatByPhoneNumberId)
 		chatGroup.Get("/messages", middleware.Protected(), h.getMessagesByChatID)
-		chatGroup.Post("/close-ticket", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.closeTicket)
 		chatGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 		chatGroup.Post("/create", middleware.Protected(), h.createChat)
-		chatGroup.Get("/ticket-analytics", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.getTicketAnalytics)
 	}
 }
 
@@ -68,7 +64,7 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 	authData := ctx.Locals("token_sub").(dto.AuthData)
 
 	// check if user can send message to the chat
-	canSend, serverError, err := h.messageUsecase.CheckCanSendMessage(ctx.Context(), authData, requestData.ChatID)
+	canSend, serverError, err := h.chatUsecase.CheckCanSendMessage(ctx.Context(), authData, requestData.ChatID, requestData.TicketID)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -89,7 +85,7 @@ func (h *ChatHandler) sendMessage(ctx fiber.Ctx) error {
 		requestData.SenderName = user.Name
 	}
 
-	_, serverError, err = h.messageUsecase.SendMessage(ctx.Context(), nil, authData.TenantID, requestData)
+	serverError, err = h.chatUsecase.SendMessage(ctx.Context(), nil, authData.TenantID, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
@@ -129,28 +125,12 @@ func (h *ChatHandler) getMessagesByChatID(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	authData := ctx.Locals("token_sub").(dto.AuthData)
-	messages, serverError, err := h.messageUsecase.GetMessagesByChatID(ctx.Context(), authData, requestData)
+	messages, serverError, err := h.chatUsecase.GetMessagesByChatID(ctx.Context(), authData, requestData)
 	if err != nil {
 		code, response := api_response.NewErrorApiResponse(serverError, err)
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Successfully retrieved messages", messages)
-	return ctx.Status(code).JSON(response)
-}
-
-func (h *ChatHandler) closeTicket(ctx fiber.Ctx) error {
-	var requestData dto.ChatCloseTicketRequest
-	if err := ctx.Bind().Body(&requestData); err != nil {
-		code, response := api_response.NewErrorApiResponse(false, err)
-		return ctx.Status(code).JSON(response)
-	}
-	authData := ctx.Locals("token_sub").(dto.AuthData)
-	serverError, err := h.chatUsecase.CloseTicket(ctx.Context(), authData.TenantID, requestData)
-	if err != nil {
-		code, response := api_response.NewErrorApiResponse(serverError, err)
-		return ctx.Status(code).JSON(response)
-	}
-	code, response := api_response.NewApiResponse("Successfully closed ticket", nil)
 	return ctx.Status(code).JSON(response)
 }
 
@@ -183,21 +163,5 @@ func (uc *ChatHandler) createChat(ctx fiber.Ctx) error {
 		return ctx.Status(code).JSON(response)
 	}
 	code, response := api_response.NewApiResponse("Successfully created chat", data)
-	return ctx.Status(code).JSON(response)
-}
-
-func (h *ChatHandler) getTicketAnalytics(ctx fiber.Ctx) error {
-	var requestData dto.ChatGetTicketAnalyticsRequest
-	if err := ctx.Bind().Query(&requestData); err != nil {
-		code, response := api_response.NewErrorApiResponse(false, err)
-		return ctx.Status(code).JSON(response)
-	}
-	authData := ctx.Locals("token_sub").(dto.AuthData)
-	data, serverError, err := h.chatUsecase.GetTicketAnalytics(ctx.Context(), authData.TenantID, requestData)
-	if err != nil {
-		code, response := api_response.NewErrorApiResponse(serverError, err)
-		return ctx.Status(code).JSON(response)
-	}
-	code, response := api_response.NewApiResponse("Successfully retrieved ticket analytics", data)
 	return ctx.Status(code).JSON(response)
 }

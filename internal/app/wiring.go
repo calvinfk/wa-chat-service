@@ -25,10 +25,10 @@ import (
 	auth_usecase "wa_chat_service/internal/usecase/auth"
 	broadcast_usecase "wa_chat_service/internal/usecase/broadcast"
 	chat_usecase "wa_chat_service/internal/usecase/chat"
-	message_usecase "wa_chat_service/internal/usecase/message"
 	storage_media_usecase "wa_chat_service/internal/usecase/storage_media"
 	template_usecase "wa_chat_service/internal/usecase/template"
 	tenant_usecase "wa_chat_service/internal/usecase/tenant"
+	ticket_usecase "wa_chat_service/internal/usecase/ticket"
 	user_usecase "wa_chat_service/internal/usecase/user"
 	wa_business_account_usecase "wa_chat_service/internal/usecase/wa_business_account"
 	server_grpc "wa_chat_service/pkg/server/grpc"
@@ -71,22 +71,24 @@ type services struct {
 }
 
 type repositories struct {
-	Chat              repository.Chat
-	Message           repository.Message
-	StorageMedia      repository.StorageMedia
-	Tenant            repository.Tenant
-	Template          repository.Template
-	Broadcast         repository.Broadcast
-	SearchTemplate    repository.SearchTemplate
-	SearchMessage     repository.SearchMessage
-	User              repository.User
-	WaBusinessAccount repository.WaBusinessAccount
-	WaPhone           repository.WaPhone
+	Chat                repository.Chat
+	Message             repository.Message
+	StorageMedia        repository.StorageMedia
+	Tenant              repository.Tenant
+	Template            repository.Template
+	Broadcast           repository.Broadcast
+	SearchTemplate      repository.SearchTemplate
+	SearchMessage       repository.SearchMessage
+	User                repository.User
+	WaBusinessAccount   repository.WaBusinessAccount
+	WaPhone             repository.WaPhone
+	Ticket              repository.Ticket
+	TicketMessage       repository.TicketMessage
+	SearchTicketMessage repository.SearchTicketMessage
 }
 
 type usecases struct {
 	Chat              usecase.Chat
-	Message           usecase.Message
 	StorageMedia      usecase.StorageMedia
 	Tenant            usecase.Tenant
 	Template          usecase.Template
@@ -94,6 +96,7 @@ type usecases struct {
 	Auth              usecase.Auth
 	WaBusinessAccount usecase.WaBusinessAccount
 	User              usecase.User
+	Ticket            usecase.Ticket
 }
 
 func NewDefaultWiring(zsLog *zap.SugaredLogger, cfg *config.Config) servers {
@@ -167,34 +170,107 @@ func newDefaultRepositories(clients clients, services services, zsLog *zap.Sugar
 	userRepository := repository_firestore.NewUserRepository(clients.firestoreClient)
 	whatsappBusinessAccountRepository := repository_firestore.NewWhatsappBusinessAccountRepository(clients.firestoreClient)
 	waPhoneRepository := repository_firestore.NewWaPhoneRepository(clients.firestoreClient)
+	ticketRepository := repository_firestore.NewTicketRepository(clients.firestoreClient)
+	ticketMessageRepository := repository_firestore.NewTicketMessageRepository(clients.firestoreClient)
+	searchTicketMessageRepository := repository_meili.NewMeiliTicketMessageRepository(clients.meiliClient, zsLog)
 	return repositories{
-		Chat:              chatRepository,
-		Message:           messageRepository,
-		StorageMedia:      storageMediaRepository,
-		Template:          templateRepository,
-		Tenant:            tenantRepository,
-		Broadcast:         broadcastRepository,
-		SearchTemplate:    meiliTemplateRepository,
-		SearchMessage:     meiliMessageRepository,
-		User:              userRepository,
-		WaBusinessAccount: whatsappBusinessAccountRepository,
-		WaPhone:           waPhoneRepository,
+		Chat:                chatRepository,
+		Message:             messageRepository,
+		StorageMedia:        storageMediaRepository,
+		Template:            templateRepository,
+		Tenant:              tenantRepository,
+		Broadcast:           broadcastRepository,
+		SearchTemplate:      meiliTemplateRepository,
+		SearchMessage:       meiliMessageRepository,
+		User:                userRepository,
+		WaBusinessAccount:   whatsappBusinessAccountRepository,
+		WaPhone:             waPhoneRepository,
+		Ticket:              ticketRepository,
+		TicketMessage:       ticketMessageRepository,
+		SearchTicketMessage: searchTicketMessageRepository,
 	}
 }
 
 func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients clients, repositories repositories, services services) usecases {
-	waBusinessAccountUsecase := wa_business_account_usecase.NewWaBusinessAccountUsecase(repositories.WaBusinessAccount, services.Encrypt, repositories.WaPhone, zsLog)
-	tenantUsecase := tenant_usecase.NewTenantUsecase(repositories.Tenant, services.Encrypt, zsLog)
-	templateUsecase := template_usecase.NewTemplateUsecase(repositories.Template, repositories.SearchTemplate, repositories.WaBusinessAccount, waBusinessAccountUsecase, services.WhatsappBusiness, clients.txManager, zsLog)
-	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(repositories.StorageMedia, waBusinessAccountUsecase, services.GoogleStorage, services.WhatsappBusiness, services.Encrypt, zsLog, cfg.App.PublicURL)
-	messageUsecase := message_usecase.NewMessageUsecase(repositories.Message, repositories.Chat, repositories.StorageMedia, repositories.SearchMessage, repositories.Tenant, repositories.User, storageMediaUsecase, waBusinessAccountUsecase, services.WhatsappBusiness, services.GoogleStorage, clients.txManager, zsLog)
-	chatUsecase := chat_usecase.NewChatUsecase(repositories.Chat, repositories.WaPhone, repositories.WaBusinessAccount, repositories.User, repositories.Message, repositories.Tenant, repositories.SearchMessage, clients.txManager, zsLog)
-	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(repositories.Template, repositories.Broadcast, repositories.Tenant, messageUsecase, waBusinessAccountUsecase, services.GoogleTask, services.WhatsappBusiness, clients.txManager, zsLog)
-	authUsecase := auth_usecase.NewAuthUsecase(repositories.User, repositories.Tenant, services.AccessToken, services.Encrypt, zsLog)
-	userUsecase := user_usecase.NewUserUsecase(repositories.User, zsLog)
+	waBusinessAccountUsecase := wa_business_account_usecase.NewWaBusinessAccountUsecase(
+		repositories.WaBusinessAccount,
+		services.Encrypt,
+		repositories.WaPhone,
+		zsLog,
+	)
+	authUsecase := auth_usecase.NewAuthUsecase(
+		repositories.User,
+		repositories.Tenant,
+		services.AccessToken,
+		services.Encrypt,
+		zsLog,
+	)
+	userUsecase := user_usecase.NewUserUsecase(
+		repositories.User,
+		zsLog,
+	)
+	tenantUsecase := tenant_usecase.NewTenantUsecase(
+		repositories.Tenant,
+		services.Encrypt,
+		zsLog,
+	)
+	ticketUsecase := ticket_usecase.NewTicketUsecase(
+		repositories.Ticket,
+		repositories.TicketMessage,
+		repositories.SearchTicketMessage,
+		repositories.WaBusinessAccount,
+		repositories.WaPhone,
+		repositories.User,
+		clients.txManager,
+		zsLog,
+	)
+	templateUsecase := template_usecase.NewTemplateUsecase(
+		repositories.Template,
+		repositories.SearchTemplate,
+		repositories.WaBusinessAccount,
+		waBusinessAccountUsecase,
+		services.WhatsappBusiness,
+		clients.txManager,
+		zsLog,
+	)
+	storageMediaUsecase := storage_media_usecase.NewStorageMediaUsecase(
+		repositories.StorageMedia,
+		waBusinessAccountUsecase,
+		services.GoogleStorage,
+		services.WhatsappBusiness,
+		services.Encrypt,
+		zsLog,
+		cfg.App.PublicURL,
+	)
+	chatUsecase := chat_usecase.NewChatUsecase(
+		repositories.Chat,
+		repositories.WaPhone,
+		repositories.WaBusinessAccount,
+		repositories.User,
+		repositories.Message,
+		repositories.Tenant,
+		repositories.SearchMessage,
+		repositories.StorageMedia,
+		repositories.Ticket,
+		waBusinessAccountUsecase,
+		storageMediaUsecase,
+		ticketUsecase,
+		clients.txManager,
+		zsLog,
+	)
+	broadcastUsecase := broadcast_usecase.NewBroadcastUsecase(
+		repositories.Template,
+		repositories.Broadcast,
+		repositories.Tenant,
+		chatUsecase,
+		waBusinessAccountUsecase,
+		services.GoogleTask,
+		services.WhatsappBusiness,
+		clients.txManager,
+		zsLog,
+	)
 	return usecases{
 		Template:          templateUsecase,
-		Message:           messageUsecase,
 		StorageMedia:      storageMediaUsecase,
 		Chat:              chatUsecase,
 		Tenant:            tenantUsecase,
@@ -202,6 +278,7 @@ func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 		Auth:              authUsecase,
 		WaBusinessAccount: waBusinessAccountUsecase,
 		User:              userUsecase,
+		Ticket:            ticketUsecase,
 	}
 }
 
@@ -220,9 +297,10 @@ func newDefaultServers(cfg *config.Config, zsLog *zap.SugaredLogger, services se
 	handlerGRPCV1 := grpc_v1.HandlerGRPCV1{
 		App:               grpcServer.App,
 		StorageMedia:      usecases.StorageMedia,
-		Message:           usecases.Message,
 		WaBusinessAccount: usecases.WaBusinessAccount,
 		Chat:              usecases.Chat,
+		Tenant:            usecases.Tenant,
+		Ticket:            usecases.Ticket,
 		ZSLog:             zsLog,
 	}
 	handler_grpc.NewRouter(handlerGRPCV1)
@@ -242,7 +320,6 @@ func newDefaultServers(cfg *config.Config, zsLog *zap.SugaredLogger, services se
 	)
 	// Router Handler
 	handlerHTTPV1 := http_v1.HandlerHTTPV1{
-		MessageUsecase:      usecases.Message,
 		StorageMediaUsecase: usecases.StorageMedia,
 		ChatUsecase:         usecases.Chat,
 		TemplateUsecase:     usecases.Template,
@@ -250,6 +327,7 @@ func newDefaultServers(cfg *config.Config, zsLog *zap.SugaredLogger, services se
 		TenantUsecase:       usecases.Tenant,
 		AuthUsecase:         usecases.Auth,
 		UserUsecase:         usecases.User,
+		TicketUsecase:       usecases.Ticket,
 		EncryptService:      services.Encrypt,
 		JWTService:          services.JWT,
 		AccessTokenService:  services.AccessToken,

@@ -5,8 +5,10 @@ import (
 	"time"
 	v1 "wa_chat_service/docs/proto/v1"
 	"wa_chat_service/internal/dto"
+	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/utils"
 
 	"go.uber.org/zap"
@@ -15,9 +17,10 @@ import (
 
 type MessageGRPC struct {
 	v1.UnimplementedMessageServer
-	messageUsecase           usecase.Message
 	waBusinessAccountUsecase usecase.WaBusinessAccount
+	tenantUsecase            usecase.Tenant
 	chatUsecase              usecase.Chat
+	ticketUsecase            usecase.Ticket
 	zsLog                    *zap.SugaredLogger
 }
 
@@ -69,7 +72,7 @@ func (h *MessageGRPC) SaveMessage(ctx context.Context, req *v1.SaveMessageReques
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
-	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
+	serverError, err = h.chatUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
@@ -81,28 +84,71 @@ func (h *MessageGRPC) UpdateMessageStatus(ctx context.Context, req *v1.UpdateMes
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
-	message, serverError, err := h.messageUsecase.GetByWamid(ctx, whatsappBusinessAccount.TenantID, req.GetPhoneNumberId(), req.GetRecipientId(), req.GetWamid())
+	tenant, serverError, err := h.tenantUsecase.GetByID(ctx, whatsappBusinessAccount.TenantID)
 	if err != nil {
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)
 	}
 	// Map gRPC request to DTO for use case
 	inputData := dto.MessageSaveRequest{
-		ID:              &message.DocumentID,
-		ChatID:          &message.ChatID,
-		StorageMediaID:  message.StorageMediaID,
-		Wamid:           message.Wamid,
 		PhoneNumberId:   req.PhoneNumberId,
 		RecipientId:     req.RecipientId,
-		MessageType:     message.MessageType,
 		MessageCategory: req.MessageCategory,
-		SenderName:      message.SenderName,
-		Payload:         message.Payload,
 		Status:          req.Status,
 		Error:           req.Error,
-		SentAt:          message.SentAt,
-		DeliveredAt:     message.DeliveredAt,
-		ReadAt:          message.ReadAt,
 		CreatedAt:       req.Timestamp.AsTime(),
+	}
+	// if tenant chat type is ticket, try to get message from ticket message collection, if not found then get from chat message collection.
+	// if tenant chat type is not ticket, get message from chat message collection.
+	if tenant.ChatType == model.TenantChatTypeTicket {
+		ticketMessage, serverError, err := h.ticketUsecase.GetTicketMessageByWamid(ctx, whatsappBusinessAccount.TenantID, req.GetPhoneNumberId(), req.GetRecipientId(), req.GetWamid())
+		if err != nil {
+			if serverError {
+				h.zsLog.Errorf("[UpdateMessageStatus] Failed to get ticket message by WAMID: %v", err)
+				return nil, api_response.NewGRPCErrorResponse(serverError, err)
+			}
+			message, serverError, err := h.chatUsecase.GetMessageByWamid(ctx, whatsappBusinessAccount.TenantID, req.GetPhoneNumberId(), req.GetRecipientId(), req.GetWamid())
+			if err != nil {
+				h.zsLog.Errorf("[UpdateMessageStatus] Failed to get message by WAMID: %v", err)
+				return nil, api_response.NewGRPCErrorResponse(serverError, err)
+			}
+			inputData.ID = &message.DocumentID
+			inputData.ChatID = &message.ChatID
+			inputData.StorageMediaID = message.StorageMediaID
+			inputData.Wamid = message.Wamid
+			inputData.MessageType = message.MessageType
+			inputData.SenderName = message.SenderName
+			inputData.Payload = message.Payload
+			inputData.SentAt = message.SentAt
+			inputData.DeliveredAt = message.DeliveredAt
+			inputData.ReadAt = message.ReadAt
+		} else {
+			inputData.ID = &ticketMessage.DocumentID
+			inputData.TicketID = &ticketMessage.TicketID
+			inputData.StorageMediaID = ticketMessage.StorageMediaID
+			inputData.Wamid = ticketMessage.Wamid
+			inputData.MessageType = ticketMessage.MessageType
+			inputData.SenderName = ticketMessage.SenderName
+			inputData.Payload = ticketMessage.Payload
+			inputData.SentAt = ticketMessage.SentAt
+			inputData.DeliveredAt = ticketMessage.DeliveredAt
+			inputData.ReadAt = ticketMessage.ReadAt
+		}
+	} else {
+		message, serverError, err := h.chatUsecase.GetMessageByWamid(ctx, whatsappBusinessAccount.TenantID, req.GetPhoneNumberId(), req.GetRecipientId(), req.GetWamid())
+		if err != nil {
+			h.zsLog.Errorf("[UpdateMessageStatus] Failed to get message by WAMID: %v", err)
+			return nil, api_response.NewGRPCErrorResponse(serverError, err)
+		}
+		inputData.ID = &message.DocumentID
+		inputData.ChatID = &message.ChatID
+		inputData.StorageMediaID = message.StorageMediaID
+		inputData.Wamid = message.Wamid
+		inputData.MessageType = message.MessageType
+		inputData.SenderName = message.SenderName
+		inputData.Payload = message.Payload
+		inputData.SentAt = message.SentAt
+		inputData.DeliveredAt = message.DeliveredAt
+		inputData.ReadAt = message.ReadAt
 	}
 	switch req.GetStatus() {
 	case "sent":
@@ -115,9 +161,9 @@ func (h *MessageGRPC) UpdateMessageStatus(ctx context.Context, req *v1.UpdateMes
 	validator := utils.NewValidator()
 	if err := validator.Struct(inputData); err != nil {
 		h.zsLog.Errorf("[UpdateMessageStatus] Validation error: %v", err)
-		return nil, api_response.NewGRPCErrorResponse(false, err)
+		return nil, api_response.NewGRPCErrorResponse(false, errs.ErrGenericInvalidBody)
 	}
-	serverError, err = h.messageUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
+	serverError, err = h.chatUsecase.SaveMessage(ctx, whatsappBusinessAccount.TenantID, inputData)
 	if err != nil {
 		h.zsLog.Errorf("[UpdateMessageStatus] Failed to update message status: %v", err)
 		return nil, api_response.NewGRPCErrorResponse(serverError, err)

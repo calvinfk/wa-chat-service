@@ -8,6 +8,7 @@ import (
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
 	"wa_chat_service/internal/service"
+	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 
 	"github.com/google/uuid"
@@ -121,4 +122,13 @@ func (u *TenantUsecase) DeleteContact(ctx context.Context, tenantID string, inpu
 		return true, err
 	}
 	return false, nil
+}
+
+func (u *TenantUsecase) GetByID(ctx context.Context, tenantID string) (model.Tenant, bool, error) {
+	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
+	if err != nil {
+		u.zsLog.Errorf("[GetByID] Failed to get tenant by ID: %v", err)
+		return model.Tenant{}, err != errs.ErrGenericNotFound, err
+	}
+	return tenant, false, nil
 }

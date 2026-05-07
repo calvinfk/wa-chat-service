@@ -1,16 +1,12 @@
-package message_usecase
+package chat_usecase
 
 import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
-	"wa_chat_service/internal/repository"
-	"wa_chat_service/internal/service"
-	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/filter_request"
 	"wa_chat_service/pkg/meta/whatsapp_business"
@@ -18,111 +14,60 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
-type MessageUsecase struct {
-	messageRepository        repository.Message
-	chatRepository           repository.Chat
-	storageMediaRepository   repository.StorageMedia
-	searchMessageRepository  repository.SearchMessage
-	tenantRepository         repository.Tenant
-	userRepository           repository.User
-	storageMediaUsecase      usecase.StorageMedia
-	waBusinessAccountUsecase usecase.WaBusinessAccount
-	whatsappService          service.WhatsappBusiness
-	googleStorageService     service.GoogleStorage
-	txManager                *utils.TxManager
-	zsLog                    *zap.SugaredLogger
-}
-
-func NewMessageUsecase(
-	messageRepository repository.Message,
-	chatRepository repository.Chat,
-	storageMediaRepository repository.StorageMedia,
-	searchMessageRepository repository.SearchMessage,
-	tenantRepository repository.Tenant,
-	userRepository repository.User,
-	storageMediaUsecase usecase.StorageMedia,
-	waBusinessAccountUsecase usecase.WaBusinessAccount,
-	whatsappService service.WhatsappBusiness,
-	googleStorageService service.GoogleStorage,
-	txManager *utils.TxManager,
-	zsLog *zap.SugaredLogger,
-) *MessageUsecase {
-	return &MessageUsecase{
-		messageRepository:        messageRepository,
-		chatRepository:           chatRepository,
-		storageMediaRepository:   storageMediaRepository,
-		tenantRepository:         tenantRepository,
-		searchMessageRepository:  searchMessageRepository,
-		userRepository:           userRepository,
-		storageMediaUsecase:      storageMediaUsecase,
-		waBusinessAccountUsecase: waBusinessAccountUsecase,
-		whatsappService:          whatsappService,
-		googleStorageService:     googleStorageService,
-		txManager:                txManager,
-		zsLog:                    zsLog,
-	}
-}
-
-func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (model.Message, bool, error) {
+// SendMessage validates and sends an outbound WhatsApp message, then persists it.
+//
+// Flow summary:
+// - Resolves recipient context from ChatID or TicketID.
+// - Creates a WhatsApp client when one is not injected.
+// - Validates message component and resolves media references when present.
+// - Sends the message through WhatsApp API.
+// - Persists the sent message through SaveMessage.
+//
+// Returns:
+// - serverError=true when the failure is considered internal/server-side.
+// - error describing the failure.
+func (u *ChatUsecase) SendMessage(ctx context.Context, whatsappClient *whatsapp_business.Client, tenantID string, inputData dto.MessageSendRequest) (bool, error) {
 	var err error
-	var response model.Message
-	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
-	if err != nil {
-		u.zsLog.Errorf("[SendMessage] Failed to get tenant: %v", err)
-		return response, true, err
-	}
-	var chatExists bool
-	chat, err := u.chatRepository.GetByID(ctx, inputData.ChatID)
-	if err != nil && err != errs.ErrGenericNotFound {
-		u.zsLog.Errorf("[SendMessage] Failed to get chat by ID: %v", err)
-		return response, true, err
-	}
 	var phoneNumberId string
 	var recipientId string
 	var recipientName string
-
-	if err != nil && err == errs.ErrGenericNotFound {
-		if tenant.ChatType == "ticket" {
-			u.zsLog.Errorf("[SendMessage] No opened ticket chat found for ID %s: %v", inputData.ChatID, err)
-			return response, false, fmt.Errorf("no opened ticket chat found for ID %s", inputData.ChatID)
+	if inputData.ChatID != nil && *inputData.ChatID != "" {
+		chat, err := u.chatRepository.GetByID(ctx, *inputData.ChatID)
+		if err != nil {
+			u.zsLog.Errorf("[SendMessage] Failed to get chat by ID: %v", err)
+			return err != errs.ErrGenericNotFound, err
 		}
-		// check if id is in format {recipient_id}-{phone_number_id} for individual chat
-		n, scanErr := fmt.Sscanf(inputData.ChatID, "%s-%s", &recipientId, &phoneNumberId)
-		if scanErr != nil || n != 2 {
-			u.zsLog.Errorf("[SendMessage] Chat ID %s is not in valid format: %v", inputData.ChatID, scanErr)
-			return response, false, fmt.Errorf("chat ID %s is not in valid format", inputData.ChatID)
-		}
-		// check if id is numeric
-		if _, err := strconv.Atoi(recipientId); err != nil {
-			u.zsLog.Errorf("[SendMessage] Recipient ID %s is not numeric: %v", recipientId, err)
-			return response, false, fmt.Errorf("recipient ID %s is not numeric", recipientId)
-		}
-		if _, err := strconv.Atoi(phoneNumberId); err != nil {
-			u.zsLog.Errorf("[SendMessage] Phone number ID %s is not numeric: %v", phoneNumberId, err)
-			return response, false, fmt.Errorf("phone number ID %s is not numeric", phoneNumberId)
-		}
-	} else {
 		phoneNumberId = chat.PhoneNumberId
 		recipientId = chat.RecipientId
 		recipientName = chat.RecipientName
-		chatExists = true
+	} else if inputData.TicketID != nil && *inputData.TicketID != "" {
+		ticket, err := u.ticketRepository.GetByID(ctx, *inputData.TicketID)
+		if err != nil {
+			u.zsLog.Errorf("[SendMessage] Failed to get ticket by ID: %v", err)
+			return err != errs.ErrGenericNotFound, err
+		}
+		phoneNumberId = ticket.PhoneNumberId
+		recipientId = ticket.RecipientId
+		recipientName = ticket.RecipientName
 	}
+
 	if whatsappClient == nil {
-		whatsappClient, _, err = u.waBusinessAccountUsecase.GetWhatsappClient(ctx, tenantID, chat.PhoneNumberId)
+		whatsappClient, _, err = u.waBusinessAccountUsecase.GetWhatsappClient(ctx, tenantID, phoneNumberId)
 		if err != nil {
 			u.zsLog.Errorf("[SendMessage] Failed to get WhatsApp client: %v", err)
-			return response, true, err
+			return true, err
 		}
 	}
 	component, err := whatsapp_business.NewComponent(inputData.Type, inputData.Payload)
 	if err != nil {
 		u.zsLog.Errorf("[SendMessage] Failed to validate message component: %v", err)
-		return response, false, err
+		return false, err
 	}
 	var sto *model.StorageMedia
+	// If media is present, try to resolve it as an internal signed link first.
+	// Otherwise, validate external URL and persist metadata for later retrieval.
 	if media := whatsapp_business.GetMedia(component); media != nil {
 		if media.Link != nil {
 			mediaToken, err := u.storageMediaUsecase.ParsePublicURL(*media.Link)
@@ -131,12 +76,12 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				storageMediaID, serverError, err := u.storageMediaUsecase.ParseMediaToken(mediaToken)
 				if err != nil {
 					u.zsLog.Errorf("[SendMessage] Failed to parse media token: %v", err)
-					return response, serverError, err
+					return serverError, err
 				}
 				storageMedia, err := u.storageMediaRepository.GetByID(ctx, storageMediaID)
 				if err != nil {
 					u.zsLog.Errorf("[SendMessage] Failed to get storage media by document ID: %v", err)
-					return response, true, err
+					return true, err
 				}
 				sto = &storageMedia
 			} else {
@@ -144,21 +89,21 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				resp, err := http.Head(*media.Link)
 				if err != nil || resp.StatusCode != http.StatusOK {
 					u.zsLog.Errorf("[SendMessage] Media link is not accessible: %v", err)
-					return response, false, fmt.Errorf("media link is not accessible")
+					return false, fmt.Errorf("media link is not accessible")
 				}
 				urlHeaders := resp.Header
 				mimeType := urlHeaders.Get("Content-Type")
 				extension := whatsapp_business.ParseMediaExtension(mimeType)
 				if extension == "" {
 					u.zsLog.Errorf("[SendMessage] Unsupported media type: %v", mimeType)
-					return response, true, fmt.Errorf("unsupported media type: %s", mimeType)
+					return true, fmt.Errorf("unsupported media type: %s", mimeType)
 				}
 				// TODO: check file size is allowed or not
 				originalFileName := utils.GetFileNameFromURL(urlHeaders, *media.Link)
 				newStorageMediaID, err := uuid.NewV7()
 				if err != nil {
 					u.zsLog.Errorf("[SendMessage] Failed to generate storage media ID: %v", err)
-					return response, true, err
+					return true, err
 				}
 				if originalFileName == "" {
 					originalFileName = fmt.Sprintf("%s%s", newStorageMediaID.String(), whatsapp_business.ParseMediaExtension(mimeType))
@@ -175,16 +120,16 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 				_, err = u.storageMediaRepository.Upsert(ctx, nil, storageMedia)
 				if err != nil {
 					u.zsLog.Errorf("[SendMessage] Failed to upsert storage media: %v", err)
-					return response, true, err
+					return true, err
 				}
 				sto = &storageMedia
 			}
 		}
 	}
-	sendResponse, httpCode, err := whatsappClient.SendMessage(chat.RecipientId, "individual", component)
+	sendResponse, httpCode, err := whatsappClient.SendMessage(recipientId, "individual", component)
 	if err != nil {
 		u.zsLog.Errorf("[SendMessage] Failed to send message: %v", err)
-		return response, httpCode >= http.StatusInternalServerError, err
+		return httpCode >= http.StatusInternalServerError, err
 	}
 	payloadData, err := utils.AnyToJsonString(component.GetPayload())
 	if err != nil {
@@ -195,13 +140,16 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		storageMediaID = &sto.DocumentID
 	}
 
-	// create a new chat for the message if chat does not exist and associate the message with the new chat
-	var chatID *string
-	if chatExists {
-		chatID = &chat.DocumentID
+	newID, err := uuid.NewV7()
+	if err != nil {
+		u.zsLog.Errorf("[SendMessage] Failed to generate message ID: %v", err)
+		return true, err
 	}
-	serverError, err := u.SaveMessage(ctx, tenantID, dto.MessageSaveRequest{
-		ChatID:          chatID,
+	newIDStr := newID.String()
+	req := dto.MessageSaveRequest{
+		ID:              &newIDStr,
+		ChatID:          inputData.ChatID,
+		TicketID:        inputData.TicketID,
 		Wamid:           sendResponse.Messages[0].ID,
 		PhoneNumberId:   phoneNumberId,
 		RecipientId:     recipientId,
@@ -214,16 +162,25 @@ func (u *MessageUsecase) SendMessage(ctx context.Context, whatsappClient *whatsa
 		StorageMediaID:  storageMediaID,
 		Status:          "-",
 		CreatedAt:       time.Now(),
-	})
+	}
+	serverError, err := u.SaveMessage(ctx, tenantID, req)
 	if err != nil {
 		u.zsLog.Errorf("[SendMessage] Failed to save message: %v", err)
-		return response, serverError, err
+		return serverError, err
 	}
 
-	return response, false, nil
+	return false, nil
 }
 
-func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
+// GetMessagesByChatID returns paginated chat messages with role-based access control.
+//
+// Access rules:
+// - Admin: can view all messages.
+// - Agent: can view messages only when assigned to the chat (or chat is unassigned).
+// - Supervisor: can view only chats assigned to agents under their supervision.
+//
+// Storage media references are expanded with generated public URLs when available.
+func (u *ChatUsecase) GetMessagesByChatID(ctx context.Context, authData dto.AuthData, requestData filter_request.FilterRequest[dto.MessageGetByChatIDRequest]) (filter_request.FilterResponse[dto.MessageResponse], bool, error) {
 	chat, err := u.chatRepository.GetByID(ctx, requestData.SpecificFilter.ChatID)
 	if err != nil {
 		u.zsLog.Errorf("[GetMessagesByChatID] Failed to get chat by ID: %v", err)
@@ -318,34 +275,57 @@ func (u *MessageUsecase) GetMessagesByChatID(ctx context.Context, authData dto.A
 	return response, false, nil
 }
 
-func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error) {
-	if inputData.ID != nil && inputData.ChatID != nil {
-		message := model.Message{
-			DocumentID:      *inputData.ID,
-			Wamid:           inputData.Wamid,
-			ChatID:          *inputData.ChatID,
-			MessageType:     inputData.MessageType,
-			MessageCategory: inputData.MessageCategory,
-			SenderName:      inputData.SenderName,
-			Payload:         inputData.Payload,
-			StorageMediaID:  inputData.StorageMediaID,
-			Status:          inputData.Status,
-			Error:           inputData.Error,
-			CreatedAt:       inputData.CreatedAt,
-			SentAt:          inputData.SentAt,
-			DeliveredAt:     inputData.DeliveredAt,
-			ReadAt:          inputData.ReadAt,
+// SaveMessage persists an inbound/outbound message to chat storage.
+//
+// Behavior summary:
+// - If inputData.ID is provided, treats the operation as an upsert path.
+// - Delegates to ticket flow when TicketID is provided or tenant chat type is "ticket".
+// - Creates chat and a one-time "chat_created" system message for first-message scenarios.
+// - Persists records in Firestore transaction, then updates search index after commit.
+func (u *ChatUsecase) SaveMessage(ctx context.Context, tenantID string, inputData dto.MessageSaveRequest) (bool, error) {
+	if inputData.ID != nil {
+		if inputData.ChatID != nil {
+			message := model.Message{
+				DocumentID:      *inputData.ID,
+				Wamid:           inputData.Wamid,
+				ChatID:          *inputData.ChatID,
+				MessageType:     inputData.MessageType,
+				MessageCategory: inputData.MessageCategory,
+				SenderName:      inputData.SenderName,
+				Payload:         inputData.Payload,
+				StorageMediaID:  inputData.StorageMediaID,
+				Status:          inputData.Status,
+				Error:           inputData.Error,
+				CreatedAt:       inputData.CreatedAt,
+				SentAt:          inputData.SentAt,
+				DeliveredAt:     inputData.DeliveredAt,
+				ReadAt:          inputData.ReadAt,
+			}
+			// Update the last message of chat and insert new message
+			serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
+				var err error
+				if inputData.LastMessage != "" {
+					err = u.chatRepository.UpdateLastMessage(ctx, txFirestore, *inputData.ChatID, inputData.LastMessage)
+					if err != nil {
+						u.zsLog.Errorf("[SaveMessage] Failed to update chat last message: %v", err)
+						return true, err
+					}
+				}
+				_, err = u.messageRepository.Upsert(ctx, nil, message)
+				if err != nil {
+					u.zsLog.Errorf("[SaveMessage] Failed to upsert existing message: %v", err)
+					return true, err
+				}
+				_, err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
+				if err != nil {
+					u.zsLog.Errorf("[SaveMessage] Failed to add existing message to search index: %v", err)
+				}
+				return false, nil
+			})
+			return serverError, err
+		} else if inputData.TicketID != nil {
+			return u.ticketUsecase.SaveTicketMessage(ctx, tenantID, inputData)
 		}
-		_, err := u.messageRepository.Upsert(ctx, nil, message)
-		if err != nil {
-			u.zsLog.Errorf("[SaveMessage] Failed to upsert existing message: %v", err)
-			return true, err
-		}
-		_, err = u.searchMessageRepository.AddDocuments(ctx, []model.Message{message})
-		if err != nil {
-			u.zsLog.Errorf("[SaveMessage] Failed to add existing message to search index: %v", err)
-		}
-		return false, err
 	}
 	// TODO: check if chat belongs to tenant
 	// check tenant chat type
@@ -354,41 +334,15 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 		u.zsLog.Errorf("[SaveMessage] Failed to get tenant: %v", err)
 		return true, err
 	}
-	var chatID string
+	if tenant.ChatType == "ticket" {
+		return u.ticketUsecase.SaveTicketMessage(ctx, tenantID, inputData)
+	}
 	var chat model.Chat
-
-	if inputData.ChatID != nil {
-		chat, err = u.chatRepository.GetByID(ctx, *inputData.ChatID)
-		if err != nil {
-			if err == errs.ErrGenericNotFound {
-				u.zsLog.Warnf("[SaveMessage] No chat found for ID %s, will create new chat if tenant chat type is not ticket", *inputData.ChatID)
-				return false, err
-			}
-			u.zsLog.Errorf("[SaveMessage] Failed to get chat by ID: %v", err)
-			return true, err
-		}
-		chatID = chat.DocumentID
-	} else {
-		switch tenant.ChatType {
-		case "ticket":
-			chat, err = u.chatRepository.GetRunningTicketChat(ctx, inputData.PhoneNumberId, inputData.RecipientId)
-			switch err {
-			case nil:
-				chatID = chat.DocumentID
-			case errs.ErrGenericNotFound:
-				newChatID, genErr := uuid.NewV7()
-				if genErr != nil {
-					u.zsLog.Errorf("[SaveMessage] Failed to generate chat ID: %v", genErr)
-					return true, genErr
-				}
-				chatID = newChatID.String()
-			default:
-				u.zsLog.Errorf("[SaveMessage] Failed to get opened ticket chat: %v", err)
-				return true, err
-			}
-		default:
-			chatID = fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId)
-		}
+	chatID := fmt.Sprintf("%s-%s", inputData.RecipientId, inputData.PhoneNumberId)
+	chat, err = u.chatRepository.GetByID(ctx, chatID)
+	if err != nil && err != errs.ErrGenericNotFound {
+		u.zsLog.Errorf("[SaveMessage] Failed to get chat by ID: %v", err)
+		return true, err
 	}
 	if chat.DocumentID == "" {
 		// create new chat if not exist
@@ -398,41 +352,29 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 			PhoneNumberId: inputData.PhoneNumberId,
 			RecipientId:   inputData.RecipientId,
 			RecipientName: inputData.RecipientName,
-			ChatStatus:    model.ChatStatusOpen,
 			CreatedAt:     inputData.CreatedAt,
+			UpdatedAt:     inputData.CreatedAt,
 		}
 	}
-	// if previous chat type is empty, set chat type based on tenant chat type
-	if chat.ChatType == "" {
-		if tenant.ChatType == "ticket" {
-			chat.ChatType = "ticket"
-		} else {
-			chat.ChatType = "individual"
-		}
-	}
+	chat.ChatType = "individual"
 	if chat.RecipientName == "" {
 		chat.RecipientName = inputData.RecipientId
 	}
 	if inputData.UserLastMessageAt != nil {
 		chat.UserLastMessageAt = inputData.UserLastMessageAt
 	}
-	chat.LastMessage = inputData.LastMessage
-	chat.UpdatedAt = time.Now()
+	if inputData.LastMessage != "" {
+		chat.LastMessage = inputData.LastMessage
+	}
 
 	messageLogID, err := uuid.NewV7()
 	if err != nil {
 		u.zsLog.Errorf("[SaveMessage] Failed to generate message log ID: %v", err)
 		return true, err
 	}
-	// create system log message for new chat if chat is new, or chat type is ticket but no opened ticket chat found
-	// if chat is not new and chat type is not ticket, it means the chat is already created from previous message, so no need to create system log message
-	logData := model.MessageSystemData{}
-	if tenant.ChatType == "ticket" {
-		logData.Type = "ticket_created"
-		logData.Message = fmt.Sprintf("Ticket created with ID %s", chat.DocumentID)
-	} else {
-		logData.Type = "chat_created"
-		logData.Message = "Chat created"
+	logData := model.MessageSystemData{
+		Type:    "chat_created",
+		Message: "Chat created",
 	}
 	logPayload, err := utils.AnyToJsonString(logData)
 	if err != nil {
@@ -476,21 +418,17 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 			return true, genErr
 		}
 		message.DocumentID = newMessageID.String()
-		// if message ID is not provided, it means the message is created from incoming webhook, so we need to set created time to current time if it's not provided to make sure the message is sorted correctly in the chat
 		if message.CreatedAt.IsZero() {
 			message.CreatedAt = time.Now()
 		}
 	}
 	var messagesToIndex []model.Message
+	// Keep chat/message persistence atomic.
+	// Search indexing is performed after transaction commit as best-effort.
 	serverError, err := u.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
 		_, isNewChat, err := u.chatRepository.Upsert(ctx, txFirestore, chat)
 		if err != nil {
 			u.zsLog.Errorf("[SaveMessage] Failed to upsert chat: %v", err)
-			return true, err
-		}
-		_, err = u.messageRepository.Upsert(ctx, txFirestore, message)
-		if err != nil {
-			u.zsLog.Errorf("[SaveMessage] Failed to save message: %v", err)
 			return true, err
 		}
 		if isNewChat {
@@ -499,10 +437,13 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 				u.zsLog.Errorf("[SaveMessage] Failed to upsert message: %v", err)
 				return true, err
 			}
-		}
-		// TODO: check if adding system log message to search index is necessary or not
-		if isNewChat {
+			// TODO: check if adding system log message to search index is necessary or not
 			messagesToIndex = append(messagesToIndex, messageLog)
+		}
+		_, err = u.messageRepository.Upsert(ctx, txFirestore, message)
+		if err != nil {
+			u.zsLog.Errorf("[SaveMessage] Failed to save message: %v", err)
+			return true, err
 		}
 		messagesToIndex = append(messagesToIndex, message)
 		return false, nil
@@ -514,56 +455,62 @@ func (u *MessageUsecase) SaveMessage(ctx context.Context, tenantID string, input
 	return serverError, err
 }
 
-func (u *MessageUsecase) GetByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error) {
-	var message model.Message
-	tenant, err := u.tenantRepository.GetByID(ctx, tenantID)
+// GetMessageByWamid finds a message by WhatsApp message ID within a recipient chat scope.
+//
+// It derives chat ID from recipientId and phoneNumberId, validates tenant ownership,
+// then queries the message by WAMID.
+func (u *ChatUsecase) GetMessageByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.Message, bool, error) {
+	chatID := fmt.Sprintf("%s-%s", recipientId, phoneNumberId)
+	chat, err := u.chatRepository.GetByID(ctx, chatID)
 	if err != nil {
-		u.zsLog.Errorf("[GetByWamid] Failed to get tenant by phone number ID: %v", err)
-		return model.Message{}, true, err
+		u.zsLog.Errorf("[GetMessageByWamid] Failed to get chat by ID: %v", err)
+		return model.Message{}, err != errs.ErrGenericNotFound, err
 	}
-	var chatID string
-	if tenant.ChatType == "ticket" {
-		chat, err := u.chatRepository.GetRunningTicketChat(ctx, phoneNumberId, recipientId)
-		if err != nil && err != errs.ErrGenericNotFound {
-			u.zsLog.Errorf("[GetByWamid] Failed to get running ticket chat: %v", err)
-			return model.Message{}, true, err
-		}
-		if err == nil {
-			chatID = chat.DocumentID
-		}
+	if chat.TenantID != tenantID {
+		u.zsLog.Warnf("[GetMessageByWamid] WhatsApp business tenant ID %s does not match auth tenant ID %s", chat.TenantID, tenantID)
+		return model.Message{}, false, errs.ErrGenericForbidden
 	}
-	defaultChatID := fmt.Sprintf("%s-%s", recipientId, phoneNumberId)
-	if chatID == "" {
-		chatID = defaultChatID
-	}
-	var getErr error
-	// if tenant uses ticketing, it will use the recent open ticket association first to find the message,
-	// if not, it will search in the default chat associated with the phone number
-	for range 2 {
-		message, getErr = u.messageRepository.GetByWamid(ctx, chatID, wamid)
-		if getErr == nil {
-			break
-		}
-		if getErr != errs.ErrGenericNotFound {
-			return model.Message{}, true, getErr
-		}
-		if chatID == defaultChatID {
-			return model.Message{}, true, errs.ErrGenericNotFound
-		}
-		chatID = defaultChatID
+	message, err := u.messageRepository.GetMessageByWamid(ctx, chatID, wamid)
+	if err != nil {
+		u.zsLog.Errorf("[GetMessageByWamid] Failed to get message by wamid: %v", err)
+		return model.Message{}, err != errs.ErrGenericNotFound, err
 	}
 	return message, false, nil
 }
 
-func (u *MessageUsecase) CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID string) (bool, bool, error) {
-	chat, err := u.chatRepository.GetByID(ctx, chatID)
-	if err != nil {
-		u.zsLog.Errorf("[CheckCanSendMessage] Failed to get chat by ID: %v", err)
-		return false, true, err
-	}
-	if chat.TenantID != authData.TenantID {
-		u.zsLog.Warnf("[CheckCanSendMessage] WhatsApp business tenant ID %s does not match auth tenant ID %s", chat.TenantID, authData.TenantID)
-		return false, false, fmt.Errorf("no chat found for ID %s", chatID)
+// CheckCanSendMessage validates whether an authenticated user can send a message.
+//
+// Context can be provided using either chatID or ticketID. Authorization is role-based:
+// - Admin: always allowed.
+// - Agent: allowed only when assigned to the target chat/ticket.
+// - Supervisor: allowed only when assigned agent is under their supervision.
+func (u *ChatUsecase) CheckCanSendMessage(ctx context.Context, authData dto.AuthData, chatID *string, ticketID *string) (bool, bool, error) {
+	var assignedAgentID *string
+	if chatID != nil && *chatID != "" {
+		chat, err := u.chatRepository.GetByID(ctx, *chatID)
+		if err != nil {
+			u.zsLog.Errorf("[CheckCanSendMessage] Failed to get chat by ID: %v", err)
+			return false, true, err
+		}
+		if chat.TenantID != authData.TenantID {
+			u.zsLog.Warnf("[CheckCanSendMessage] WhatsApp business tenant ID %s does not match auth tenant ID %s", chat.TenantID, authData.TenantID)
+			return false, false, errs.ErrGenericForbidden
+		}
+		assignedAgentID = chat.AgentID
+	} else if ticketID != nil && *ticketID != "" {
+		ticket, err := u.ticketRepository.GetByID(ctx, *ticketID)
+		if err != nil {
+			u.zsLog.Errorf("[CheckCanSendMessage] Failed to get ticket by ID: %v", err)
+			return false, err != errs.ErrGenericNotFound, err
+		}
+		if ticket.TenantID != authData.TenantID {
+			u.zsLog.Warnf("[CheckCanSendMessage] Ticket tenant ID %s does not match auth tenant ID %s", ticket.TenantID, authData.TenantID)
+			return false, false, errs.ErrGenericForbidden
+		}
+		assignedAgentID = ticket.AgentID
+	} else {
+		u.zsLog.Warnf("[CheckCanSendMessage] Both chat ID and ticket ID are empty, cannot check if user can send message")
+		return false, false, fmt.Errorf("both chat ID and ticket ID are empty, cannot check if user can send message")
 	}
 	switch authData.Role {
 	case model.UserRoleAdmin:
@@ -571,14 +518,14 @@ func (u *MessageUsecase) CheckCanSendMessage(ctx context.Context, authData dto.A
 		return true, false, nil
 	case model.UserRoleAgent:
 		// Agent can only send message if they are assigned to the chat
-		if chat.AgentID != nil && *chat.AgentID == authData.UserID {
+		if assignedAgentID != nil && *assignedAgentID == authData.UserID {
 			return true, false, nil
 		}
-		u.zsLog.Warnf("[CheckCanSendMessage] Agent user ID %s is not assigned to chat ID %s", authData.UserID, chat.DocumentID)
+		u.zsLog.Warnf("[CheckCanSendMessage] Agent user ID %s is not assigned to chat ID %s", authData.UserID, chatID)
 		return false, false, errs.ErrGenericForbidden
 	case model.UserRoleSupervisor:
-		if chat.AgentID == nil {
-			u.zsLog.Warnf("[CheckCanSendMessage] Chat ID %s is not assigned to any agent, supervisor user ID %s cannot send message", chat.DocumentID, authData.UserID)
+		if assignedAgentID == nil {
+			u.zsLog.Warnf("[CheckCanSendMessage] Chat ID %s is not assigned to any agent, supervisor user ID %s cannot send message to the chat", chatID, authData.UserID)
 			return false, false, errs.ErrGenericForbidden
 		}
 		// Supervisor can send message in the chats that they supervise
@@ -588,14 +535,15 @@ func (u *MessageUsecase) CheckCanSendMessage(ctx context.Context, authData dto.A
 			return false, true, err
 		}
 		for _, agent := range agents {
-			if agent.DocumentID == *chat.AgentID {
+			if agent.DocumentID == *assignedAgentID {
 				return true, false, nil
 			}
 		}
-		u.zsLog.Warnf("[CheckCanSendMessage] Supervisor user ID %s does not supervise agent assigned to chat ID %s", authData.UserID, chat.DocumentID)
+		u.zsLog.Warnf("[CheckCanSendMessage] Supervisor user ID %s does not supervise agent assigned to chat ID %s", authData.UserID, chatID)
 		return false, false, errs.ErrGenericForbidden
 	default:
 		u.zsLog.Warnf("[CheckCanSendMessage] Unauthorized role %s for checking can send message", authData.Role)
 		return false, false, fmt.Errorf("unauthorized role %s for checking can send message", authData.Role)
 	}
+
 }

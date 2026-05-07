@@ -11,10 +11,10 @@ type Chat struct {
 	RecipientName     string     `json:"recipient_name" firestore:"recipient_name"`
 	TenantID          string     `json:"tenant_id" firestore:"tenant_id"`
 	AgentID           *string    `json:"agent_id,omitempty" firestore:"agent_id,omitempty"`
-	ChatType          string     `json:"chat_type" firestore:"chat_type"` // individual, group, ticket
+	ChatType          string     `json:"chat_type" firestore:"chat_type"`     // individual, group
+	ChatStatus        ChatStatus `json:"chat_status" firestore:"chat_status"` // open, in_progress, closed
 	LastMessage       string     `json:"last_message" firestore:"last_message"`
 	UserLastMessageAt *time.Time `json:"user_last_message_at" firestore:"user_last_message_at"` // to calculate csw
-	ChatStatus        ChatStatus `json:"chat_status" firestore:"chat_status"`
 	CreatedAt         time.Time  `json:"created_at" firestore:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at" firestore:"updated_at"`
 }
@@ -28,7 +28,7 @@ const (
 )
 
 func (c *Chat) AllowedFilterFields() []string {
-	return []string{"phone_number_id", "chat_type", "chat_status", "agent_id"}
+	return []string{"phone_number_id", "chat_status", "chat_type", "agent_id"}
 }
 
 func (c *Chat) AllowedSortFields() []string {
