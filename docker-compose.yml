@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    depends_on:
+      - meili-search
   meili-search:
     image: getmeili/meilisearch:v1.42.1
     container_name: meili-search
