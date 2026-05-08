@@ -82,10 +82,10 @@ func (s *googleTaskService) CreateReminderSLATask(scheduleTime time.Time) error 
 	}
 	req := &cloudtasks.CreateTaskRequest{
 		Task: &cloudtasks.Task{
-			Name:         s.cfg.ScheduleTaskParent + "/tasks/" + "reminder-sla",
+			Name:         s.cfg.ScheduleTaskParent + "/tasks/" + "reminder-sla-" + time.Now().Format("20060102150405"),
 			ScheduleTime: scheduleTime.Format(time.RFC3339), // Schedule task to run at specified time
 			HttpRequest: &cloudtasks.HttpRequest{
-				Url:        s.baseURL + "/api/v1/chat/reminder-sla",
+				Url:        s.baseURL + "/api/v1/ticket/reminder-sla",
 				HttpMethod: http.MethodPost,
 				Headers: map[string]string{
 					"Authorization": "Bearer " + encryptedToken,
