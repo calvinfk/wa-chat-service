@@ -58,6 +58,7 @@ type (
 	GCP struct {
 		ProjectID           string `env:"GCP_PROJECT_ID,required"`
 		BroadcastTaskParent string `env:"GCP_TASK_BROADCAST_PARENT,required"`
+		ScheduleTaskParent  string `env:"GCP_TASK_SCHEDULE_PARENT,required"`
 		DefaultBucket       string // default bucket for general use
 	}
 
@@ -265,6 +266,7 @@ func gcpEnv() (GCP, error) {
 	config := GCP{
 		ProjectID:           os.Getenv("GCP_PROJECT_ID"),
 		BroadcastTaskParent: os.Getenv("GCP_TASK_BROADCAST_PARENT"),
+		ScheduleTaskParent:  os.Getenv("GCP_TASK_SCHEDULE_PARENT"),
 	}
 	errors := []string{}
 	if config.ProjectID == "" {
@@ -272,6 +274,9 @@ func gcpEnv() (GCP, error) {
 	}
 	if config.BroadcastTaskParent == "" {
 		errors = append(errors, "GCP_TASK_BROADCAST_PARENT is required")
+	}
+	if config.ScheduleTaskParent == "" {
+		errors = append(errors, "GCP_TASK_SCHEDULE_PARENT is required")
 	}
 	config.DefaultBucket = config.ProjectID + ".firebasestorage.app"
 	if len(errors) > 0 {

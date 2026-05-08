@@ -65,6 +65,8 @@ type (
 		CreateBroadcastTask(broadcastID string, scheduleTime time.Time) error
 		// DeleteBroadcastTask deletes a broadcast task from Google Cloud Tasks based on the provided broadcast ID.
 		DeleteBroadcastTask(broadcastID string) error
+		// CreateReminderSLATask creates a new reminder SLA task in Google Cloud Tasks scheduled to run at the specified time.
+		CreateReminderSLATask(scheduleTime time.Time) error
 	}
 
 	// JWT is an interface that defines methods for generating and parsing JSON Web Tokens.

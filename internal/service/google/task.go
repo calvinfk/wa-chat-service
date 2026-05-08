@@ -70,3 +70,33 @@ func (s *googleTaskService) DeleteBroadcastTask(broadcastID string) error {
 	}
 	return nil
 }
+
+func (s *googleTaskService) CreateReminderSLATask(scheduleTime time.Time) error {
+	token, err := s.jwtService.GenerateJWT("reminder-sla", scheduleTime.Add(time.Second*20).Unix())
+	if err != nil {
+		return err
+	}
+	encryptedToken, err := s.encryptService.Encrypt(token)
+	if err != nil {
+		return err
+	}
+	req := &cloudtasks.CreateTaskRequest{
+		Task: &cloudtasks.Task{
+			Name:         s.cfg.ScheduleTaskParent + "/tasks/" + "reminder-sla",
+			ScheduleTime: scheduleTime.Format(time.RFC3339), // Schedule task to run at specified time
+			HttpRequest: &cloudtasks.HttpRequest{
+				Url:        s.baseURL + "/api/v1/chat/reminder-sla",
+				HttpMethod: http.MethodPost,
+				Headers: map[string]string{
+					"Authorization": "Bearer " + encryptedToken,
+				},
+			},
+		},
+	}
+	_, err = s.client.Projects.Locations.Queues.Tasks.Create(s.cfg.ScheduleTaskParent, req).Do()
+	if err != nil {
+		s.zsLog.Errorf("[CreateReminderSLATask] error creating reminder SLA task: %v", err)
+		return err
+	}
+	return nil
+}

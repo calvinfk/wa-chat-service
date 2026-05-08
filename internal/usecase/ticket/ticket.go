@@ -326,7 +326,13 @@ func (uc *TicketUsecase) AssignAgent(ctx context.Context, tenantID string, reque
 }
 
 func (uc *TicketUsecase) RemindSLA(ctx context.Context) (bool, error) {
+	// Create new google task for a new reminder
 	respondTime := 5 * time.Minute
+	err := uc.googleTaskService.CreateReminderSLATask(time.Now().Add(respondTime))
+	if err != nil {
+		uc.zsLog.Errorf("[RemindSLA] error while creating Google Task for next reminder: %v", err)
+		return true, err
+	}
 	tickets, err := uc.ticketRepository.GetTicketsNeedAttention(ctx, respondTime)
 	if err != nil {
 		uc.zsLog.Errorf("[RemindSLA] error while fetching tickets needing supervisor attention: %v", err)
@@ -342,7 +348,8 @@ func (uc *TicketUsecase) RemindSLA(ctx context.Context) (bool, error) {
 		if ticket.AgentLastMessageAt != nil {
 			lastAgentMessageAt = *ticket.AgentLastMessageAt
 		}
-		// TODO: Add logic to identify the supervisor(s) for this ticket and send them a notification about the pending ticket that needs attention.
+		// If the ticket has an assigned agent, remind the supervisor to follow up with the agent.
+		// If not, remind the admin to assign the ticket to an agent.
 		if ticket.AgentID != nil {
 			// Remind the supervisor to follow up with the assigned agent
 			agent, err := uc.userRepository.GetByID(ctx, *ticket.AgentID)
@@ -365,8 +372,5 @@ func (uc *TicketUsecase) RemindSLA(ctx context.Context) (bool, error) {
 			uc.zsLog.Warnf("[RemindSLA] Admin, please assign ticket %s to an agent as it has not been assigned for %v since creation at %v.", ticket.DocumentID, time.Since(ticket.CreatedAt), ticket.CreatedAt)
 		}
 	}
-
-	// TODO: Create new google task for a new reminder
-
 	return false, nil
 }
