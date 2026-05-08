@@ -26,7 +26,9 @@ func NewJWTService(cfg *config.JOSE, zsLog *zap.SugaredLogger) *jwtService {
 func (s *jwtService) GenerateJWT(sub any, expiredAt int64) (string, error) {
 	token := jwt.New()
 	token.Set(jwt.SubjectKey, sub)
-	token.Set(jwt.ExpirationKey, expiredAt)
+	if expiredAt > 0 {
+		token.Set(jwt.ExpirationKey, expiredAt)
+	}
 	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256(), s.cfg.RSAPrivateKey))
 	if err != nil {
 		s.zsLog.Errorf("[GenerateJWT] error signing JWT: %v", err)

@@ -74,6 +74,9 @@ func (uc *TicketUsecase) SaveTicketMessage(ctx context.Context, tenantID string,
 	if inputData.UserLastMessageAt != nil {
 		ticket.UserLastMessageAt = inputData.UserLastMessageAt
 	}
+	if inputData.AgentLastMessageAt != nil {
+		ticket.AgentLastMessageAt = inputData.AgentLastMessageAt
+	}
 	if inputData.LastMessage != "" {
 		ticket.LastMessage = inputData.LastMessage
 	}

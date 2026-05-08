@@ -156,6 +156,8 @@ type (
 		GetTicketDataAnalytics(ctx context.Context, phoneNumberIds []string, startTime time.Time, endTime time.Time) ([]model.Ticket, error)
 		// Update last message info of a ticket by ticket ID.
 		UpdateLastMessage(ctx context.Context, tx *firestore.Transaction, ticketID string, lastMessage string) error
+		// GetTicketsNeedAttention gets tickets that are pending and have exceeded the SLA response time
+		GetTicketsNeedAttention(ctx context.Context, respondTime time.Duration) ([]model.Ticket, error)
 	}
 
 	TicketMessage interface {

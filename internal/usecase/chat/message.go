@@ -148,22 +148,24 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, whatsappClient *whatsapp_
 		return true, err
 	}
 	newIDStr := newID.String()
+	now := time.Now()
 	req := dto.MessageSaveRequest{
-		ID:              &newIDStr,
-		ChatID:          inputData.ChatID,
-		TicketID:        inputData.TicketID,
-		Wamid:           sendResponse.Messages[0].ID,
-		PhoneNumberId:   phoneNumberId,
-		RecipientId:     recipientId,
-		RecipientName:   recipientName,
-		LastMessage:     component.GetMessage(),
-		MessageType:     string(component.GetType()),
-		MessageCategory: "-",
-		SenderName:      inputData.SenderName,
-		Payload:         payloadData,
-		StorageMediaID:  storageMediaID,
-		Status:          "-",
-		CreatedAt:       time.Now(),
+		ID:                 &newIDStr,
+		ChatID:             inputData.ChatID,
+		TicketID:           inputData.TicketID,
+		Wamid:              sendResponse.Messages[0].ID,
+		PhoneNumberId:      phoneNumberId,
+		RecipientId:        recipientId,
+		RecipientName:      recipientName,
+		LastMessage:        component.GetMessage(),
+		AgentLastMessageAt: &now, // if the message sent by this API, it means the message is sent by agent, so set agent last message time to now.
+		MessageType:        string(component.GetType()),
+		MessageCategory:    "-",
+		SenderName:         inputData.SenderName,
+		Payload:            payloadData,
+		StorageMediaID:     storageMediaID,
+		Status:             "-",
+		CreatedAt:          now,
 	}
 	serverError, err := u.SaveMessage(ctx, tenantID, req)
 	if err != nil {

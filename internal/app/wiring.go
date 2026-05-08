@@ -221,6 +221,7 @@ func newDefaultUsecases(cfg *config.Config, zsLog *zap.SugaredLogger, clients cl
 		repositories.WaBusinessAccount,
 		repositories.WaPhone,
 		repositories.User,
+		services.GoogleTask,
 		clients.txManager,
 		zsLog,
 	)

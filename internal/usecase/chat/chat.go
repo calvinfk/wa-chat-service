@@ -268,7 +268,7 @@ func (uc *ChatUsecase) AssignAgent(ctx context.Context, tenantID string, request
 		})
 	} else {
 		logPayload, err = utils.AnyToJsonString(model.MessageSystemData{
-			Type:    "move_agent",
+			Type:    "assign_agent",
 			Message: fmt.Sprintf("Agent %s assigned to chat", agent.Name),
 		})
 	}
@@ -281,6 +281,7 @@ func (uc *ChatUsecase) AssignAgent(ctx context.Context, tenantID string, request
 		ChatID:      chat.DocumentID,
 		MessageType: "system_flag",
 		Payload:     logPayload,
+		CreatedAt:   time.Now(),
 	}
 	serverError, err := uc.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
 		_, _, err = uc.chatRepository.Upsert(ctx, txFirestore, chat)

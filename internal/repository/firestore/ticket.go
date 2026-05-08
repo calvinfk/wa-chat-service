@@ -37,11 +37,16 @@ func (r *TicketRepository) Upsert(ctx context.Context, tx *firestore.Transaction
 	updates := []firestore.Update{
 		{Path: "agent_id", Value: ticket.AgentID},
 		{Path: "last_message", Value: ticket.LastMessage},
-		{Path: "user_last_message_at", Value: ticket.UserLastMessageAt},
 		{Path: "updated_at", Value: ticket.UpdatedAt},
 	}
 	if ticket.TicketStatus != "" {
 		updates = append(updates, firestore.Update{Path: "ticket_status", Value: ticket.TicketStatus})
+	}
+	if ticket.UserLastMessageAt != nil {
+		updates = append(updates, firestore.Update{Path: "user_last_message_at", Value: ticket.UserLastMessageAt})
+	}
+	if ticket.AgentLastMessageAt != nil {
+		updates = append(updates, firestore.Update{Path: "agent_last_message_at", Value: ticket.AgentLastMessageAt})
 	}
 	if tx != nil {
 		if created {
@@ -135,4 +140,38 @@ func (r *TicketRepository) UpdateLastMessage(ctx context.Context, tx *firestore.
 	}
 	_, err := docRef.Update(ctx, updates)
 	return err
+}
+
+func (r *TicketRepository) GetTicketsNeedAttention(ctx context.Context, respondTime time.Duration) ([]model.Ticket, error) {
+	var tickets []model.Ticket
+	iter := r.db.Collection(r.ticket.TableName()).
+		Where("ticket_status", "in", []model.TicketStatus{model.TicketStatusOpen, model.TicketStatusInProgress}).
+		Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var ticket model.Ticket
+		docData := doc.Data()
+		docData["id"] = doc.Ref.ID
+		err = utils.MapToStruct(docData, &ticket)
+		if err != nil {
+			return nil, err
+		}
+		currentTime := time.Now()
+		if ticket.UserLastMessageAt == nil || currentTime.Sub(*ticket.UserLastMessageAt) < respondTime {
+			continue // skip tickets that don't have user messages or haven't exceeded max response time
+		}
+		// check if agent has responded after the last user message
+		if ticket.AgentLastMessageAt != nil && ticket.AgentLastMessageAt.After(*ticket.UserLastMessageAt) {
+			continue // skip tickets that have agent responses after the last user message
+		}
+
+		tickets = append(tickets, ticket)
+	}
+	return tickets, nil
 }

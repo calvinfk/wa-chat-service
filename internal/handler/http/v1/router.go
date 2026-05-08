@@ -43,6 +43,6 @@ func New(api fiber.Router, routerHandler HandlerHTTPV1, config *config.Config) {
 	authHandler.RegisterRoutes(api)
 	userHandler := NewUserHandler(routerHandler.UserUsecase)
 	userHandler.RegisterRoute(api)
-	ticketHandler := NewTicketHandler(routerHandler.TicketUsecase, routerHandler.ZSLog)
+	ticketHandler := NewTicketHandler(routerHandler.TicketUsecase, routerHandler.EncryptService, routerHandler.JWTService, routerHandler.ZSLog)
 	ticketHandler.RegisterRoute(api)
 }

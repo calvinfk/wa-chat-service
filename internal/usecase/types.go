@@ -186,5 +186,9 @@ type (
 		// GetTicketMessageByWamid retrieves a ticket message by WAMID
 		// Returns the ticket message model, a server-error flag (true if error is from server), and an error.
 		GetTicketMessageByWamid(ctx context.Context, tenantID string, phoneNumberId string, recipientId string, wamid string) (model.TicketMessage, bool, error)
+		// RemindSLA sends a reminder to the supervisor about pending tickets that need attention (SLA).
+		// Either an opened ticket that haven't been assigned an agent or an assigned ticket that haven't received a response from the agent within a certain time threshold will be reminded.
+		// Returns a server-error flag (true if error is from server) and an error.
+		RemindSLA(ctx context.Context) (bool, error)
 	}
 )

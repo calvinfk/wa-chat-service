@@ -1,9 +1,11 @@
 package http_v1
 
 import (
+	"net/http"
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/handler/http/middleware"
 	"wa_chat_service/internal/model"
+	"wa_chat_service/internal/service"
 	"wa_chat_service/internal/usecase"
 	"wa_chat_service/pkg/api_response"
 
@@ -12,14 +14,18 @@ import (
 )
 
 type TicketHandler struct {
-	ticketUsecase usecase.Ticket
-	zsLog         *zap.SugaredLogger
+	ticketUsecase  usecase.Ticket
+	encryptService service.Encrypt
+	jwtService     service.JWT
+	zsLog          *zap.SugaredLogger
 }
 
-func NewTicketHandler(ticketUsecase usecase.Ticket, zsLog *zap.SugaredLogger) HandlerV1 {
+func NewTicketHandler(ticketUsecase usecase.Ticket, encryptService service.Encrypt, jwtService service.JWT, zsLog *zap.SugaredLogger) HandlerV1 {
 	return &TicketHandler{
-		ticketUsecase: ticketUsecase,
-		zsLog:         zsLog,
+		ticketUsecase:  ticketUsecase,
+		encryptService: encryptService,
+		jwtService:     jwtService,
+		zsLog:          zsLog,
 	}
 }
 
@@ -29,6 +35,7 @@ func (h *TicketHandler) RegisterRoute(api fiber.Router) {
 		ticketGroup.Post("/close", middleware.Protected(), middleware.Role(model.UserRoleAgent), h.closeTicket)
 		ticketGroup.Post("/assign-agent", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.assignAgent)
 		ticketGroup.Get("/analytics", middleware.Protected(), middleware.Role(model.UserRoleAdmin), h.getAnalytics)
+		ticketGroup.Post("/remind-sla", middleware.Jwt(h.encryptService, h.jwtService, http.StatusOK, true, h.zsLog), h.remindSla)
 	}
 }
 
@@ -78,4 +85,12 @@ func (h *TicketHandler) getAnalytics(ctx fiber.Ctx) error {
 	}
 	code, response := api_response.NewApiResponse("Successfully retrieved ticket analytics", data)
 	return ctx.Status(code).JSON(response)
+}
+
+func (h *TicketHandler) remindSla(ctx fiber.Ctx) error {
+	go func() {
+		h.ticketUsecase.RemindSLA(ctx.Context())
+	}()
+	ctx.Status(http.StatusOK)
+	return nil
 }

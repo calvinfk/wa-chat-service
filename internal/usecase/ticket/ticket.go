@@ -8,6 +8,7 @@ import (
 	"wa_chat_service/internal/dto"
 	"wa_chat_service/internal/model"
 	"wa_chat_service/internal/repository"
+	"wa_chat_service/internal/service"
 	"wa_chat_service/pkg/errs"
 	"wa_chat_service/pkg/utils"
 
@@ -23,12 +24,23 @@ type TicketUsecase struct {
 	waBusinessAccountRepository   repository.WaBusinessAccount
 	waPhoneRepository             repository.WaPhone
 	userRepository                repository.User
+	googleTaskService             service.GoogleTask
 	txManager                     *utils.TxManager
 	zsLog                         *zap.SugaredLogger
 }
 
 // NewTicketUsecase wires ticket-related repositories and utilities into a TicketUsecase.
-func NewTicketUsecase(ticketRepository repository.Ticket, ticketMessageRepository repository.TicketMessage, searchTicketMessageRepository repository.SearchTicketMessage, waBusinessAccountRepository repository.WaBusinessAccount, waPhoneRepository repository.WaPhone, userRepository repository.User, txManager *utils.TxManager, zsLog *zap.SugaredLogger) *TicketUsecase {
+func NewTicketUsecase(
+	ticketRepository repository.Ticket,
+	ticketMessageRepository repository.TicketMessage,
+	searchTicketMessageRepository repository.SearchTicketMessage,
+	waBusinessAccountRepository repository.WaBusinessAccount,
+	waPhoneRepository repository.WaPhone,
+	userRepository repository.User,
+	googleTaskService service.GoogleTask,
+	txManager *utils.TxManager,
+	zsLog *zap.SugaredLogger,
+) *TicketUsecase {
 	return &TicketUsecase{
 		ticketRepository:              ticketRepository,
 		ticketMessageRepository:       ticketMessageRepository,
@@ -36,6 +48,7 @@ func NewTicketUsecase(ticketRepository repository.Ticket, ticketMessageRepositor
 		waBusinessAccountRepository:   waBusinessAccountRepository,
 		waPhoneRepository:             waPhoneRepository,
 		userRepository:                userRepository,
+		googleTaskService:             googleTaskService,
 		txManager:                     txManager,
 		zsLog:                         zsLog,
 	}
@@ -272,8 +285,8 @@ func (uc *TicketUsecase) AssignAgent(ctx context.Context, tenantID string, reque
 		})
 	} else {
 		logPayload, err = utils.AnyToJsonString(model.MessageSystemData{
-			Type:    "move_agent",
-			Message: fmt.Sprintf("Agent %s assigned to chat", agent.Name),
+			Type:    "assign_agent",
+			Message: fmt.Sprintf("Agent %s assigned to ticket", agent.Name),
 		})
 	}
 	if err != nil {
@@ -285,6 +298,7 @@ func (uc *TicketUsecase) AssignAgent(ctx context.Context, tenantID string, reque
 		TicketID:    ticket.DocumentID,
 		MessageType: "system_flag",
 		Payload:     logPayload,
+		CreatedAt:   time.Now(),
 	}
 	// Keep assignment change and audit message consistent in a single transaction.
 	serverError, err := uc.txManager.DoFirestore(ctx, func(ctx context.Context, txFirestore *firestore.Transaction) (bool, error) {
@@ -308,5 +322,51 @@ func (uc *TicketUsecase) AssignAgent(ctx context.Context, tenantID string, reque
 	if err != nil {
 		return serverError, err
 	}
+	return false, nil
+}
+
+func (uc *TicketUsecase) RemindSLA(ctx context.Context) (bool, error) {
+	respondTime := 5 * time.Minute
+	tickets, err := uc.ticketRepository.GetTicketsNeedAttention(ctx, respondTime)
+	if err != nil {
+		uc.zsLog.Errorf("[RemindSLA] error while fetching tickets needing supervisor attention: %v", err)
+		return true, err
+	}
+	if len(tickets) == 0 {
+		uc.zsLog.Infof("[RemindSLA] no tickets need supervisor attention at this time")
+		return false, nil
+	}
+	// For simplicity, we just log the reminder here. In a real implementation, this could be an email or in-app notification to the supervisor.
+	for _, ticket := range tickets {
+		lastAgentMessageAt := ticket.CreatedAt
+		if ticket.AgentLastMessageAt != nil {
+			lastAgentMessageAt = *ticket.AgentLastMessageAt
+		}
+		// TODO: Add logic to identify the supervisor(s) for this ticket and send them a notification about the pending ticket that needs attention.
+		if ticket.AgentID != nil {
+			// Remind the supervisor to follow up with the assigned agent
+			agent, err := uc.userRepository.GetByID(ctx, *ticket.AgentID)
+			if err != nil {
+				uc.zsLog.Errorf("[RemindSLA] error while fetching agent info for ticket %s: %v", ticket.DocumentID, err)
+				continue
+			}
+			if agent.SupervisorID == nil {
+				uc.zsLog.Warnf("[RemindSLA] Agent %s assigned to ticket %s has no supervisor assigned. Please assign a supervisor to the agent.", agent.Name, ticket.DocumentID)
+				continue
+			}
+			supervisor, err := uc.userRepository.GetByID(ctx, *agent.SupervisorID)
+			if err != nil {
+				uc.zsLog.Errorf("[RemindSLA] error while fetching supervisor info for agent %s: %v", agent.DocumentID, err)
+				continue
+			}
+			uc.zsLog.Warnf("[RemindSLA] Supervisor %s, please follow up on ticket %s assigned to agent %s that has not received a response for %v since last agent message at %v.", supervisor.Name, ticket.DocumentID, agent.Name, time.Since(lastAgentMessageAt), lastAgentMessageAt)
+		} else {
+			// Remind the admin to assign the ticket to an agent
+			uc.zsLog.Warnf("[RemindSLA] Admin, please assign ticket %s to an agent as it has not been assigned for %v since creation at %v.", ticket.DocumentID, time.Since(ticket.CreatedAt), ticket.CreatedAt)
+		}
+	}
+
+	// TODO: Create new google task for a new reminder
+
 	return false, nil
 }
